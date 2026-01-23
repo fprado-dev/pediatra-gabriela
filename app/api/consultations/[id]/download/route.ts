@@ -109,8 +109,12 @@ export async function GET(
       const x = options.x || leftMargin;
       const maxWidth = options.maxWidth || (rightMargin - leftMargin);
 
-      // Quebra de linha automática
-      const words = text.split(' ');
+      // Substituir quebras de linha por espaço para processamento
+      // PDF não aceita \n diretamente no WinAnsi
+      const cleanText = text.replace(/\n/g, ' ').replace(/\r/g, '');
+
+      // Quebra de linha automática por palavras
+      const words = cleanText.split(' ').filter(w => w.length > 0);
       let line = '';
       const lines: string[] = [];
 

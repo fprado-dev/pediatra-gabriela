@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { compressAudio, shouldCompress, formatFileSize } from "@/lib/utils/audio-compressor";
 
 interface AudioUploaderProps {
   onUploadComplete: (audioBlob: Blob, duration: number) => void;
@@ -39,8 +40,13 @@ const MAX_DURATION = 30 * 60; // 30 minutos em segundos
 
 export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState(0);
+  const [originalSize, setOriginalSize] = useState<number>(0);
+  const [compressedSize, setCompressedSize] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +71,7 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
   const processFile = useCallback(async (file: File) => {
     setError(null);
     setIsProcessing(true);
+    setOriginalSize(file.size);
 
     try {
       // Validar arquivo
@@ -82,7 +89,7 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
 
       // Obter duração do áudio
       const audio = new Audio(url);
-      audio.addEventListener("loadedmetadata", () => {
+      audio.addEventListener("loadedmetadata", async () => {
         const audioDuration = Math.floor(audio.duration);
         setDuration(audioDuration);
 
@@ -92,9 +99,40 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
           setSelectedFile(null);
           setAudioUrl(null);
           URL.revokeObjectURL(url);
+          setIsProcessing(false);
+          return;
         }
 
         setIsProcessing(false);
+
+        // Comprimir áudio se necessário
+        if (shouldCompress(file)) {
+          setIsCompressing(true);
+          setCompressionProgress(0);
+          
+          try {
+            console.log("🗜️  Iniciando compressão automática...");
+            toast.info("Comprimindo áudio para acelerar o upload...");
+
+            const result = await compressAudio(file, {
+              bitrate: 96, // 96 kbps é ideal para transcrição de voz
+              onProgress: (progress) => setCompressionProgress(progress),
+            });
+
+            setCompressedBlob(result.compressedBlob);
+            setCompressedSize(result.compressedSize);
+            setIsCompressing(false);
+
+            toast.success(
+              `Áudio comprimido! Economia de ${result.compressionRatio.toFixed(0)}%`
+            );
+          } catch (err) {
+            console.error("Erro na compressão:", err);
+            toast.warning("Não foi possível comprimir. Usando arquivo original.");
+            setIsCompressing(false);
+            setCompressedBlob(null);
+          }
+        }
       });
 
       audio.addEventListener("error", () => {
@@ -143,8 +181,12 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
       URL.revokeObjectURL(audioUrl);
     }
     setSelectedFile(null);
+    setCompressedBlob(null);
     setAudioUrl(null);
     setDuration(0);
+    setOriginalSize(0);
+    setCompressedSize(0);
+    setCompressionProgress(0);
     setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -155,14 +197,14 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
     if (!selectedFile) return;
 
     try {
-      // Converter File para Blob
-      const blob = new Blob([selectedFile], { type: selectedFile.type });
+      // Usar blob comprimido se disponível, senão usar original
+      const blob = compressedBlob || new Blob([selectedFile], { type: selectedFile.type });
       onUploadComplete(blob, duration);
     } catch (err) {
       console.error("Erro ao confirmar upload:", err);
       toast.error("Erro ao processar arquivo");
     }
-  }, [selectedFile, duration, onUploadComplete]);
+  }, [selectedFile, compressedBlob, duration, onUploadComplete]);
 
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -170,10 +212,6 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const formatFileSize = (bytes: number): string => {
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(2)} MB`;
-  };
 
   return (
     <Card>
@@ -293,8 +331,55 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
                   />
                 )}
 
+                {/* Compressão em andamento */}
+                {isCompressing && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Comprimindo áudio...
+                      </span>
+                      <span className="font-medium">{compressionProgress}%</span>
+                    </div>
+                    <Progress value={compressionProgress} className="h-2" />
+                    <p className="text-xs text-muted-foreground">
+                      Reduzindo tamanho para acelerar upload
+                    </p>
+                  </div>
+                )}
+
+                {/* Compressão concluída */}
+                {!isCompressing && compressedBlob && compressedSize > 0 && (
+                  <div className="mt-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0 text-sm">
+                        <p className="font-medium text-green-900 dark:text-green-100 mb-1">
+                          Áudio comprimido com sucesso!
+                        </p>
+                        <div className="space-y-1 text-xs text-green-700 dark:text-green-300">
+                          <div className="flex items-center justify-between">
+                            <span>Original:</span>
+                            <span className="font-mono">{formatFileSize(originalSize)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Comprimido:</span>
+                            <span className="font-mono font-semibold">{formatFileSize(compressedSize)}</span>
+                          </div>
+                          <div className="flex items-center justify-between pt-1 border-t border-green-200 dark:border-green-800">
+                            <span>Economia:</span>
+                            <span className="font-semibold">
+                              {((1 - compressedSize / originalSize) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Status */}
-                {duration > 0 && (
+                {duration > 0 && !isCompressing && (
                   <div className="flex items-center gap-2 mt-3 text-sm text-green-600">
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Arquivo válido e pronto para enviar</span>

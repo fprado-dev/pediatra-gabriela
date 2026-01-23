@@ -10,8 +10,9 @@ export const dynamic = 'force-dynamic';
 export default async function EditPatientPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = await createClient();
 
   const {
@@ -26,7 +27,7 @@ export default async function EditPatientPage({
   const { data: patient, error } = await supabase
     .from("patients")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("doctor_id", user.id)
     .eq("is_active", true)
     .single();
@@ -39,7 +40,7 @@ export default async function EditPatientPage({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href={`/dashboard/patients/${params.id}`}>
+        <Link href={`/dashboard/patients/${id}`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-5 w-5" />
           </Button>

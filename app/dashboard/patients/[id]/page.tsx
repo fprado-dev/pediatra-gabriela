@@ -26,8 +26,9 @@ export const dynamic = 'force-dynamic';
 export default async function PatientProfilePage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = await createClient();
 
   const {
@@ -42,7 +43,7 @@ export default async function PatientProfilePage({
   const { data: patient, error } = await supabase
     .from("patients")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("doctor_id", user.id)
     .eq("is_active", true)
     .single();
@@ -112,13 +113,13 @@ export default async function PatientProfilePage({
           </div>
         </div>
         <div className="flex gap-2">
-          <Link href={`/dashboard/patients/${patient.id}/edit`}>
+          <Link href={`/dashboard/patients/${id}/edit`}>
             <Button>
               <Edit className="h-4 w-4 mr-2" />
               Editar
             </Button>
           </Link>
-          <DeletePatientButton patientId={patient.id} patientName={patient.full_name} />
+          <DeletePatientButton patientId={id} patientName={patient.full_name} />
         </div>
       </div>
 

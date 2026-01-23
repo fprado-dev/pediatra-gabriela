@@ -26,7 +26,6 @@ const navigation = [
     name: "Consultas",
     href: "/dashboard/consultations",
     icon: FileText,
-    disabled: true, // Ainda não implementado
   },
   {
     name: "Configurações",
@@ -50,19 +49,6 @@ export function Sidebar() {
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navigation.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-          
-          if (item.disabled) {
-            return (
-              <div
-                key={item.name}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground opacity-50 cursor-not-allowed"
-              >
-                <item.icon className="h-5 w-5" />
-                {item.name}
-                <span className="ml-auto text-xs">(Em breve)</span>
-              </div>
-            );
-          }
 
           return (
             <Link
@@ -85,7 +71,7 @@ export function Sidebar() {
       {/* Footer info */}
       <div className="border-t p-4">
         <p className="text-xs text-muted-foreground text-center">
-          v0.2.0 - Módulo de Pacientes
+          v0.3.0 - Consultas com IA
         </p>
       </div>
     </div>

@@ -206,7 +206,7 @@ export async function GET(
     if (patient?.phone) addText(`Telefone: ${patient.phone}`);
     if (patient?.email) addText(`Email: ${patient.email}`);
     if (patient?.blood_type) addText(`Tipo Sanguíneo: ${patient.blood_type}`);
-    if (patient?.allergies) addText(`⚠️  Alergias: ${patient.allergies}`, { bold: true });
+    if (patient?.allergies) addText(`ALERTA - Alergias: ${patient.allergies}`, { bold: true });
     yPosition -= 10;
 
     // === DATA DA CONSULTA ===

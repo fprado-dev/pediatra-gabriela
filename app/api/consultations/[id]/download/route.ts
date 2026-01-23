@@ -10,12 +10,14 @@ import { ptBR } from "date-fns/locale";
 import PDFDocument from "pdfkit";
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'; // PDFKit precisa do Node.js runtime
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log("📄 Iniciando geração de PDF...");
     const { id } = await params;
     const supabase = await createClient();
 
@@ -71,6 +73,7 @@ export async function GET(
     }
 
     // Criar PDF
+    console.log("📄 Criando documento PDF...");
     const doc = new PDFDocument({
       size: "A4",
       margins: { top: 50, bottom: 50, left: 50, right: 50 },
@@ -81,6 +84,7 @@ export async function GET(
         CreationDate: new Date(),
       },
     });
+    console.log("✅ PDFDocument criado com sucesso");
 
     // Buffer para armazenar o PDF
     const chunks: Uint8Array[] = [];
@@ -262,7 +266,9 @@ export async function GET(
     });
 
     // Combinar chunks em Buffer
+    console.log(`📦 PDF gerado: ${chunks.length} chunks, total: ${chunks.reduce((acc, c) => acc + c.length, 0)} bytes`);
     const pdfBuffer = Buffer.concat(chunks);
+    console.log(`✅ Buffer final: ${pdfBuffer.length} bytes`);
 
     // Nome do arquivo
     const fileName = `Consulta_${patient?.full_name?.replace(/\s+/g, "_")}_${format(
@@ -271,6 +277,7 @@ export async function GET(
     )}.pdf`;
 
     // Retornar PDF
+    console.log(`📥 Enviando PDF: ${fileName}`);
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",

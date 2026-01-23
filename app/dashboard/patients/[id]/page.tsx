@@ -21,6 +21,8 @@ import {
 import Link from "next/link";
 import { DeletePatientButton } from "@/components/patients/delete-patient-button";
 
+export const dynamic = 'force-dynamic';
+
 export default async function PatientProfilePage({
   params,
 }: {

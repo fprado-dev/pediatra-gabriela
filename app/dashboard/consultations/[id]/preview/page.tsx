@@ -7,6 +7,7 @@ import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, Penc
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AudioPlayer } from "@/components/consultations/audio-player";
 
 export const dynamic = 'force-dynamic';
 
@@ -268,21 +269,7 @@ export default async function ConsultationPreviewPage({
 
       {/* Audio Player - Minimalista */}
       {consultation.audio_url && (
-        <div className="pt-8 border-t">
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Áudio da Consulta
-            </h2>
-            <audio 
-              controls 
-              src={consultation.audio_url} 
-              className="w-full h-10"
-              style={{ filter: 'grayscale(20%)' }}
-            >
-              Seu navegador não suporta o elemento de áudio.
-            </audio>
-          </div>
-        </div>
+        <AudioPlayer consultationId={id} />
       )}
 
       {/* Debug Info - Colapsável */}

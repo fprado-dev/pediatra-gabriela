@@ -61,8 +61,13 @@ export async function extractConsultationFields(
       if (context.bloodType) {
         patientContextText += `- Tipo sanguíneo: ${context.bloodType}\n`;
       }
-      if (context.allergies && context.allergies.length > 0) {
-        patientContextText += `- Alergias conhecidas: ${context.allergies.join(", ")}\n`;
+      if (context.allergies) {
+        const allergiesText = Array.isArray(context.allergies) 
+          ? context.allergies.join(", ") 
+          : context.allergies;
+        if (allergiesText) {
+          patientContextText += `- Alergias conhecidas: ${allergiesText}\n`;
+        }
       }
       if (context.medicalHistory) {
         patientContextText += `- Histórico médico: ${context.medicalHistory}\n`;

@@ -36,7 +36,9 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
       if (timerRef.current) clearInterval(timerRef.current);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (audioUrl) URL.revokeObjectURL(audioUrl);
-      if (audioContextRef.current) audioContextRef.current.close();
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
     };
   }, [audioUrl]);
 
@@ -110,7 +112,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
         }
-        if (audioContextRef.current) {
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
           audioContextRef.current.close();
         }
       };

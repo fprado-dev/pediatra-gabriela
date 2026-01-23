@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
   const tempFilePath = join(tmpdir(), `audio-${Date.now()}.mp3`);
   
   try {
+    console.log("\n=== INICIANDO PROCESSAMENTO DE CONSULTA ===");
+    
     const supabase = await createClient();
 
     // Verificar autenticação
@@ -22,13 +24,19 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
+      console.error("❌ Usuário não autenticado");
       return NextResponse.json(
         { error: "Não autenticado" },
         { status: 401 }
       );
     }
 
-    const { consultationId } = await request.json();
+    console.log(`👤 Usuário autenticado: ${user.id}`);
+
+    const body = await request.json();
+    const { consultationId } = body;
+    
+    console.log(`📋 Consultation ID: ${consultationId}`);
 
     if (!consultationId) {
       return NextResponse.json(
@@ -65,18 +73,38 @@ export async function POST(request: NextRequest) {
     console.log("📥 Step 1/4: Baixando áudio...");
     await updateProcessingStep(supabase, consultationId, "download", "in_progress");
 
-    const audioPath = consultation.audio_url.split("/").pop();
+    // Extrair o caminho do arquivo do audio_url
+    const audioUrl = consultation.audio_url;
+    console.log(`📍 Audio URL: ${audioUrl}`);
+    
+    // O path está no formato: {user_id}/{consultation_id}.webm
+    const pathMatch = audioUrl.match(/consultation-audios\/(.+)$/);
+    if (!pathMatch) {
+      throw new Error(`Não foi possível extrair o path do áudio da URL: ${audioUrl}`);
+    }
+    
+    const audioPath = pathMatch[1];
+    console.log(`📁 Path do áudio: ${audioPath}`);
+
     const { data: audioData, error: downloadError } = await supabase.storage
       .from("consultation-audios")
-      .download(`${user.id}/${audioPath}`);
+      .download(audioPath);
 
-    if (downloadError || !audioData) {
-      throw new Error(`Erro ao baixar áudio: ${downloadError?.message}`);
+    if (downloadError) {
+      console.error("❌ Erro no download:", downloadError);
+      throw new Error(`Erro ao baixar áudio: ${downloadError.message}`);
     }
+
+    if (!audioData) {
+      throw new Error("Dados do áudio não retornados");
+    }
+
+    console.log(`📦 Áudio baixado: ${audioData.size} bytes`);
 
     // Salvar áudio temporariamente
     const arrayBuffer = await audioData.arrayBuffer();
     await writeFile(tempFilePath, Buffer.from(arrayBuffer));
+    console.log(`💾 Áudio salvo temporariamente em: ${tempFilePath}`);
     
     await updateProcessingStep(supabase, consultationId, "download", "completed");
 

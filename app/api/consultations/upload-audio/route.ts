@@ -150,13 +150,35 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Upload concluído - Consulta ID: ${consultation.id}`);
 
-    // Iniciar processamento em background (não esperar)
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/consultations/process`, {
+    // Iniciar processamento em background (não esperar resposta)
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (request.headers.get('host')?.includes('localhost') 
+                      ? 'http://localhost:3000' 
+                      : `https://${request.headers.get('host')}`);
+    
+    console.log(`🚀 Disparando processamento para ${baseUrl}/api/consultations/process`);
+    
+    // Disparar processamento sem await
+    fetch(`${baseUrl}/api/consultations/process`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": request.headers.get("Authorization") || "",
+      },
       body: JSON.stringify({ consultationId: consultation.id }),
+    }).then(() => {
+      console.log("✅ Processamento disparado com sucesso");
     }).catch((err) => {
-      console.error("❌ Erro ao iniciar processamento:", err);
+      console.error("❌ Erro ao disparar processamento:", err);
+      // Tentar atualizar status no banco mesmo com erro
+      supabase
+        .from("consultations")
+        .update({
+          status: "error",
+          processing_error: `Erro ao iniciar processamento: ${err.message}`,
+        })
+        .eq("id", consultation.id)
+        .then(() => console.log("Status de erro salvo"));
     });
 
     return NextResponse.json({

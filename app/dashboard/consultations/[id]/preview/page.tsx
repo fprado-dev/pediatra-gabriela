@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -100,12 +100,20 @@ export default async function ConsultationPreviewPage({
             </div>
           </div>
 
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/consultations/${id}/edit`}>
-              <PencilLine className="h-4 w-4 mr-2" />
-              Editar
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <a href={`/api/consultations/${id}/download`} download>
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </a>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/consultations/${id}/edit`}>
+                <PencilLine className="h-4 w-4 mr-2" />
+                Editar
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -168,6 +176,23 @@ export default async function ConsultationPreviewPage({
               <Badge variant="secondary" className="text-sm font-normal px-3 py-1.5">
                 {consultation.diagnosis}
               </Badge>
+            </div>
+          </div>
+        )}
+
+        {/* Prescrição */}
+        {consultation.prescription && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Prescrição Médica
+              </h2>
+            </div>
+            <div className="bg-muted/30 p-4 rounded-md border border-muted ml-6">
+              <pre className="text-sm leading-relaxed whitespace-pre-wrap font-mono">
+                {consultation.prescription}
+              </pre>
             </div>
           </div>
         )}

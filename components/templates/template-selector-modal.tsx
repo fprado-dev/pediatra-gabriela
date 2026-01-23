@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Star, StarOff, TrendingUp, FileText, Loader2 } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Search, Star, StarOff, TrendingUp, FileText, Loader2, Save, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { PrescriptionTemplate } from "@/lib/types/prescription-template";
@@ -33,6 +34,9 @@ export function TemplateSelectorModal({
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const [customDescription, setCustomDescription] = useState("");
+  const [generatedTemplates, setGeneratedTemplates] = useState<any[]>([]);
+  const [showGeneratedPreview, setShowGeneratedPreview] = useState(false);
   const supabase = createClient();
 
   // Buscar templates
@@ -71,8 +75,9 @@ export function TemplateSelectorModal({
       const { data, error } = await supabase
         .from("prescription_templates")
         .select("*")
-        .order("usage_count", { ascending: false })
-        .order("name");
+        .order("usage_count", { ascending: false }) // Mais usados primeiro!
+        .order("is_favorite", { ascending: false })
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
@@ -136,20 +141,16 @@ export function TemplateSelectorModal({
   // Obter categorias únicas
   const categories = Array.from(new Set(templates.map((t) => t.category))).filter(Boolean);
 
-  // Gerar templates com IA
+  // Gerar templates padrão (15)
   const handleGenerateTemplates = async () => {
     setIsGenerating(true);
     setGenerationProgress(0);
 
     try {
-      toast.info("🤖 Gerando templates com IA...", { duration: 2000 });
+      toast.info("🤖 Gerando 15 templates padrão...", { duration: 2000 });
 
-      // Simular progresso (15 templates = ~15-30 segundos)
       const progressInterval = setInterval(() => {
-        setGenerationProgress((prev) => {
-          if (prev >= 90) return prev;
-          return prev + 10;
-        });
+        setGenerationProgress((prev) => (prev >= 90 ? prev : prev + 10));
       }, 2000);
 
       const response = await fetch("/api/templates/generate", {
@@ -164,19 +165,103 @@ export function TemplateSelectorModal({
       }
 
       const data = await response.json();
-
       setGenerationProgress(100);
-      toast.success(`✨ ${data.count} templates gerados com sucesso!`);
-
-      // Recarregar templates
+      toast.success(`✨ ${data.count} templates gerados!`);
       await loadTemplates();
     } catch (error: any) {
-      console.error("Erro ao gerar templates:", error);
+      console.error("Erro:", error);
       toast.error(error.message || "Erro ao gerar templates");
     } finally {
       setIsGenerating(false);
       setGenerationProgress(0);
     }
+  };
+
+  // Gerar templates personalizados (3)
+  const handleGenerateCustomTemplates = async () => {
+    if (!customDescription || customDescription.trim().length < 5) {
+      toast.error("Descreva o que você precisa (mínimo 5 caracteres)");
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationProgress(0);
+
+    try {
+      toast.info("🤖 Gerando 3 templates personalizados...");
+
+      const progressInterval = setInterval(() => {
+        setGenerationProgress((prev) => (prev >= 90 ? prev : prev + 30));
+      }, 1000);
+
+      const response = await fetch("/api/templates/generate-custom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: customDescription,
+          count: 3,
+        }),
+      });
+
+      clearInterval(progressInterval);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Erro ao gerar templates");
+      }
+
+      const data = await response.json();
+      setGenerationProgress(100);
+      setGeneratedTemplates(data.templates);
+      setShowGeneratedPreview(true);
+      toast.success(`✨ ${data.count} templates gerados!`);
+    } catch (error: any) {
+      console.error("Erro:", error);
+      toast.error(error.message || "Erro ao gerar");
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+    }
+  };
+
+  // Salvar template gerado
+  const handleSaveGeneratedTemplate = async (template: any) => {
+    try {
+      const { error } = await supabase.from("prescription_templates").insert({
+        name: template.name,
+        category: template.category,
+        medications: template.medications,
+        instructions: template.instructions,
+        warnings: template.warnings,
+      });
+
+      if (error) throw error;
+
+      toast.success("Template salvo!");
+      setShowGeneratedPreview(false);
+      setGeneratedTemplates([]);
+      setCustomDescription("");
+      await loadTemplates();
+    } catch (error: any) {
+      console.error("Erro ao salvar:", error);
+      toast.error("Erro ao salvar template");
+    }
+  };
+
+  // Usar template gerado sem salvar
+  const handleUseGeneratedTemplate = (template: any) => {
+    const formattedText = `PRESCRIÇÃO:\n${template.medications
+      .map((m: any, i: number) => `${i + 1}. ${m.name} ${m.dosage}, ${m.frequency}`)
+      .join("\n")}\n\nORIENTAÇÕES:\n${template.instructions}\n\n⚠️  ATENÇÃO:\n${
+      template.warnings
+    }`;
+
+    onSelectTemplate(formattedText, "custom");
+    setShowGeneratedPreview(false);
+    setGeneratedTemplates([]);
+    setCustomDescription("");
+    onOpenChange(false);
+    toast.success("Template inserido!");
   };
 
   return (
@@ -248,28 +333,133 @@ export function TemplateSelectorModal({
                   </p>
                 </div>
               </div>
-            ) : templates.length === 0 && !searchQuery && !selectedCategory ? (
-              <div className="flex flex-col items-center justify-center py-12 space-y-6">
-                <div className="p-6 rounded-full bg-primary/10">
-                  <FileText className="h-16 w-16 text-primary" />
+            ) : showGeneratedPreview ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b">
+                  <h3 className="font-semibold">Templates Gerados</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowGeneratedPreview(false);
+                      setGeneratedTemplates([]);
+                    }}
+                  >
+                    Voltar
+                  </Button>
                 </div>
-                <div className="text-center space-y-2 max-w-sm">
-                  <h3 className="text-lg font-semibold">Nenhum Template Ainda</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Gere automaticamente 15 templates pediátricos profissionais usando IA
-                  </p>
-                  <div className="pt-4">
-                    <Button
-                      size="lg"
-                      onClick={handleGenerateTemplates}
+                {generatedTemplates.map((template, index) => (
+                  <Card key={index} className="border-primary/20">
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center justify-between">
+                        {template.name}
+                        <Badge variant="secondary">{template.category}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">
+                          Medicações:
+                        </p>
+                        <div className="space-y-1">
+                          {template.medications.map((med: any, i: number) => (
+                            <p key={i} className="text-sm">
+                              • {med.name} {med.dosage}, {med.frequency}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                      {template.instructions && (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">
+                            Orientações:
+                          </p>
+                          <p className="text-sm">{template.instructions}</p>
+                        </div>
+                      )}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSaveGeneratedTemplate(template)}
+                          className="flex-1"
+                        >
+                          <Save className="h-4 w-4 mr-2" />
+                          Salvar Template
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleUseGeneratedTemplate(template)}
+                          className="flex-1"
+                        >
+                          Usar Agora
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : templates.length === 0 && !searchQuery && !selectedCategory ? (
+              <div className="space-y-6">
+                {/* Gerador Personalizado */}
+                <div className="space-y-4">
+                  <div className="text-center space-y-2">
+                    <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto">
+                      <FileText className="h-12 w-12 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold">Criar Templates com IA</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Descreva o que você precisa e a IA gerará 3 templates
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 max-w-md mx-auto">
+                    <Input
+                      placeholder="Ex: tratamento para febre alta em lactente"
+                      value={customDescription}
+                      onChange={(e) => setCustomDescription(e.target.value)}
                       disabled={isGenerating}
-                      className="gap-2"
+                      className="text-center"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleGenerateCustomTemplates();
+                      }}
+                    />
+                    <Button
+                      className="w-full gap-2"
+                      onClick={handleGenerateCustomTemplates}
+                      disabled={isGenerating || customDescription.trim().length < 5}
                     >
-                      <Loader2 className={cn("h-5 w-5", isGenerating && "animate-spin")} />
-                      Gerar Templates com IA
+                      <Sparkles className="h-4 w-4" />
+                      Gerar 3 Templates Personalizados
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground pt-2">
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">ou</span>
+                  </div>
+                </div>
+
+                {/* Templates Padrão */}
+                <div className="text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Gere 15 templates pediátricos padrão
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={handleGenerateTemplates}
+                    disabled={isGenerating}
+                    className="gap-2"
+                  >
+                    <Loader2 className={cn("h-4 w-4", isGenerating && "animate-spin")} />
+                    Gerar Templates Padrão
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
                     Febre, gripe, antibióticos, asma e mais...
                   </p>
                 </div>

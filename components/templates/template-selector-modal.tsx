@@ -31,6 +31,8 @@ export function TemplateSelectorModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
   const supabase = createClient();
 
   // Buscar templates
@@ -134,6 +136,49 @@ export function TemplateSelectorModal({
   // Obter categorias únicas
   const categories = Array.from(new Set(templates.map((t) => t.category))).filter(Boolean);
 
+  // Gerar templates com IA
+  const handleGenerateTemplates = async () => {
+    setIsGenerating(true);
+    setGenerationProgress(0);
+
+    try {
+      toast.info("🤖 Gerando templates com IA...", { duration: 2000 });
+
+      // Simular progresso (15 templates = ~15-30 segundos)
+      const progressInterval = setInterval(() => {
+        setGenerationProgress((prev) => {
+          if (prev >= 90) return prev;
+          return prev + 10;
+        });
+      }, 2000);
+
+      const response = await fetch("/api/templates/generate", {
+        method: "POST",
+      });
+
+      clearInterval(progressInterval);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Erro ao gerar templates");
+      }
+
+      const data = await response.json();
+
+      setGenerationProgress(100);
+      toast.success(`✨ ${data.count} templates gerados com sucesso!`);
+
+      // Recarregar templates
+      await loadTemplates();
+    } catch (error: any) {
+      console.error("Erro ao gerar templates:", error);
+      toast.error(error.message || "Erro ao gerar templates");
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
@@ -185,19 +230,57 @@ export function TemplateSelectorModal({
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
+            ) : isGenerating ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-6">
+                <div className="relative">
+                  <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs font-semibold">{generationProgress}%</span>
+                  </div>
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="font-semibold">Gerando Templates com IA</p>
+                  <p className="text-sm text-muted-foreground">
+                    GPT-4o-mini está criando 15 templates pediátricos...
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Isso pode levar 1-2 minutos
+                  </p>
+                </div>
+              </div>
+            ) : templates.length === 0 && !searchQuery && !selectedCategory ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-6">
+                <div className="p-6 rounded-full bg-primary/10">
+                  <FileText className="h-16 w-16 text-primary" />
+                </div>
+                <div className="text-center space-y-2 max-w-sm">
+                  <h3 className="text-lg font-semibold">Nenhum Template Ainda</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Gere automaticamente 15 templates pediátricos profissionais usando IA
+                  </p>
+                  <div className="pt-4">
+                    <Button
+                      size="lg"
+                      onClick={handleGenerateTemplates}
+                      disabled={isGenerating}
+                      className="gap-2"
+                    >
+                      <Loader2 className={cn("h-5 w-5", isGenerating && "animate-spin")} />
+                      Gerar Templates com IA
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground pt-2">
+                    Febre, gripe, antibióticos, asma e mais...
+                  </p>
+                </div>
+              </div>
             ) : filteredTemplates.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {searchQuery || selectedCategory
-                    ? "Nenhum template encontrado"
-                    : "Nenhum template criado ainda"}
+                <p className="text-muted-foreground">Nenhum template encontrado</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Tente ajustar sua busca ou filtros
                 </p>
-                {!searchQuery && !selectedCategory && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Templates serão gerados automaticamente pela IA
-                  </p>
-                )}
               </div>
             ) : (
               <div className="space-y-3">

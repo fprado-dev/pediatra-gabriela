@@ -17,9 +17,12 @@ import {
   FileText,
   Trash2,
   UserCheck,
+  Mic,
+  Stethoscope,
 } from "lucide-react";
 import Link from "next/link";
 import { DeletePatientButton } from "@/components/patients/delete-patient-button";
+import { ConsultationList } from "@/components/consultations/consultation-list";
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +54,34 @@ export default async function PatientProfilePage({
   if (error || !patient) {
     notFound();
   }
+
+  // Buscar últimas 10 consultas do paciente
+  const { data: consultations, error: consultationsError } = await supabase
+    .from("consultations")
+    .select("id, patient_id, status, created_at, audio_duration_seconds, chief_complaint")
+    .eq("patient_id", id)
+    .eq("doctor_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (consultationsError) {
+    console.error("Error fetching consultations:", consultationsError);
+  }
+
+  // Adicionar dados do paciente a cada consulta (para o ConsultationList)
+  const consultationsWithPatient = consultations?.map((consultation) => ({
+    id: consultation.id,
+    patient_id: consultation.patient_id || id,
+    status: consultation.status,
+    created_at: consultation.created_at,
+    audio_duration_seconds: consultation.audio_duration_seconds,
+    chief_complaint: consultation.chief_complaint,
+    patient: {
+      id: patient.id,
+      full_name: patient.full_name,
+      date_of_birth: patient.date_of_birth,
+    },
+  })) || [];
 
   const getInitials = (name: string) => {
     return name
@@ -113,8 +144,14 @@ export default async function PatientProfilePage({
           </div>
         </div>
         <div className="flex gap-2">
+          <Link href="/dashboard/consultations/new-recording">
+            <Button className="gap-2" size="lg">
+              <Mic className="h-4 w-4" />
+              Nova Consulta
+            </Button>
+          </Link>
           <Link href={`/dashboard/patients/${id}/edit`}>
-            <Button>
+            <Button variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Editar
             </Button>
@@ -286,6 +323,51 @@ export default async function PatientProfilePage({
           </Card>
         )}
       </div>
+
+      {/* Histórico de Consultas */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Stethoscope className="h-5 w-5" />
+              Histórico de Consultas
+              {consultationsWithPatient.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {consultationsWithPatient.length}
+                </Badge>
+              )}
+            </CardTitle>
+            {consultationsWithPatient.length >= 10 && (
+              <Link href={`/dashboard/consultations?patient=${id}`}>
+                <Button variant="ghost" size="sm">
+                  Ver todas →
+                </Button>
+              </Link>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {consultationsWithPatient.length > 0 ? (
+            <ConsultationList consultations={consultationsWithPatient} />
+          ) : (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+              <h3 className="text-lg font-semibold mb-2">
+                Nenhuma consulta registrada
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                {patient.full_name} ainda não possui consultas gravadas.
+              </p>
+              <Link href="/dashboard/consultations/new-recording">
+                <Button>
+                  <Mic className="h-4 w-4 mr-2" />
+                  Gravar Primeira Consulta
+                </Button>
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

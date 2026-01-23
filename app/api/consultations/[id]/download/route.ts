@@ -7,10 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import PDFDocument from "pdfkit";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs'; // PDFKit precisa do Node.js runtime
 
 export async function GET(
   request: NextRequest,
@@ -72,203 +71,215 @@ export async function GET(
       }
     }
 
-    // Criar PDF
-    console.log("📄 Criando documento PDF...");
-    const doc = new PDFDocument({
-      size: "A4",
-      margins: { top: 50, bottom: 50, left: 50, right: 50 },
-      info: {
-        Title: `Consulta - ${patient?.full_name || "Paciente"}`,
-        Author: profile?.full_name || "Médico",
-        Subject: "Prontuário Médico Pediátrico",
-        CreationDate: new Date(),
-      },
-    });
-    console.log("✅ PDFDocument criado com sucesso");
+    // Criar PDF com pdf-lib
+    console.log("📄 Criando documento PDF com pdf-lib...");
+    const pdfDoc = await PDFDocument.create();
+    
+    // Configurar metadados
+    pdfDoc.setTitle(`Consulta - ${patient?.full_name || "Paciente"}`);
+    pdfDoc.setAuthor(profile?.full_name || "Médico");
+    pdfDoc.setSubject("Prontuário Médico Pediátrico");
+    pdfDoc.setCreationDate(new Date());
 
-    // Buffer para armazenar o PDF
-    const chunks: Uint8Array[] = [];
-    doc.on("data", (chunk) => chunks.push(chunk));
+    // Adicionar página A4
+    const page = pdfDoc.addPage([595, 842]); // A4 em pontos
+    const { width, height } = page.getSize();
 
-    // Criar o PDF
-    await new Promise<void>((resolve, reject) => {
-      doc.on("end", () => resolve());
-      doc.on("error", reject);
+    // Carregar fontes
+    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const courierFont = await pdfDoc.embedFont(StandardFonts.Courier);
 
-      // === CABEÇALHO ===
-      doc
-        .fontSize(20)
-        .font("Helvetica-Bold")
-        .text("PRONTUÁRIO MÉDICO PEDIÁTRICO", { align: "center" })
-        .moveDown(0.5);
+    let yPosition = height - 50; // Começar do topo com margem
+    const leftMargin = 50;
+    const rightMargin = width - 50;
+    const lineHeight = 14;
 
-      doc
-        .fontSize(10)
-        .font("Helvetica")
-        .text(
-          `Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
-          { align: "center" }
-        )
-        .moveDown(1.5);
+    // Helper para adicionar texto
+    const addText = (text: string, options: {
+      font?: any;
+      size?: number;
+      color?: any;
+      bold?: boolean;
+      x?: number;
+      maxWidth?: number;
+    } = {}) => {
+      const font = options.bold ? helveticaBoldFont : (options.font || helveticaFont);
+      const size = options.size || 10;
+      const x = options.x || leftMargin;
+      const maxWidth = options.maxWidth || (rightMargin - leftMargin);
 
-      // Linha separadora
-      doc
-        .moveTo(50, doc.y)
-        .lineTo(545, doc.y)
-        .stroke()
-        .moveDown(1);
+      // Quebra de linha automática
+      const words = text.split(' ');
+      let line = '';
+      const lines: string[] = [];
 
-      // === DADOS DO MÉDICO ===
-      doc.fontSize(12).font("Helvetica-Bold").text("DADOS DO MÉDICO");
-      doc.moveDown(0.3);
-      
-      doc.fontSize(10).font("Helvetica");
-      if (profile?.full_name) doc.text(`Nome: ${profile.full_name}`);
-      if (profile?.crm) doc.text(`CRM: ${profile.crm}`);
-      if (profile?.specialty) doc.text(`Especialidade: ${profile.specialty}`);
-      doc.moveDown(1);
+      for (const word of words) {
+        const testLine = line + (line ? ' ' : '') + word;
+        const testWidth = font.widthOfTextAtSize(testLine, size);
 
-      // === DADOS DO PACIENTE ===
-      doc.fontSize(12).font("Helvetica-Bold").text("DADOS DO PACIENTE");
-      doc.moveDown(0.3);
-
-      doc.fontSize(10).font("Helvetica");
-      if (patient?.full_name) doc.text(`Nome: ${patient.full_name}`);
-      if (patient?.cpf) doc.text(`CPF: ${patient.cpf}`);
-      if (patientAge !== null) doc.text(`Idade: ${patientAge} anos`);
-      if (patient?.date_of_birth)
-        doc.text(`Data de Nascimento: ${format(new Date(patient.date_of_birth), "dd/MM/yyyy")}`);
-      if (patient?.phone) doc.text(`Telefone: ${patient.phone}`);
-      if (patient?.email) doc.text(`Email: ${patient.email}`);
-      if (patient?.blood_type) doc.text(`Tipo Sanguíneo: ${patient.blood_type}`);
-      if (patient?.allergies) {
-        doc.font("Helvetica-Bold").text("⚠️  Alergias: ", { continued: true });
-        doc.font("Helvetica").text(patient.allergies);
-      }
-      doc.moveDown(1);
-
-      // === DATA DA CONSULTA ===
-      doc.fontSize(12).font("Helvetica-Bold").text("DATA DA CONSULTA");
-      doc.moveDown(0.3);
-      doc
-        .fontSize(10)
-        .font("Helvetica")
-        .text(
-          format(
-            new Date(consultation.created_at),
-            "dd 'de' MMMM 'de' yyyy 'às' HH:mm",
-            { locale: ptBR }
-          )
-        );
-      doc.moveDown(1.5);
-
-      // Linha separadora
-      doc
-        .moveTo(50, doc.y)
-        .lineTo(545, doc.y)
-        .stroke()
-        .moveDown(1);
-
-      // Função auxiliar para adicionar seção
-      const addSection = (title: string, content: string | null, options: { bold?: boolean } = {}) => {
-        if (!content) return;
-
-        // Verificar se precisa de nova página
-        if (doc.y > 700) {
-          doc.addPage();
-        }
-
-        doc.fontSize(12).font("Helvetica-Bold").text(title.toUpperCase());
-        doc.moveDown(0.3);
-        
-        if (options.bold) {
-          doc.fontSize(10).font("Helvetica-Bold").text(content, { align: "left" });
+        if (testWidth > maxWidth && line) {
+          lines.push(line);
+          line = word;
         } else {
-          doc.fontSize(10).font("Helvetica").text(content, { align: "left" });
+          line = testLine;
         }
-        doc.moveDown(1);
-      };
+      }
+      if (line) lines.push(line);
 
-      // === CONTEÚDO CLÍNICO ===
-      addSection("Queixa Principal", consultation.chief_complaint);
-      addSection("História / Anamnese", consultation.history);
-      addSection("Exame Físico", consultation.physical_exam);
-      addSection("Diagnóstico", consultation.diagnosis, { bold: true });
-      
-      // Prescrição com destaque
-      if (consultation.prescription) {
-        if (doc.y > 700) doc.addPage();
-        
-        doc.fontSize(12).font("Helvetica-Bold").text("PRESCRIÇÃO MÉDICA");
-        doc.moveDown(0.3);
-        
-        // Box para prescrição
-        const prescriptionY = doc.y;
-        doc.fontSize(10).font("Courier").text(consultation.prescription, {
-          align: "left",
+      // Desenhar linhas
+      for (const textLine of lines) {
+        // Verificar se precisa de nova página
+        if (yPosition < 50) {
+          const newPage = pdfDoc.addPage([595, 842]);
+          yPosition = height - 50;
+          page.drawText = newPage.drawText.bind(newPage);
+        }
+
+        page.drawText(textLine, {
+          x,
+          y: yPosition,
+          size,
+          font,
+          color: options.color || rgb(0, 0, 0),
         });
-        doc.moveDown(1);
+
+        yPosition -= lineHeight;
       }
-      
-      addSection("Plano Terapêutico", consultation.plan);
+    };
 
-      // === MEDIDAS ANTROPOMÉTRICAS ===
-      if (
-        consultation.weight_kg ||
-        consultation.height_cm ||
-        consultation.head_circumference_cm
-      ) {
-        if (doc.y > 700) doc.addPage();
-        
-        doc.fontSize(12).font("Helvetica-Bold").text("MEDIDAS ANTROPOMÉTRICAS");
-        doc.moveDown(0.3);
-        doc.fontSize(10).font("Helvetica");
-        
-        if (consultation.weight_kg) doc.text(`Peso: ${consultation.weight_kg} kg`);
-        if (consultation.height_cm) doc.text(`Altura: ${consultation.height_cm} cm`);
-        if (consultation.head_circumference_cm)
-          doc.text(`Perímetro Cefálico: ${consultation.head_circumference_cm} cm`);
-        doc.moveDown(1);
+    const addLine = () => {
+      page.drawLine({
+        start: { x: leftMargin, y: yPosition },
+        end: { x: rightMargin, y: yPosition },
+        thickness: 1,
+        color: rgb(0.7, 0.7, 0.7),
+      });
+      yPosition -= 20;
+    };
+
+    const addSection = (title: string, content: string | null, options: { mono?: boolean } = {}) => {
+      if (!content) return;
+
+      addText(title.toUpperCase(), { size: 12, bold: true });
+      yPosition -= 5;
+      addText(content, { 
+        size: 10, 
+        font: options.mono ? courierFont : helveticaFont 
+      });
+      yPosition -= 10;
+    };
+
+    // === CABEÇALHO ===
+    addText("PRONTUÁRIO MÉDICO PEDIÁTRICO", { 
+      size: 20, 
+      bold: true,
+      x: leftMargin + (rightMargin - leftMargin) / 2 - 150
+    });
+    yPosition -= 5;
+    addText(
+      `Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
+      { 
+        size: 10,
+        x: leftMargin + (rightMargin - leftMargin) / 2 - 80
       }
+    );
+    yPosition -= 10;
+    addLine();
 
-      addSection("Desenvolvimento", consultation.development_notes);
-      addSection("Observações Adicionais", consultation.notes);
+    // === DADOS DO MÉDICO ===
+    addText("DADOS DO MÉDICO", { size: 12, bold: true });
+    yPosition -= 5;
+    if (profile?.full_name) addText(`Nome: ${profile.full_name}`);
+    if (profile?.crm) addText(`CRM: ${profile.crm}`);
+    if (profile?.specialty) addText(`Especialidade: ${profile.specialty}`);
+    yPosition -= 10;
 
-      // === HISTÓRICO MÉDICO ===
-      if (patient?.medical_history) {
-        if (doc.y > 700) doc.addPage();
-        
-        doc.fontSize(12).font("Helvetica-Bold").text("HISTÓRICO MÉDICO DO PACIENTE");
-        doc.moveDown(0.3);
-        doc.fontSize(10).font("Helvetica").text(patient.medical_history);
-        doc.moveDown(1);
-      }
+    // === DADOS DO PACIENTE ===
+    addText("DADOS DO PACIENTE", { size: 12, bold: true });
+    yPosition -= 5;
+    if (patient?.full_name) addText(`Nome: ${patient.full_name}`);
+    if (patient?.cpf) addText(`CPF: ${patient.cpf}`);
+    if (patientAge !== null) addText(`Idade: ${patientAge} anos`);
+    if (patient?.date_of_birth)
+      addText(`Data de Nascimento: ${format(new Date(patient.date_of_birth), "dd/MM/yyyy")}`);
+    if (patient?.phone) addText(`Telefone: ${patient.phone}`);
+    if (patient?.email) addText(`Email: ${patient.email}`);
+    if (patient?.blood_type) addText(`Tipo Sanguíneo: ${patient.blood_type}`);
+    if (patient?.allergies) addText(`⚠️  Alergias: ${patient.allergies}`, { bold: true });
+    yPosition -= 10;
 
-      // === RODAPÉ ===
-      const bottomY = 750;
-      doc
-        .moveTo(50, bottomY)
-        .lineTo(545, bottomY)
-        .stroke();
+    // === DATA DA CONSULTA ===
+    addText("DATA DA CONSULTA", { size: 12, bold: true });
+    yPosition -= 5;
+    addText(
+      format(
+        new Date(consultation.created_at),
+        "dd 'de' MMMM 'de' yyyy 'às' HH:mm",
+        { locale: ptBR }
+      )
+    );
+    yPosition -= 15;
+    addLine();
 
-      doc
-        .fontSize(8)
-        .font("Helvetica")
-        .text(
-          "Este documento foi gerado digitalmente e contém informações confidenciais protegidas por sigilo médico.",
-          50,
-          bottomY + 10,
-          { align: "center", width: 495 }
-        );
+    // === CONTEÚDO CLÍNICO ===
+    addSection("Queixa Principal", consultation.chief_complaint);
+    addSection("História / Anamnese", consultation.history);
+    addSection("Exame Físico", consultation.physical_exam);
+    addSection("Diagnóstico", consultation.diagnosis);
+    addSection("Prescrição Médica", consultation.prescription, { mono: true });
+    addSection("Plano Terapêutico", consultation.plan);
 
-      // Finalizar PDF
-      doc.end();
+    // === MEDIDAS ===
+    if (
+      consultation.weight_kg ||
+      consultation.height_cm ||
+      consultation.head_circumference_cm
+    ) {
+      addText("MEDIDAS ANTROPOMÉTRICAS", { size: 12, bold: true });
+      yPosition -= 5;
+      if (consultation.weight_kg) addText(`Peso: ${consultation.weight_kg} kg`);
+      if (consultation.height_cm) addText(`Altura: ${consultation.height_cm} cm`);
+      if (consultation.head_circumference_cm)
+        addText(`Perímetro Cefálico: ${consultation.head_circumference_cm} cm`);
+      yPosition -= 10;
+    }
+
+    addSection("Desenvolvimento", consultation.development_notes);
+    addSection("Observações Adicionais", consultation.notes);
+
+    if (patient?.medical_history) {
+      addSection("Histórico Médico do Paciente", patient.medical_history);
+    }
+
+    // === RODAPÉ ===
+    const footerY = 50;
+    page.drawLine({
+      start: { x: leftMargin, y: footerY + 15 },
+      end: { x: rightMargin, y: footerY + 15 },
+      thickness: 1,
+      color: rgb(0.7, 0.7, 0.7),
     });
 
-    // Combinar chunks em Buffer
-    console.log(`📦 PDF gerado: ${chunks.length} chunks, total: ${chunks.reduce((acc, c) => acc + c.length, 0)} bytes`);
-    const pdfBuffer = Buffer.concat(chunks);
-    console.log(`✅ Buffer final: ${pdfBuffer.length} bytes`);
+    page.drawText(
+      "Este documento foi gerado digitalmente e contém informações confidenciais protegidas por sigilo médico.",
+      {
+        x: leftMargin,
+        y: footerY,
+        size: 8,
+        font: helveticaFont,
+        color: rgb(0.5, 0.5, 0.5),
+        maxWidth: rightMargin - leftMargin,
+      }
+    );
+
+    // Gerar bytes do PDF
+    console.log("📦 Gerando bytes do PDF...");
+    const pdfBytes = await pdfDoc.save();
+    console.log(`✅ PDF gerado: ${pdfBytes.length} bytes`);
+
+    // Converter para Buffer
+    const pdfBuffer = Buffer.from(pdfBytes);
 
     // Nome do arquivo
     const fileName = `Consulta_${patient?.full_name?.replace(/\s+/g, "_")}_${format(
@@ -276,8 +287,9 @@ export async function GET(
       "yyyyMMdd"
     )}.pdf`;
 
-    // Retornar PDF
     console.log(`📥 Enviando PDF: ${fileName}`);
+
+    // Retornar PDF
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",

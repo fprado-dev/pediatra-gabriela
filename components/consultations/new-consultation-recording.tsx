@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AudioRecorder } from "./audio-recorder";
+import { AudioUploader } from "./audio-uploader";
+import { ModeSelector } from "./mode-selector";
 import { PatientSelector } from "./patient-selector";
 import { ProcessingStatus } from "./processing-status";
 import { Button } from "@/components/ui/button";
@@ -23,11 +25,13 @@ interface NewConsultationRecordingProps {
   patients: Patient[];
 }
 
-type FlowState = "select-patient" | "recording" | "processing" | "completed";
+type InputMode = "record" | "upload";
+type FlowState = "select-patient" | "select-mode" | "input" | "processing" | "completed";
 
 export function NewConsultationRecording({ patients }: NewConsultationRecordingProps) {
   const router = useRouter();
   const [flowState, setFlowState] = useState<FlowState>("select-patient");
+  const [inputMode, setInputMode] = useState<InputMode | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [consultationId, setConsultationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,10 +42,15 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
       toast.error("Por favor, selecione um paciente");
       return;
     }
-    setFlowState("recording");
+    setFlowState("select-mode");
   };
 
-  const handleRecordingComplete = async (audioBlob: Blob, duration: number) => {
+  const handleModeSelected = (mode: InputMode) => {
+    setInputMode(mode);
+    setFlowState("input");
+  };
+
+  const handleAudioComplete = async (audioBlob: Blob, duration: number) => {
     if (!selectedPatientId) {
       toast.error("Paciente não selecionado");
       return;
@@ -53,18 +62,22 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
     try {
       // Criar FormData para upload
       const formData = new FormData();
-      formData.append("audio", audioBlob, "consultation.webm");
+      
+      // Determinar extensão baseada no modo
+      const fileName = inputMode === "record" ? "consultation.webm" : "consultation.mp3";
+      formData.append("audio", audioBlob, fileName);
       formData.append("patientId", selectedPatientId);
       formData.append("duration", duration.toString());
 
-      // Upload do áudio (esta rota será criada no backend)
+      // Upload do áudio
       const response = await fetch("/api/consultations/upload-audio", {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error("Erro ao fazer upload do áudio");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao fazer upload do áudio");
       }
 
       const data = await response.json();
@@ -74,8 +87,8 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
       toast.success("Áudio enviado! Processando...");
     } catch (err: any) {
       console.error("Erro no upload:", err);
-      setError(err.message || "Erro ao processar gravação");
-      toast.error("Erro ao enviar gravação");
+      setError(err.message || "Erro ao processar áudio");
+      toast.error("Erro ao enviar áudio");
     } finally {
       setIsUploading(false);
     }
@@ -93,6 +106,12 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
 
   const handleBackToPatientSelection = () => {
     setFlowState("select-patient");
+    setInputMode(null);
+  };
+
+  const handleBackToModeSelection = () => {
+    setFlowState("select-mode");
+    setInputMode(null);
   };
 
   return (
@@ -107,9 +126,14 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">Nova Consulta com Gravação</h1>
+              <h1 className="text-2xl font-bold">Nova Consulta</h1>
               <p className="text-sm text-muted-foreground">
-                Grave a consulta e deixe a IA gerar a documentação
+                {flowState === "select-patient" && "Selecione o paciente"}
+                {flowState === "select-mode" && "Escolha como adicionar o áudio"}
+                {flowState === "input" && inputMode === "record" && "Grave a consulta"}
+                {flowState === "input" && inputMode === "upload" && "Envie o arquivo de áudio"}
+                {flowState === "processing" && "Processando com IA..."}
+                {flowState === "completed" && "Consulta processada!"}
               </p>
             </div>
           </div>
@@ -141,14 +165,30 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
                   onClick={handlePatientSelected}
                   disabled={!selectedPatientId}
                 >
-                  Continuar para Gravação
+                  Continuar
                 </Button>
               </div>
             </>
           )}
 
-          {/* Fluxo: Gravação */}
-          {flowState === "recording" && (
+          {/* Fluxo: Seleção de Modo */}
+          {flowState === "select-mode" && (
+            <>
+              <ModeSelector onSelectMode={handleModeSelected} />
+              <div className="flex justify-start">
+                <Button
+                  variant="ghost"
+                  onClick={handleBackToPatientSelection}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Voltar
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* Fluxo: Input (Gravação ou Upload) */}
+          {flowState === "input" && (
             <>
               {/* Info do paciente selecionado */}
               <div className="bg-muted/50 rounded-lg p-4">
@@ -162,22 +202,31 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleBackToPatientSelection}
+                    onClick={handleBackToModeSelection}
                   >
-                    Alterar
+                    Alterar Método
                   </Button>
                 </div>
               </div>
 
-              <AudioRecorder
-                onRecordingComplete={handleRecordingComplete}
-                onCancel={handleBackToPatientSelection}
-              />
+              {inputMode === "record" && (
+                <AudioRecorder
+                  onRecordingComplete={handleAudioComplete}
+                  onCancel={handleBackToModeSelection}
+                />
+              )}
+
+              {inputMode === "upload" && (
+                <AudioUploader
+                  onUploadComplete={handleAudioComplete}
+                  onCancel={handleBackToModeSelection}
+                />
+              )}
 
               {isUploading && (
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground">
-                    Enviando gravação...
+                    Enviando áudio...
                   </p>
                 </div>
               )}

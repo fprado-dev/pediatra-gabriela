@@ -1,11 +1,20 @@
 import { openai } from "./client";
 
+interface PatientContext {
+  patientName?: string;
+  patientAge?: number | null;
+}
+
 /**
  * Limpa a transcrição removendo ruídos, conversas irrelevantes e melhorando o texto
  * @param rawText - Texto bruto da transcrição
+ * @param context - Contexto do paciente para melhorar a análise
  * @returns Texto limpo e estruturado
  */
-export async function cleanTranscription(rawText: string): Promise<string> {
+export async function cleanTranscription(
+  rawText: string, 
+  context?: PatientContext
+): Promise<string> {
   if (!rawText || rawText.trim().length === 0) {
     throw new Error("Texto para limpeza está vazio");
   }
@@ -13,8 +22,13 @@ export async function cleanTranscription(rawText: string): Promise<string> {
   try {
     console.log("🧹 Iniciando limpeza de texto...");
 
-    const prompt = `Você é um assistente especializado em processar transcrições de consultas médicas pediátricas.
+    // Adicionar contexto do paciente ao prompt
+    const patientInfo = context?.patientName && context?.patientAge 
+      ? `\n\nCONTEXTO DO PACIENTE:\n- Nome: ${context.patientName}\n- Idade: ${context.patientAge} anos\n`
+      : "";
 
+    const prompt = `Você é um assistente especializado em processar transcrições de consultas médicas pediátricas.
+${patientInfo}
 TAREFA: Limpe e melhore o texto abaixo seguindo estas diretrizes:
 
 1. REMOVER:

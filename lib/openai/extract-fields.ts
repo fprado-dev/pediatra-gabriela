@@ -1,5 +1,16 @@
 import { openai } from "./client";
 
+interface PatientContext {
+  patientName?: string;
+  patientAge?: number | null;
+  weight?: number | null;
+  height?: number | null;
+  allergies?: string[] | null;
+  bloodType?: string | null;
+  medicalHistory?: string | null;
+  currentMedications?: string | null;
+}
+
 export interface ConsultationFields {
   chief_complaint: string | null;
   history: string | null;
@@ -16,10 +27,12 @@ export interface ConsultationFields {
 /**
  * Extrai campos estruturados de uma consulta médica a partir do texto limpo
  * @param cleanedText - Texto limpo e processado
+ * @param context - Contexto do paciente para melhorar a análise
  * @returns Campos estruturados da consulta
  */
 export async function extractConsultationFields(
-  cleanedText: string
+  cleanedText: string,
+  context?: PatientContext
 ): Promise<ConsultationFields> {
   if (!cleanedText || cleanedText.trim().length === 0) {
     throw new Error("Texto para extração está vazio");
@@ -28,7 +41,46 @@ export async function extractConsultationFields(
   try {
     console.log("🤖 Iniciando extração de campos estruturados...");
 
+    // Criar contexto rico do paciente
+    let patientContextText = "";
+    if (context) {
+      patientContextText = "\n\nCONTEXTO DO PACIENTE (para referência e análise):\n";
+      
+      if (context.patientName) {
+        patientContextText += `- Nome: ${context.patientName}\n`;
+      }
+      if (context.patientAge !== null && context.patientAge !== undefined) {
+        patientContextText += `- Idade: ${context.patientAge} anos\n`;
+      }
+      if (context.weight) {
+        patientContextText += `- Peso cadastrado: ${context.weight} kg\n`;
+      }
+      if (context.height) {
+        patientContextText += `- Altura cadastrada: ${context.height} cm\n`;
+      }
+      if (context.bloodType) {
+        patientContextText += `- Tipo sanguíneo: ${context.bloodType}\n`;
+      }
+      if (context.allergies && context.allergies.length > 0) {
+        patientContextText += `- Alergias conhecidas: ${context.allergies.join(", ")}\n`;
+      }
+      if (context.medicalHistory) {
+        patientContextText += `- Histórico médico: ${context.medicalHistory}\n`;
+      }
+      if (context.currentMedications) {
+        patientContextText += `- Medicações em uso: ${context.currentMedications}\n`;
+      }
+
+      patientContextText += "\nUSE ESTAS INFORMAÇÕES para:\n";
+      patientContextText += "- Contextualizar melhor a consulta\n";
+      patientContextText += "- Identificar mudanças nos valores (peso, altura)\n";
+      patientContextText += "- Alertar sobre interações medicamentosas\n";
+      patientContextText += "- Considerar alergias ao sugerir tratamentos\n";
+      patientContextText += "- Analisar desenvolvimento considerando a idade\n";
+    }
+
     const prompt = `Você é um assistente médico especializado em pediatria com expertise em organizar documentação clínica.
+${patientContextText}
 
 TAREFA: Analise a transcrição da consulta médica pediátrica e extraia as seguintes informações de forma estruturada e precisa:
 

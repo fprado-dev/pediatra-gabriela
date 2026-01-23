@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine } from "lucide-react";
 import Link from "next/link";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export const dynamic = 'force-dynamic';
 
@@ -44,185 +47,245 @@ export default async function ConsultationPreviewPage({
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold">Consulta não encontrada</h1>
+            <h1 className="text-2xl font-semibold">Consulta não encontrada</h1>
           </div>
         </div>
       </div>
     );
   }
 
+  const patient = consultation.patient as any;
+
+  // Calcular idade
+  let patientAge = null;
+  if (patient?.date_of_birth) {
+    const birthDate = new Date(patient.date_of_birth);
+    const today = new Date();
+    patientAge = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      patientAge--;
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
+    <div className="max-w-4xl mx-auto space-y-8 py-8">
+      {/* Header Minimalista */}
+      <div className="space-y-4">
         <Link href="/dashboard/consultations">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="sm" className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
           </Button>
         </Link>
-        <div>
-          <h1 className="text-3xl font-bold">Preview da Consulta</h1>
-          <p className="text-muted-foreground mt-1">
-            Paciente: {(consultation.patient as any)?.full_name}
-          </p>
+
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <User className="h-5 w-5 text-muted-foreground" />
+              <h1 className="text-3xl font-semibold">{patient?.full_name}</h1>
+            </div>
+            
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              {patientAge && (
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {patientAge} anos
+                </span>
+              )}
+              <span className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                {format(new Date(consultation.created_at), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+              </span>
+            </div>
+          </div>
+
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/dashboard/consultations/${id}/edit`}>
+              <PencilLine className="h-4 w-4 mr-2" />
+              Editar
+            </Link>
+          </Button>
         </div>
       </div>
 
-      {/* Status de Conclusão */}
-      {consultation.status === "completed" && (
-        <Card className="bg-green-50 border-green-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
-              <div>
-                <p className="font-semibold text-green-900">Processamento Concluído!</p>
-                <p className="text-sm text-green-700">
-                  A consulta foi processada com sucesso pela IA
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Separator />
 
-      {/* Dados Processados */}
-      <div className="grid gap-6">
+      {/* Conteúdo Principal - Minimalista */}
+      <div className="space-y-8">
         {/* Queixa Principal */}
         {consultation.chief_complaint && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Queixa Principal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">{consultation.chief_complaint}</p>
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Stethoscope className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Queixa Principal
+              </h2>
+            </div>
+            <p className="text-base leading-relaxed pl-6">
+              {consultation.chief_complaint}
+            </p>
+          </div>
         )}
 
         {/* História/Anamnese */}
         {consultation.history && (
-          <Card>
-            <CardHeader>
-              <CardTitle>História / Anamnese</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{consultation.history}</p>
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Anamnese
+              </h2>
+            </div>
+            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6">
+              {consultation.history}
+            </p>
+          </div>
         )}
 
         {/* Exame Físico */}
         {consultation.physical_exam && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Exame Físico</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{consultation.physical_exam}</p>
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Exame Físico
+              </h2>
+            </div>
+            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6">
+              {consultation.physical_exam}
+            </p>
+          </div>
         )}
 
         {/* Diagnóstico */}
         {consultation.diagnosis && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Diagnóstico</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{consultation.diagnosis}</p>
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground pl-0">
+              Diagnóstico
+            </h2>
+            <div className="pl-0">
+              <Badge variant="secondary" className="text-sm font-normal px-3 py-1.5">
+                {consultation.diagnosis}
+              </Badge>
+            </div>
+          </div>
         )}
 
-        {/* Plano */}
+        {/* Plano Terapêutico */}
         {consultation.plan && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Plano Terapêutico</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{consultation.plan}</p>
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Plano Terapêutico
+            </h2>
+            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6">
+              {consultation.plan}
+            </p>
+          </div>
         )}
 
-        {/* Dados Pediátricos */}
-        {(consultation.weight_kg || consultation.height_cm || consultation.head_circumference_cm || consultation.development_notes) && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Dados Pediátricos</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4">
+        {/* Dados Pediátricos - Grid Compacto */}
+        {(consultation.weight_kg || consultation.height_cm || consultation.head_circumference_cm) && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Medidas
+            </h2>
+            <div className="grid grid-cols-3 gap-6 pl-6">
               {consultation.weight_kg && (
-                <div>
-                  <p className="text-sm font-medium">Peso</p>
-                  <p className="text-sm text-muted-foreground">{consultation.weight_kg} kg</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Peso</p>
+                  <p className="text-2xl font-semibold">{consultation.weight_kg}</p>
+                  <p className="text-xs text-muted-foreground">kg</p>
                 </div>
               )}
               {consultation.height_cm && (
-                <div>
-                  <p className="text-sm font-medium">Altura</p>
-                  <p className="text-sm text-muted-foreground">{consultation.height_cm} cm</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Altura</p>
+                  <p className="text-2xl font-semibold">{consultation.height_cm}</p>
+                  <p className="text-xs text-muted-foreground">cm</p>
                 </div>
               )}
               {consultation.head_circumference_cm && (
-                <div>
-                  <p className="text-sm font-medium">Perímetro Cefálico</p>
-                  <p className="text-sm text-muted-foreground">{consultation.head_circumference_cm} cm</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">PC</p>
+                  <p className="text-2xl font-semibold">{consultation.head_circumference_cm}</p>
+                  <p className="text-xs text-muted-foreground">cm</p>
                 </div>
               )}
-              {consultation.development_notes && (
-                <div>
-                  <p className="text-sm font-medium">Desenvolvimento</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{consultation.development_notes}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
-        {/* Transcrições (para debug) */}
-        {(consultation.raw_transcription || consultation.cleaned_transcription) && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Transcrições (Debug)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {consultation.raw_transcription && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Transcrição Bruta:</p>
-                  <div className="bg-muted p-3 rounded text-xs max-h-40 overflow-y-auto">
-                    {consultation.raw_transcription}
-                  </div>
-                </div>
-              )}
-              {consultation.cleaned_transcription && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Transcrição Limpa:</p>
-                  <div className="bg-muted p-3 rounded text-xs max-h-40 overflow-y-auto">
-                    {consultation.cleaned_transcription}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Desenvolvimento */}
+        {consultation.development_notes && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Desenvolvimento
+            </h2>
+            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6">
+              {consultation.development_notes}
+            </p>
+          </div>
+        )}
+
+        {/* Notas Adicionais */}
+        {consultation.notes && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Observações
+            </h2>
+            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6 text-muted-foreground">
+              {consultation.notes}
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-4">
-        <Button asChild>
-          <Link href={`/dashboard/consultations/${id}/edit`}>
-            Editar Consulta
-          </Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/dashboard/consultations">
-            Voltar para Consultas
-          </Link>
-        </Button>
-      </div>
+      {/* Audio Player - Minimalista */}
+      {consultation.audio_url && (
+        <div className="pt-8 border-t">
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Áudio da Consulta
+            </h2>
+            <audio 
+              controls 
+              src={consultation.audio_url} 
+              className="w-full h-10"
+              style={{ filter: 'grayscale(20%)' }}
+            >
+              Seu navegador não suporta o elemento de áudio.
+            </audio>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Info - Colapsável */}
+      {process.env.NODE_ENV === 'development' && (consultation.raw_transcription || consultation.cleaned_transcription) && (
+        <details className="pt-8 border-t">
+          <summary className="text-sm font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition">
+            Informações de Debug
+          </summary>
+          <div className="mt-4 space-y-4 pl-4">
+            {consultation.raw_transcription && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Transcrição Bruta (Whisper):</p>
+                <div className="bg-muted/50 p-3 rounded-md text-xs max-h-32 overflow-y-auto font-mono">
+                  {consultation.raw_transcription}
+                </div>
+              </div>
+            )}
+            {consultation.cleaned_transcription && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Transcrição Limpa (GPT-4o-mini):</p>
+                <div className="bg-muted/50 p-3 rounded-md text-xs max-h-32 overflow-y-auto font-mono">
+                  {consultation.cleaned_transcription}
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

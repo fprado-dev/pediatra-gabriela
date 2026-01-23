@@ -38,6 +38,31 @@ export async function processConsultation(consultationId: string) {
     console.log("👤 Doctor ID:", consultation.doctor_id);
     console.log("📍 Audio URL:", consultation.audio_url);
 
+    // Buscar dados do paciente para contexto da IA
+    const { data: patient, error: patientError } = await supabase
+      .from("patients")
+      .select("full_name, date_of_birth, weight_kg, height_cm, allergies, blood_type, medical_history, current_medications")
+      .eq("id", consultation.patient_id)
+      .single();
+
+    if (patientError) {
+      console.warn("⚠️ Não foi possível buscar dados do paciente:", patientError);
+    }
+
+    // Calcular idade do paciente
+    let patientAge: number | null = null;
+    if (patient?.date_of_birth) {
+      const birthDate = new Date(patient.date_of_birth);
+      const today = new Date();
+      patientAge = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        patientAge--;
+      }
+    }
+
+    console.log("👤 Paciente:", patient?.full_name, `(${patientAge} anos)`);
+
     // Step 1: Baixar áudio do Supabase Storage
     console.log("\n📥 Step 1/4: Baixando áudio...");
     await updateProcessingStep(supabase, consultationId, "download", "in_progress");
@@ -96,7 +121,10 @@ export async function processConsultation(consultationId: string) {
     console.log("\n🧹 Step 3/4: Limpando texto...");
     await updateProcessingStep(supabase, consultationId, "cleaning", "in_progress");
 
-    const cleanedText = await cleanTranscription(rawTranscription);
+    const cleanedText = await cleanTranscription(rawTranscription, {
+      patientName: patient?.full_name,
+      patientAge,
+    });
 
     console.log(`✨ Texto limpo: ${cleanedText.substring(0, 200)}...`);
 
@@ -111,7 +139,16 @@ export async function processConsultation(consultationId: string) {
     console.log("\n🤖 Step 4/4: Extraindo campos estruturados...");
     await updateProcessingStep(supabase, consultationId, "extraction", "in_progress");
 
-    const extractedFields = await extractConsultationFields(cleanedText);
+    const extractedFields = await extractConsultationFields(cleanedText, {
+      patientName: patient?.full_name,
+      patientAge,
+      weight: patient?.weight_kg,
+      height: patient?.height_cm,
+      allergies: patient?.allergies,
+      bloodType: patient?.blood_type,
+      medicalHistory: patient?.medical_history,
+      currentMedications: patient?.current_medications,
+    });
 
     console.log("📊 Campos extraídos:", Object.keys(extractedFields));
 

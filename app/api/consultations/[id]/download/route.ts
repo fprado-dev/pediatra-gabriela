@@ -109,9 +109,14 @@ export async function GET(
       const x = options.x || leftMargin;
       const maxWidth = options.maxWidth || (rightMargin - leftMargin);
 
-      // Substituir quebras de linha por espaço para processamento
-      // PDF não aceita \n diretamente no WinAnsi
-      const cleanText = text.replace(/\n/g, ' ').replace(/\r/g, '');
+      // Limpeza completa: remover caracteres não suportados por WinAnsi
+      // WinAnsi suporta apenas: 0x20-0x7E (ASCII) + 0xA0-0xFF (Latin-1)
+      let cleanText = text
+        .replace(/\n/g, ' ')  // Line Feed -> espaço
+        .replace(/\r/g, '')   // Carriage Return -> remove
+        .replace(/\t/g, ' ')  // Tab -> espaço
+        // Remover emojis e caracteres Unicode fora do range WinAnsi
+        .replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
 
       // Quebra de linha automática por palavras
       const words = cleanText.split(' ').filter(w => w.length > 0);

@@ -150,54 +150,34 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Upload concluído - Consulta ID: ${consultation.id}`);
 
-    // Iniciar processamento em background (não esperar resposta)
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-                    (request.headers.get('host')?.includes('localhost') 
-                      ? 'http://localhost:3000' 
-                      : `https://${request.headers.get('host')}`);
-    
-    const processUrl = `${baseUrl}/api/consultations/process`;
-    console.log(`\n🚀 INICIANDO DISPARO DE PROCESSAMENTO`);
-    console.log(`   URL: ${processUrl}`);
+    // Disparar processamento em background (importando função diretamente)
+    console.log(`\n🚀 INICIANDO PROCESSAMENTO DIRETO`);
     console.log(`   Consultation ID: ${consultation.id}`);
-    console.log(`   Host: ${request.headers.get('host')}`);
     
-    // Disparar processamento sem await
-    fetch(processUrl, {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": request.headers.get("Authorization") || "",
-      },
-      body: JSON.stringify({ consultationId: consultation.id }),
-    }).then((response) => {
-      console.log(`✅ Fetch executado! Status: ${response.status}`);
-      return response.text();
-    }).then((text) => {
-      console.log(`📦 Resposta do processamento:`, text.substring(0, 200));
-    }).catch((err) => {
-      console.error("❌ ERRO NO FETCH DE PROCESSAMENTO:", err);
-      console.error("   Tipo:", err.name);
-      console.error("   Mensagem:", err.message);
-      console.error("   Stack:", err.stack);
-      
-      // Tentar atualizar status no banco mesmo com erro
-      supabase
-        .from("consultations")
-        .update({
-          status: "error",
-          processing_error: `Erro ao iniciar processamento: ${err.message}`,
-        })
-        .eq("id", consultation.id)
-        .then(() => console.log("Status de erro salvo no banco"));
-    });
+    // Importar e chamar função diretamente (mais confiável que fetch)
+    import("@/lib/openai/process-consultation")
+      .then(({ processConsultation }) => {
+        console.log("✅ Módulo importado, iniciando processamento...");
+        return processConsultation(consultation.id);
+      })
+      .then((result) => {
+        console.log("✅ Processamento concluído com sucesso!", result);
+      })
+      .catch((err) => {
+        console.error("❌ ERRO NO PROCESSAMENTO:", err);
+        console.error("   Tipo:", err.name);
+        console.error("   Mensagem:", err.message);
+        console.error("   Stack:", err.stack);
+        
+        // Erro já foi salvo no banco pela função processConsultation
+      });
 
-    console.log(`📤 Retornando resposta ao cliente...`);
+    console.log(`📤 Retornando resposta ao cliente (processamento em background)...`);
 
     return NextResponse.json({
       consultationId: consultation.id,
       audioUrl: urlData.publicUrl,
-      message: "Upload concluído, processamento iniciado",
+      message: "Upload concluído, processamento iniciado em background",
     });
   } catch (error: any) {
     console.error("❌ Erro no upload:", error);

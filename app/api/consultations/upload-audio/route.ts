@@ -156,20 +156,31 @@ export async function POST(request: NextRequest) {
                       ? 'http://localhost:3000' 
                       : `https://${request.headers.get('host')}`);
     
-    console.log(`🚀 Disparando processamento para ${baseUrl}/api/consultations/process`);
+    const processUrl = `${baseUrl}/api/consultations/process`;
+    console.log(`\n🚀 INICIANDO DISPARO DE PROCESSAMENTO`);
+    console.log(`   URL: ${processUrl}`);
+    console.log(`   Consultation ID: ${consultation.id}`);
+    console.log(`   Host: ${request.headers.get('host')}`);
     
     // Disparar processamento sem await
-    fetch(`${baseUrl}/api/consultations/process`, {
+    fetch(processUrl, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
         "Authorization": request.headers.get("Authorization") || "",
       },
       body: JSON.stringify({ consultationId: consultation.id }),
-    }).then(() => {
-      console.log("✅ Processamento disparado com sucesso");
+    }).then((response) => {
+      console.log(`✅ Fetch executado! Status: ${response.status}`);
+      return response.text();
+    }).then((text) => {
+      console.log(`📦 Resposta do processamento:`, text.substring(0, 200));
     }).catch((err) => {
-      console.error("❌ Erro ao disparar processamento:", err);
+      console.error("❌ ERRO NO FETCH DE PROCESSAMENTO:", err);
+      console.error("   Tipo:", err.name);
+      console.error("   Mensagem:", err.message);
+      console.error("   Stack:", err.stack);
+      
       // Tentar atualizar status no banco mesmo com erro
       supabase
         .from("consultations")
@@ -178,8 +189,10 @@ export async function POST(request: NextRequest) {
           processing_error: `Erro ao iniciar processamento: ${err.message}`,
         })
         .eq("id", consultation.id)
-        .then(() => console.log("Status de erro salvo"));
+        .then(() => console.log("Status de erro salvo no banco"));
     });
+
+    console.log(`📤 Retornando resposta ao cliente...`);
 
     return NextResponse.json({
       consultationId: consultation.id,

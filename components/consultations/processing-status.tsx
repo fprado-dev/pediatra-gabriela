@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Loader2, Upload, FileAudio, Bot, CheckCheck } from "lucide-react";
+import { CheckCircle2, Loader2, Upload, FileAudio, Bot, CheckCheck, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ProcessingStep {
   id: string;
@@ -22,14 +24,14 @@ interface ProcessingStatusProps {
 
 export function ProcessingStatus({ consultationId, onComplete }: ProcessingStatusProps) {
   const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<ProcessingStep[]>([
     {
       id: "upload",
       label: "Upload do Áudio",
       description: "Enviando gravação para processamento",
       icon: <Upload className="h-4 w-4" />,
-      status: "processing",
+      status: "completed", // Já foi feito antes de chegar aqui
     },
     {
       id: "transcribe",
@@ -54,43 +56,88 @@ export function ProcessingStatus({ consultationId, onComplete }: ProcessingStatu
     },
   ]);
 
-  // Simular progresso (será substituído por polling real da API)
+  // Polling real do status no Supabase
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        const newProgress = prev + 2;
-        
-        // Atualizar steps baseado no progresso
-        if (newProgress >= 25 && steps[0].status !== "completed") {
-          updateStepStatus(0, "completed");
-          updateStepStatus(1, "processing");
-          setCurrentStep(1);
+    const supabase = createClient();
+    let pollingInterval: NodeJS.Timeout;
+
+    const checkStatus = async () => {
+      try {
+        const { data: consultation, error: fetchError } = await supabase
+          .from("consultations")
+          .select("status, processing_steps, processing_error")
+          .eq("id", consultationId)
+          .single();
+
+        if (fetchError) {
+          console.error("Erro ao buscar status:", fetchError);
+          return;
         }
-        if (newProgress >= 50 && steps[1].status !== "completed") {
-          updateStepStatus(1, "completed");
-          updateStepStatus(2, "processing");
-          setCurrentStep(2);
+
+        if (!consultation) {
+          console.error("Consulta não encontrada");
+          return;
         }
-        if (newProgress >= 75 && steps[2].status !== "completed") {
-          updateStepStatus(2, "completed");
-          updateStepStatus(3, "processing");
-          setCurrentStep(3);
+
+        console.log("Status da consulta:", consultation.status);
+        console.log("Processing steps:", consultation.processing_steps);
+
+        // Calcular progresso baseado nos steps
+        const processingSteps = consultation.processing_steps || [];
+        const completedSteps = processingSteps.filter(
+          (s: any) => s.status === "completed"
+        ).length;
+
+        // Atualizar steps UI baseado nos dados reais
+        const newSteps = [...steps];
+        if (processingSteps.length > 0) {
+          // Upload sempre completo
+          // Transcribe
+          const transcribeStep = processingSteps.find((s: any) => s.step === "transcription");
+          if (transcribeStep) {
+            newSteps[1].status = transcribeStep.status === "completed" ? "completed" : "processing";
+          }
+          // Clean
+          const cleanStep = processingSteps.find((s: any) => s.step === "cleaning");
+          if (cleanStep) {
+            newSteps[2].status = cleanStep.status === "completed" ? "completed" : "processing";
+          }
+          // Extract
+          const extractStep = processingSteps.find((s: any) => s.step === "extraction");
+          if (extractStep) {
+            newSteps[3].status = extractStep.status === "completed" ? "completed" : "processing";
+          }
+          setSteps(newSteps);
         }
-        if (newProgress >= 100) {
-          updateStepStatus(3, "completed");
+
+        // Calcular progresso: 25% por step (4 steps = 100%)
+        const newProgress = Math.min(25 + (completedSteps * 20), 100);
+        setProgress(newProgress);
+
+        // Verificar status final
+        if (consultation.status === "completed") {
+          setProgress(100);
+          clearInterval(pollingInterval);
           if (onComplete) {
             setTimeout(() => onComplete(consultationId), 1000);
           }
-          clearInterval(interval);
-          return 100;
+        } else if (consultation.status === "error") {
+          setError(consultation.processing_error || "Erro desconhecido no processamento");
+          clearInterval(pollingInterval);
         }
-        
-        return newProgress;
-      });
-    }, 500);
+      } catch (err: any) {
+        console.error("Erro no polling:", err);
+      }
+    };
 
-    return () => clearInterval(interval);
-  }, [consultationId, onComplete, steps]);
+    // Primeira verificação imediata
+    checkStatus();
+
+    // Polling a cada 2 segundos
+    pollingInterval = setInterval(checkStatus, 2000);
+
+    return () => clearInterval(pollingInterval);
+  }, [consultationId, onComplete]);
 
   const updateStepStatus = (index: number, status: ProcessingStep["status"]) => {
     setSteps((prev) =>
@@ -181,8 +228,16 @@ export function ProcessingStatus({ consultationId, onComplete }: ProcessingStatu
           </div>
         )}
 
+        {/* Erro */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Informação */}
-        {progress < 100 && (
+        {progress < 100 && !error && (
           <div className="text-xs text-center text-muted-foreground">
             Este processo pode levar de 30 segundos a 2 minutos, dependendo do tamanho do áudio.
           </div>

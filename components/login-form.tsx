@@ -66,16 +66,16 @@ export function LoginForm({
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
+                <Input
+                  id="email"
+                  type="email"
                     placeholder="seu@email.com"
                     className="pl-10"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
-                  />
+                />
                 </div>
               </div>
 
@@ -92,16 +92,16 @@ export function LoginForm({
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
+                <Input
+                  id="password"
+                  type="password"
                     placeholder="••••••••"
                     className="pl-10"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
-                  />
+                />
                 </div>
               </div>
 
@@ -125,13 +125,13 @@ export function LoginForm({
 
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Não tem uma conta? </span>
-            <Link
-              href="/auth/sign-up"
+              <Link
+                href="/auth/sign-up"
               className="text-primary font-medium hover:underline"
-            >
+              >
               Criar conta
-            </Link>
-          </div>
+              </Link>
+            </div>
         </CardContent>
       </Card>
     </div>

@@ -29,8 +29,8 @@ const COLORS = {
   textLight: rgb(0.15, 0.14, 0.14), // #272424
   gray: rgb(0.5, 0.5, 0.5),
   lightGray: rgb(0.9, 0.9, 0.9),
-  warning: rgb(1, 0.98, 0.8), // Amarelo claro
-  warningBorder: rgb(0.9, 0.6, 0),
+  warning: rgb(1, 1, 1), // Branco (background da caixa de alerta)
+  warningBorder: rgb(1, 0.9, 0.4), // Amarelo mais claro e suave
   white: rgb(1, 1, 1),
 };
 
@@ -109,8 +109,10 @@ class PDFBuilder {
   
   cleanText(text: string): string {
     if (this.fonts.useCustom) {
-      // Com fontes customizadas, manter emojis
-      return text.replace(/[\r\t]/g, ' ');
+      // Com fontes customizadas, manter emojis (preservar Unicode)
+      return text
+        .replace(/[\r\t]/g, ' ')
+        .replace(/\s\s+/g, ' '); // Múltiplos espaços -> 1 espaço
     } else {
       // Com fontes padrão, remover emojis e caracteres não-ASCII
       return text
@@ -287,7 +289,7 @@ class PDFBuilder {
   } = {}) {
     const font = this.fonts.regular;
     const size = options.size || 9;
-    const lineHeight = options.lineHeight || 12; // Mais compacto que normal
+    const lineHeight = options.lineHeight || 13; // Ajustado para melhor legibilidade
     const color = COLORS.text;
     
     // Limpar apenas caracteres problemáticos, preservar quebras de linha
@@ -302,7 +304,7 @@ class PDFBuilder {
         this.addNewPage();
       }
       
-      // Se linha vazia, só pular
+      // Se linha vazia, só pular (espaço menor)
       if (line.trim().length === 0) {
         this.yPosition -= lineHeight / 2; // Meia linha para espaços
         continue;
@@ -317,8 +319,11 @@ class PDFBuilder {
         color,
       });
       
-      this.yPosition -= lineHeight;
+      this.yPosition -= lineHeight; // FIX: Move sempre para baixo
     }
+    
+    // FIX: Garantir espaço após o texto pré-formatado
+    this.yPosition -= 5;
   }
 
   addSection(title: string, content: string | null, options: {
@@ -366,15 +371,15 @@ class PDFBuilder {
     const boxHeight = 50;
     const boxY = this.yPosition - boxHeight;
 
-    // Desenhar caixa de alerta
+    // Desenhar caixa de alerta (NOVA: borda amarela, fundo branco)
     this.drawRectangle(
       LAYOUT.marginLeft,
       boxY,
       LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight,
       boxHeight,
       {
-        fillColor: COLORS.warning,
-        borderColor: COLORS.warningBorder,
+        fillColor: COLORS.warning, // Branco
+        borderColor: COLORS.warningBorder, // Amarelo claro
         borderWidth: 2,
       }
     );
@@ -387,7 +392,7 @@ class PDFBuilder {
     this.drawText(alertText, {
       size: 11,
       bold: true,
-      color: COLORS.warningBorder,
+      color: rgb(0.8, 0.6, 0), // Cor mais escura para contraste com fundo branco
     });
 
     this.drawText(allergies, {
@@ -398,18 +403,13 @@ class PDFBuilder {
     this.yPosition = boxY - 15;
   }
 
-  addStampSpace() {
-    // Verificar espaço
-    if (!this.checkSpace(100)) {
-      this.addNewPage();
-    }
-
-    this.moveDown(20);
-
-    const stampHeight = 60; // Pequeno conforme solicitado
+  addFooter() {
+    // NOVO: Adicionar carimbo no rodapé
+    const footerBaseY = LAYOUT.marginBottom - 30;
+    const stampHeight = 60;
     const stampWidth = 200;
+    const stampY = footerBaseY + 50; // Acima do texto do rodapé
     const stampX = LAYOUT.marginLeft + (LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight - stampWidth) / 2;
-    const stampY = this.yPosition - stampHeight;
 
     // Caixa pontilhada para carimbo
     this.currentPage.drawRectangle({
@@ -422,40 +422,36 @@ class PDFBuilder {
       borderDashArray: [3, 3],
     });
 
-    // Texto centralizado
-    const savedY = this.yPosition;
-    this.yPosition = stampY + stampHeight / 2 + 5;
-    
-    this.drawText("Espaço para Carimbo e Assinatura", {
+    // Texto do carimbo centralizado
+    this.currentPage.drawText("Espaço para Carimbo e Assinatura", {
+      x: LAYOUT.marginLeft,
+      y: stampY + stampHeight / 2 - 4,
       size: 9,
+      font: this.fonts.regular,
       color: COLORS.gray,
-      align: 'center',
+      maxWidth: LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight,
     });
 
-    this.yPosition = stampY - 20;
-  }
-
-  addFooter() {
-    const footerY = LAYOUT.marginBottom - 30;
-
+    // Linha divisória
     this.currentPage.drawLine({
-      start: { x: LAYOUT.marginLeft, y: footerY + 15 },
-      end: { x: LAYOUT.pageWidth - LAYOUT.marginRight, y: footerY + 15 },
+      start: { x: LAYOUT.marginLeft, y: footerBaseY + 15 },
+      end: { x: LAYOUT.pageWidth - LAYOUT.marginRight, y: footerBaseY + 15 },
       thickness: 1,
       color: COLORS.lightGray,
     });
 
-    this.currentPage.drawText(
-      "Este documento foi gerado digitalmente e contém informações confidenciais protegidas por sigilo médico.",
-      {
-        x: LAYOUT.marginLeft,
-        y: footerY,
-        size: 8,
-        font: this.fonts.regular,
-        color: COLORS.gray,
-        maxWidth: LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight,
-      }
-    );
+    // Texto do rodapé CENTRALIZADO
+    const footerText = "Este documento foi gerado digitalmente e contém informações confidenciais protegidas por sigilo médico.";
+    const textWidth = this.fonts.regular.widthOfTextAtSize(footerText, 8);
+    const textX = LAYOUT.marginLeft + (LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight - textWidth) / 2;
+    
+    this.currentPage.drawText(footerText, {
+      x: textX,
+      y: footerBaseY,
+      size: 8,
+      font: this.fonts.regular,
+      color: COLORS.gray,
+    });
   }
 }
 
@@ -563,12 +559,6 @@ export async function GET(
     // Linha divisória
     builder.drawLine();
 
-    // === ALERGIAS (se houver) ===
-    if (patient?.allergies) {
-      builder.addAllergyWarning(patient.allergies);
-      builder.moveDown(10);
-    }
-
     // === DADOS DO PACIENTE ===
     let patientInfo = `Nome: ${patient?.full_name || 'N/A'}\n`;
     if (patientAge !== null) patientInfo += `Idade: ${patientAge} anos\n`;
@@ -579,6 +569,12 @@ export async function GET(
     if (patient?.blood_type) patientInfo += `Tipo Sanguíneo: ${patient.blood_type}`;
 
     builder.addSection("Dados do Paciente", patientInfo);
+
+    // === ALERGIAS (MOVIDO: após dados do paciente) ===
+    if (patient?.allergies) {
+      builder.addAllergyWarning(patient.allergies);
+      builder.moveDown(10);
+    }
 
     // === CONTEÚDO CLÍNICO ===
     builder.addSection("Queixa Principal", consultation.chief_complaint);
@@ -619,10 +615,7 @@ export async function GET(
       builder.addSection("Histórico Médico do Paciente", patient.medical_history);
     }
 
-    // === ESPAÇO PARA CARIMBO ===
-    builder.addStampSpace();
-
-    // === RODAPÉ ===
+    // === RODAPÉ (inclui carimbo) ===
     builder.addFooter();
 
     // Gerar PDF

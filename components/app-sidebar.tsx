@@ -87,7 +87,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
   }
 
   return (
-    <Sidebar {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-4 py-2">
           <img src="/full-logo.png" alt="Logo" className="h-8 w-auto" />

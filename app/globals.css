@@ -36,7 +36,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
@@ -74,25 +74,4 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-/* Fix para sidebar não sobrepor conteúdo */
-@media (min-width: 768px) {
-  [data-slot="sidebar-inset"] {
-    margin-left: var(--sidebar-width);
-    transition: margin-left 200ms ease-linear;
-  }
-  
-  .group[data-state="collapsed"] [data-slot="sidebar-inset"] {
-    margin-left: var(--sidebar-width-icon);
-  }
 }

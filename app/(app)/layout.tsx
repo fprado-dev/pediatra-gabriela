@@ -1,19 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
+import { AppShell } from "@/components/layout/app-shell";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-export default async function AppLayout({
+export default async function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
 
-  // Check authentication
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -22,35 +19,19 @@ export default async function AppLayout({
     redirect("/auth/login");
   }
 
-  // Fetch user profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select("full_name, crm, specialty")
     .eq("id", user.id)
     .single();
 
   const userData = {
     name: profile?.full_name || "Usuário",
     email: user.email || "",
-    specialty: profile?.specialty || "Médico",
-    crm: profile?.crm || "",
+    specialty: profile?.specialty ?? null,
+    crm: profile?.crm ?? null,
   };
 
-  return (
-    <SidebarProvider>
-      <AppSidebar user={userData} />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <h1 className="text-lg font-semibold">Pediatra Gabriela</h1>
-          </div>
-        </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          {children}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
-  );
+  return <AppShell user={userData}>{children}</AppShell>;
 }
+

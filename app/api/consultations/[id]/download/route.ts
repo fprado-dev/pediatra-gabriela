@@ -112,7 +112,7 @@ class PDFBuilder {
       // Com fontes customizadas, manter emojis (preservar Unicode)
       return text
         .replace(/[\r\t]/g, ' ')
-        .replace(/\s\s+/g, ' '); // Múltiplos espaços -> 1 espaço
+        .replace(/  +/g, ' '); // Múltiplos espaços -> 1 espaço (NÃO TOCA em \n)
     } else {
       // Com fontes padrão, remover emojis e caracteres não-ASCII
       return text
@@ -120,6 +120,24 @@ class PDFBuilder {
         .replace(/[^\x00-\xFF]/g, '') // Remove Unicode (emojis)
         .replace(/\s+/g, ' ')
         .trim();
+    }
+  }
+
+  // Método específico para texto pré-formatado (preserva \n)
+  cleanPreformattedText(text: string): string {
+    if (this.fonts.useCustom) {
+      // Preservar emojis E quebras de linha
+      return text
+        .replace(/\r\n/g, '\n') // Windows line endings -> Unix
+        .replace(/\r/g, '\n')   // Mac line endings -> Unix
+        .replace(/\t/g, '  ');  // Tab -> 2 espaços
+    } else {
+      // Remover emojis MAS preservar quebras de linha
+      return text
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .replace(/\t/g, '  ')
+        .replace(/[^\x00-\xFF\n]/g, ''); // Remove Unicode mas MANTÉM \n
     }
   }
 
@@ -265,7 +283,7 @@ class PDFBuilder {
       const logoBytes = fs.readFileSync(logoPath);
       const logoImage = await this.doc.embedPng(logoBytes);
       
-      const logoSize = 40; // Tamanho médio conforme solicitado
+      const logoSize = 30; // Tamanho médio conforme solicitado
       const logoDims = logoImage.scale(logoSize / logoImage.width);
 
       this.currentPage.drawImage(logoImage, {
@@ -292,8 +310,8 @@ class PDFBuilder {
     const lineHeight = options.lineHeight || 13; // Ajustado para melhor legibilidade
     const color = COLORS.text;
     
-    // Limpar apenas caracteres problemáticos, preservar quebras de linha
-    const cleanText = this.cleanText(text);
+    // FIX: Usar método específico que PRESERVA \n
+    const cleanText = this.cleanPreformattedText(text);
     
     // Dividir em linhas pelo \n (não quebrar por palavras!)
     const lines = cleanText.split('\n');
@@ -350,6 +368,7 @@ class PDFBuilder {
     if (options.preformatted) {
       this.drawPreformattedText(content, {
         size: options.size || 9,
+        lineHeight: 13,
       });
     } else {
       this.drawText(content, {
@@ -567,6 +586,7 @@ export async function GET(
     if (patient?.cpf) patientInfo += `CPF: ${patient.cpf}\n`;
     if (patient?.phone) patientInfo += `Telefone: ${patient.phone}\n`;
     if (patient?.blood_type) patientInfo += `Tipo Sanguíneo: ${patient.blood_type}`;
+    builder.moveDown(8);
 
     builder.addSection("Dados do Paciente", patientInfo);
 
@@ -585,8 +605,7 @@ export async function GET(
     // === MEDIDAS ===
     if (consultation.weight_kg || consultation.height_cm || consultation.head_circumference_cm) {
       let measures = "";
-      if (consultation.weight_kg) measures += `Peso: ${consultation.weight_kg} kg\n`;
-      if (consultation.height_cm) measures += `Altura: ${consultation.height_cm} cm\n`;
+      if (consultation.weight_kg) measures += `Peso: ${consultation.weight_kg} kg | Altura: ${consultation.height_cm} cm | `;
       if (consultation.head_circumference_cm)
         measures += `Perímetro Cefálico: ${consultation.head_circumference_cm} cm`;
       
@@ -594,7 +613,7 @@ export async function GET(
     }
 
     // === PRESCRIÇÃO MÉDICA (com emojis se disponível) ===
-    const prescriptionTitle = builder.fonts.useCustom ? "💊 Prescrição Médica" : "Prescrição Médica";
+    const prescriptionTitle =  "Prescrição Médica";
     builder.addSection(prescriptionTitle, consultation.prescription, { 
       preformatted: true, // Preservar formatação da IA
       size: 9, // Fonte menor para caber mais conteúdo

@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Search, Star, StarOff, TrendingUp, FileText, Loader2, Save, Sparkles } from "lucide-react";
+import { Search, Star, StarOff, TrendingUp, FileText, Loader2, Save, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { PrescriptionTemplate } from "@/lib/types/prescription-template";
@@ -37,6 +38,8 @@ export function TemplateSelectorModal({
   const [customDescription, setCustomDescription] = useState("");
   const [generatedTemplates, setGeneratedTemplates] = useState<any[]>([]);
   const [showGeneratedPreview, setShowGeneratedPreview] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<PrescriptionTemplate | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const supabase = createClient();
 
   // Buscar templates
@@ -91,22 +94,33 @@ export function TemplateSelectorModal({
     }
   };
 
-  const handleSelectTemplate = async (template: PrescriptionTemplate) => {
+  const handleSelectTemplate = (template: PrescriptionTemplate) => {
+    setPreviewTemplate(template);
+    setDrawerOpen(true);
+  };
+
+  const handleConfirmTemplate = async () => {
+    if (!previewTemplate) return;
+
     try {
       // Incrementar contador de uso
       await supabase
         .from("prescription_templates")
-        .update({ usage_count: template.usage_count + 1 })
-        .eq("id", template.id);
+        .update({ usage_count: (previewTemplate.usage_count || 0) + 1 })
+        .eq("id", previewTemplate.id);
 
       // Formatar template com peso do paciente
-      const formattedText = formatTemplate(template, patientWeight || undefined);
+      const formattedText = formatTemplate(previewTemplate, patientWeight || undefined);
 
       // Passar para o componente pai
-      onSelectTemplate(formattedText, template.id);
+      onSelectTemplate(formattedText, previewTemplate.id);
+      
+      // Fechar tudo
+      setDrawerOpen(false);
+      setPreviewTemplate(null);
       onOpenChange(false);
 
-      toast.success(`Template "${template.name}" inserido!`);
+      toast.success(`Template "${previewTemplate.name}" inserido!`);
     } catch (error: any) {
       console.error("Erro ao selecionar template:", error);
       toast.error("Erro ao inserir template");
@@ -141,41 +155,7 @@ export function TemplateSelectorModal({
   // Obter categorias únicas
   const categories = Array.from(new Set(templates.map((t) => t.category))).filter(Boolean);
 
-  // Gerar templates padrão (15)
-  const handleGenerateTemplates = async () => {
-    setIsGenerating(true);
-    setGenerationProgress(0);
-
-    try {
-      toast.info("🤖 Gerando 15 templates padrão...", { duration: 2000 });
-
-      const progressInterval = setInterval(() => {
-        setGenerationProgress((prev) => (prev >= 90 ? prev : prev + 10));
-      }, 2000);
-
-      const response = await fetch("/api/templates/generate", {
-        method: "POST",
-      });
-
-      clearInterval(progressInterval);
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Erro ao gerar templates");
-      }
-
-      const data = await response.json();
-      setGenerationProgress(100);
-      toast.success(`✨ ${data.count} templates gerados!`);
-      await loadTemplates();
-    } catch (error: any) {
-      console.error("Erro:", error);
-      toast.error(error.message || "Erro ao gerar templates");
-    } finally {
-      setIsGenerating(false);
-      setGenerationProgress(0);
-    }
-  };
+  // Função removida - não gerar mais 15 templates padrão
 
   // Gerar templates personalizados (3)
   const handleGenerateCustomTemplates = async () => {
@@ -265,8 +245,9 @@ export function TemplateSelectorModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh]">
+      <DialogContent className="max-w-5xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>Selecionar Template de Prescrição</DialogTitle>
           <DialogDescription>
@@ -326,10 +307,10 @@ export function TemplateSelectorModal({
                 <div className="text-center space-y-2">
                   <p className="font-semibold">Gerando Templates com IA</p>
                   <p className="text-sm text-muted-foreground">
-                    GPT-4o-mini está criando 15 templates pediátricos...
+                    GPT-4o-mini está criando 3 templates personalizados...
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Isso pode levar 1-2 minutos
+                    Isso pode levar 30-60 segundos
                   </p>
                 </div>
               </div>
@@ -435,34 +416,6 @@ export function TemplateSelectorModal({
                     </Button>
                   </div>
                 </div>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">ou</span>
-                  </div>
-                </div>
-
-                {/* Templates Padrão */}
-                <div className="text-center space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Gere 15 templates pediátricos padrão
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={handleGenerateTemplates}
-                    disabled={isGenerating}
-                    className="gap-2"
-                  >
-                    <Loader2 className={cn("h-4 w-4", isGenerating && "animate-spin")} />
-                    Gerar Templates Padrão
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Febre, gripe, antibióticos, asma e mais...
-                  </p>
-                </div>
               </div>
             ) : filteredTemplates.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -473,7 +426,7 @@ export function TemplateSelectorModal({
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredTemplates.map((template) => (
                   <div
                     key={template.id}
@@ -501,12 +454,12 @@ export function TemplateSelectorModal({
                         {/* Preview de medicações */}
                         {template.medications && template.medications.length > 0 && (
                           <div className="text-sm text-muted-foreground">
-                            {template.medications.slice(0, 2).map((med: any, idx: number) => (
+                            {template.medications.slice(0, 3).map((med: any, idx: number) => (
                               <div key={idx}>• {med.name} {med.dosage}</div>
                             ))}
-                            {template.medications.length > 2 && (
+                            {template.medications.length > 3 && (
                               <div className="text-xs">
-                                +{template.medications.length - 2} medicação(ões)
+                                +{template.medications.length - 3} medicação(ões)
                               </div>
                             )}
                           </div>
@@ -537,5 +490,117 @@ export function TemplateSelectorModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Drawer de Preview */}
+    <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+      <DrawerContent className="max-h-[85vh]">
+        <DrawerHeader>
+          <DrawerTitle className="flex items-center justify-between">
+            <span>Preview da Prescrição</span>
+            <Button variant="ghost" size="icon" onClick={() => setDrawerOpen(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </DrawerTitle>
+          <DrawerDescription>
+            {previewTemplate && (
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="secondary">{previewTemplate.category}</Badge>
+                <span className="text-sm">{previewTemplate.name}</span>
+              </div>
+            )}
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <ScrollArea className="flex-1 px-6">
+          {previewTemplate && (
+            <div className="space-y-6 pb-6">
+              {/* Medicações */}
+              {previewTemplate.medications && previewTemplate.medications.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                    Medicações
+                  </h3>
+                  <div className="space-y-2">
+                    {previewTemplate.medications.map((med: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-muted/50 rounded-lg">
+                        <p className="font-medium">{idx + 1}. {med.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Dosagem: {med.dosage}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Frequência: {med.frequency}
+                        </p>
+                        {med.duration && (
+                          <p className="text-sm text-muted-foreground">
+                            Duração: {med.duration}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Instruções */}
+              {previewTemplate.instructions && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                    Orientações
+                  </h3>
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-sm whitespace-pre-wrap">{previewTemplate.instructions}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Alertas */}
+              {previewTemplate.warnings && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm uppercase tracking-wide text-red-600">
+                    ⚠️ Atenção
+                  </h3>
+                  <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
+                    <p className="text-sm text-red-800 dark:text-red-200 whitespace-pre-wrap">
+                      {previewTemplate.warnings}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Info de dosagem automática */}
+              {patientWeight && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    ℹ️ Dosagens calculadas automaticamente para paciente de <strong>{patientWeight}kg</strong>
+                  </p>
+                </div>
+              )}
+
+              {/* Preview Formatado */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                  Preview do Texto Final
+                </h3>
+                <div className="p-4 bg-muted/30 rounded-lg border border-dashed">
+                  <pre className="text-sm whitespace-pre-wrap font-mono">
+                    {formatTemplate(previewTemplate, patientWeight || undefined)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          )}
+        </ScrollArea>
+
+        <DrawerFooter className="flex-row gap-2">
+          <Button variant="outline" onClick={() => setDrawerOpen(false)} className="flex-1">
+            Cancelar
+          </Button>
+          <Button onClick={handleConfirmTemplate} className="flex-1">
+            Usar esta Prescrição
+          </Button>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+    </>
   );
 }

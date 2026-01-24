@@ -51,7 +51,7 @@ class PDFBuilder {
   private doc: PDFDocument;
   private currentPage: PDFPage;
   public yPosition: number; // Público para permitir ajustes externos
-  private fonts: any = {};
+  public fonts: any = {}; // Público para permitir acesso externo
   
   constructor(doc: PDFDocument) {
     this.doc = doc;
@@ -60,19 +60,65 @@ class PDFBuilder {
   }
 
   async loadFonts() {
-    this.doc.registerFontkit(fontkit);
-    
-    // Carregar Noto Sans (suporte Unicode + emojis)
-    const regularFontPath = path.join(process.cwd(), 'public/fonts/NotoSans-Regular.ttf');
-    const boldFontPath = path.join(process.cwd(), 'public/fonts/NotoSans-Bold.ttf');
-    
-    const regularFontBytes = fs.readFileSync(regularFontPath);
-    const boldFontBytes = fs.readFileSync(boldFontPath);
-    
-    this.fonts.regular = await this.doc.embedFont(regularFontBytes);
-    this.fonts.bold = await this.doc.embedFont(boldFontBytes);
-    
-    console.log("✅ Fontes Unicode carregadas com sucesso");
+    try {
+      this.doc.registerFontkit(fontkit);
+      
+      // Tentar carregar fontes customizadas (Inter OTF)
+      const regularFontPath = path.join(process.cwd(), 'public/fonts/Inter-Regular.otf');
+      const boldFontPath = path.join(process.cwd(), 'public/fonts/Inter-Bold.otf');
+      
+      if (fs.existsSync(regularFontPath) && fs.existsSync(boldFontPath)) {
+        try {
+          const regularFontBytes = fs.readFileSync(regularFontPath);
+          const boldFontBytes = fs.readFileSync(boldFontPath);
+          
+          // Verificar se são arquivos válidos (não HTML)
+          const regularHeader = regularFontBytes.slice(0, 4).toString();
+          if (regularHeader.includes('<') || regularHeader.includes('html')) {
+            throw new Error('Arquivo de fonte inválido (HTML)');
+          }
+          
+          this.fonts.regular = await this.doc.embedFont(regularFontBytes);
+          this.fonts.bold = await this.doc.embedFont(boldFontBytes);
+          this.fonts.useCustom = true;
+          
+          console.log("✅ Fontes customizadas Unicode carregadas");
+          return;
+        } catch (fontError: any) {
+          console.warn("⚠️ Erro ao carregar fontes customizadas:", fontError?.message || fontError);
+        }
+      }
+      
+      // Fallback: usar fontes padrão do PDF
+      const { StandardFonts } = await import('pdf-lib');
+      this.fonts.regular = await this.doc.embedFont(StandardFonts.Helvetica);
+      this.fonts.bold = await this.doc.embedFont(StandardFonts.HelveticaBold);
+      this.fonts.useCustom = false;
+      
+      console.log("✅ Usando fontes padrão (Helvetica) - emojis serão removidos");
+      
+    } catch (error) {
+      console.error("❌ Erro crítico ao carregar fontes:", error);
+      // Último fallback
+      const { StandardFonts } = await import('pdf-lib');
+      this.fonts.regular = await this.doc.embedFont(StandardFonts.Helvetica);
+      this.fonts.bold = await this.doc.embedFont(StandardFonts.Helvetica);
+      this.fonts.useCustom = false;
+    }
+  }
+  
+  cleanText(text: string): string {
+    if (this.fonts.useCustom) {
+      // Com fontes customizadas, manter emojis
+      return text.replace(/[\r\t]/g, ' ');
+    } else {
+      // Com fontes padrão, remover emojis e caracteres não-ASCII
+      return text
+        .replace(/[\r\t]/g, ' ')
+        .replace(/[^\x00-\xFF]/g, '') // Remove Unicode (emojis)
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
   }
 
   checkSpace(requiredSpace: number): boolean {
@@ -105,8 +151,8 @@ class PDFBuilder {
     const color = options.color || COLORS.text;
     const maxWidth = options.maxWidth || (LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight);
     
-    // Limpar texto de caracteres problemáticos (manter emojis)
-    const cleanText = text.replace(/[\r\t]/g, ' ');
+    // Limpar texto (remover emojis se usar fontes padrão)
+    const cleanText = this.cleanText(text);
     
     // Calcular X baseado no alinhamento
     let x = options.x !== undefined ? options.x : LAYOUT.marginLeft;
@@ -290,7 +336,8 @@ class PDFBuilder {
     const savedY = this.yPosition;
     this.yPosition = boxY + boxHeight - 15;
 
-    this.drawText("⚠️  ATENÇÃO - ALERGIAS", {
+    const alertText = this.fonts.useCustom ? "⚠️  ATENÇÃO - ALERGIAS" : "ATENÇÃO - ALERGIAS";
+    this.drawText(alertText, {
       size: 11,
       bold: true,
       color: COLORS.warningBorder,
@@ -503,8 +550,9 @@ export async function GET(
       builder.addSection("Medidas Antropométricas", measures);
     }
 
-    // === PRESCRIÇÃO MÉDICA (com emojis!) ===
-    builder.addSection("💊 Prescrição Médica", consultation.prescription);
+    // === PRESCRIÇÃO MÉDICA (com emojis se disponível) ===
+    const prescriptionTitle = builder.fonts.useCustom ? "💊 Prescrição Médica" : "Prescrição Médica";
+    builder.addSection(prescriptionTitle, consultation.prescription);
 
     // === OBSERVAÇÕES ADICIONAIS ===
     let observations = "";

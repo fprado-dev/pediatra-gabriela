@@ -31,7 +31,7 @@ export function EmailVerificationSection({
         type: "signup",
         email: userEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard/settings`,
+          emailRedirectTo: `${window.location.origin}/settings`,
         },
       });
 

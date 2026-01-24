@@ -88,7 +88,7 @@ export default async function ConsultationsPage({
             Gerencie suas consultas gravadas e processadas por IA
           </p>
         </div>
-        <Link href="/dashboard/consultations/new-recording">
+        <Link href="/consultations/new-recording">
           <Button size="lg" className="gap-2">
             <Mic className="h-5 w-5" />
             Nova Consulta
@@ -102,7 +102,7 @@ export default async function ConsultationsPage({
           <span className="text-sm text-muted-foreground">Filtrando por:</span>
           <Badge variant="secondary" className="gap-2">
             {filteredPatient.full_name}
-            <Link href="/dashboard/consultations">
+            <Link href="/consultations">
               <X className="h-3 w-3 hover:text-destructive cursor-pointer" />
             </Link>
           </Badge>
@@ -122,7 +122,7 @@ export default async function ConsultationsPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/dashboard/consultations/new-recording">
+            <Link href="/consultations/new-recording">
               <Button size="lg" className="gap-2">
                 <Mic className="h-5 w-5" />
                 Nova Consulta com Gravação

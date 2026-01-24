@@ -1,0 +1,58 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
+
+export const dynamic = 'force-dynamic';
+
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = await createClient();
+
+  // Check authentication
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  // Fetch user profile
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  const userData = {
+    name: profile?.full_name || "Usuário",
+    email: user.email || "",
+    specialty: profile?.specialty || "Médico",
+    crm: profile?.crm || "",
+  };
+
+  return (
+    <SidebarProvider>
+      <AppSidebar user={userData} />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 h-4" />
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">Pediatra Gabriela</h1>
+          </div>
+        </header>
+        <main className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 p-4 md:min-h-min">
+            {children}
+          </div>
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}

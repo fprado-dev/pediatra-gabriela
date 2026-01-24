@@ -75,7 +75,7 @@ export function SignUpForm({
             specialty: formData.specialty,
             phone: formData.phone,
           },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/`,
         },
       });
       
@@ -84,7 +84,7 @@ export function SignUpForm({
       // Verificar se o Supabase retornou uma sessão (auto-confirmação habilitada)
       if (data.session) {
         // Login automático funcionou
-        router.push("/dashboard");
+        router.push("/");
         router.refresh();
       } else {
         // Precisa confirmar email

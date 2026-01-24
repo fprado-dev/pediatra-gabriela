@@ -61,7 +61,7 @@ export function DeletePatientButton({
 
       toast.success("Paciente removido com sucesso");
       setIsOpen(false);
-      router.push("/dashboard/patients");
+      router.push("/patients");
       router.refresh();
     } catch (error: any) {
       setError(error.message || "Erro ao remover paciente");

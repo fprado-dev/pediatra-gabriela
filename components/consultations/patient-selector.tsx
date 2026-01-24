@@ -132,7 +132,7 @@ export function PatientSelector({
                 <CommandEmpty>
                   <div className="py-6 text-center text-sm">
                     <p className="text-muted-foreground mb-2">Nenhum paciente encontrado</p>
-                    <Link href="/dashboard/patients/new">
+                    <Link href="/patients/new">
                       <Button size="sm" variant="outline" className="gap-2">
                         <UserPlus className="h-4 w-4" />
                         Cadastrar Novo Paciente
@@ -213,7 +213,7 @@ export function PatientSelector({
         {/* Botão para criar novo paciente */}
         {!selectedPatient && (
           <div className="pt-2">
-            <Link href="/dashboard/patients/new" target="_blank">
+            <Link href="/patients/new" target="_blank">
               <Button variant="outline" className="w-full gap-2">
                 <UserPlus className="h-4 w-4" />
                 Cadastrar Novo Paciente

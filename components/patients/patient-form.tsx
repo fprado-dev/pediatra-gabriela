@@ -145,7 +145,7 @@ export function PatientForm({ patient, mode }: PatientFormProps) {
         toast.success("Paciente atualizado com sucesso!");
       }
 
-      router.push("/dashboard/patients");
+      router.push("/patients");
       router.refresh();
     } catch (error: any) {
       setError(error.message || "Erro ao salvar paciente");

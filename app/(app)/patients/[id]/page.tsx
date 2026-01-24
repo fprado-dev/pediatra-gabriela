@@ -123,7 +123,7 @@ export default async function PatientProfilePage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/patients">
+          <Link href="/patients">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -144,13 +144,13 @@ export default async function PatientProfilePage({
           </div>
         </div>
         <div className="flex gap-2">
-          <Link href="/dashboard/consultations/new-recording">
+          <Link href="/consultations/new-recording">
             <Button className="gap-2" size="lg">
               <Mic className="h-4 w-4" />
               Nova Consulta
             </Button>
           </Link>
-          <Link href={`/dashboard/patients/${id}/edit`}>
+          <Link href={`/patients/${id}/edit`}>
             <Button variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Editar
@@ -338,7 +338,7 @@ export default async function PatientProfilePage({
               )}
             </CardTitle>
             {consultationsWithPatient.length >= 10 && (
-              <Link href={`/dashboard/consultations?patient=${id}`}>
+              <Link href={`/consultations?patient=${id}`}>
                 <Button variant="ghost" size="sm">
                   Ver todas →
                 </Button>
@@ -358,7 +358,7 @@ export default async function PatientProfilePage({
               <p className="text-sm text-muted-foreground mb-6">
                 {patient.full_name} ainda não possui consultas gravadas.
               </p>
-              <Link href="/dashboard/consultations/new-recording">
+              <Link href="/consultations/new-recording">
                 <Button>
                   <Mic className="h-4 w-4 mr-2" />
                   Gravar Primeira Consulta

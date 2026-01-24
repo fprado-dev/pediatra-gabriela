@@ -40,7 +40,7 @@ export default async function EditPatientPage({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href={`/dashboard/patients/${id}`}>
+        <Link href={`/patients/${id}`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-5 w-5" />
           </Button>

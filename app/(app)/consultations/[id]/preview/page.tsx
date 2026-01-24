@@ -42,7 +42,7 @@ export default async function ConsultationPreviewPage({
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/consultations">
+          <Link href="/consultations">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -73,7 +73,7 @@ export default async function ConsultationPreviewPage({
     <div className="max-w-4xl mx-auto space-y-8 py-8">
       {/* Header Minimalista */}
       <div className="space-y-4">
-        <Link href="/dashboard/consultations">
+        <Link href="/consultations">
           <Button variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Voltar
@@ -109,7 +109,7 @@ export default async function ConsultationPreviewPage({
               </a>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link href={`/dashboard/consultations/${id}/edit`}>
+              <Link href={`/consultations/${id}/edit`}>
                 <PencilLine className="h-4 w-4 mr-2" />
                 Editar
               </Link>

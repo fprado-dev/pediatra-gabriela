@@ -100,7 +100,7 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
     
     // Redirecionar para preview da consulta
     setTimeout(() => {
-      router.push(`/dashboard/consultations/${consultationId}/preview`);
+      router.push(`/consultations/${consultationId}/preview`);
     }, 1500);
   };
 
@@ -120,7 +120,7 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
       <header className="border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/consultations">
+            <Link href="/consultations">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>

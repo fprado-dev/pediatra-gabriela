@@ -55,7 +55,7 @@ export function PatientCard({ patient }: PatientCardProps) {
   const hasAllergies = patient.allergies && patient.allergies.trim().length > 0;
 
   return (
-    <Link href={`/dashboard/patients/${patient.id}`}>
+    <Link href={`/patients/${patient.id}`}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer">
         <CardContent className="p-4">
           <div className="flex items-start gap-4">

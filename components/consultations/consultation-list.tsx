@@ -135,7 +135,7 @@ export function ConsultationList({ consultations }: ConsultationListProps) {
               {/* Ações */}
               <div className="flex flex-col gap-2">
                 {consultation.status === "completed" && (
-                  <Link href={`/dashboard/consultations/${consultation.id}/preview`}>
+                  <Link href={`/consultations/${consultation.id}/preview`}>
                     <Button size="sm" variant="default">
                       Ver Consulta
                       <ArrowRight className="h-4 w-4 ml-2" />
@@ -143,7 +143,7 @@ export function ConsultationList({ consultations }: ConsultationListProps) {
                   </Link>
                 )}
                 {consultation.status === "processing" && (
-                  <Link href={`/dashboard/consultations/${consultation.id}/preview`}>
+                  <Link href={`/consultations/${consultation.id}/preview`}>
                     <Button size="sm" variant="outline">
                       Acompanhar
                       <Loader2 className="h-4 w-4 ml-2 animate-spin" />
@@ -151,7 +151,7 @@ export function ConsultationList({ consultations }: ConsultationListProps) {
                   </Link>
                 )}
                 {consultation.status === "error" && (
-                  <Link href={`/dashboard/consultations/${consultation.id}/preview`}>
+                  <Link href={`/consultations/${consultation.id}/preview`}>
                     <Button size="sm" variant="outline">
                       Ver Erro
                       <AlertCircle className="h-4 w-4 ml-2" />

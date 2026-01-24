@@ -144,7 +144,7 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
       if (error) throw error;
 
       toast.success("Consulta atualizada com sucesso!");
-      router.push(`/dashboard/consultations/${consultation.id}/preview`);
+      router.push(`/consultations/${consultation.id}/preview`);
     } catch (error: any) {
       console.error("Erro ao salvar:", error);
       toast.error("Erro ao atualizar consulta: " + error.message);
@@ -231,7 +231,7 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href={`/dashboard/consultations/${consultation.id}/preview`}>
+          <Link href={`/consultations/${consultation.id}/preview`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -476,7 +476,7 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
 
         {/* Botões de Ação */}
         <div className="flex items-center justify-between gap-4 pt-4">
-          <Link href={`/dashboard/consultations/${consultation.id}/preview`}>
+          <Link href={`/consultations/${consultation.id}/preview`}>
             <Button type="button" variant="outline">
               Cancelar
             </Button>

@@ -43,7 +43,7 @@ export default async function PatientsPage() {
             Gerencie seus pacientes cadastrados
           </p>
         </div>
-        <Link href="/dashboard/patients/new">
+        <Link href="/patients/new">
           <Button size="lg">
             <Plus className="h-4 w-4 mr-2" />
             Novo Paciente

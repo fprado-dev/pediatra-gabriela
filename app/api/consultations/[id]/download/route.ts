@@ -263,7 +263,7 @@ class PDFBuilder {
       const logoBytes = fs.readFileSync(logoPath);
       const logoImage = await this.doc.embedPng(logoBytes);
       
-      const logoSize = 60; // Tamanho médio conforme solicitado
+      const logoSize = 40; // Tamanho médio conforme solicitado
       const logoDims = logoImage.scale(logoSize / logoImage.width);
 
       this.currentPage.drawImage(logoImage, {
@@ -281,9 +281,50 @@ class PDFBuilder {
     }
   }
 
+  drawPreformattedText(text: string, options: {
+    size?: number;
+    lineHeight?: number;
+  } = {}) {
+    const font = this.fonts.regular;
+    const size = options.size || 9;
+    const lineHeight = options.lineHeight || 12; // Mais compacto que normal
+    const color = COLORS.text;
+    
+    // Limpar apenas caracteres problemáticos, preservar quebras de linha
+    const cleanText = this.cleanText(text);
+    
+    // Dividir em linhas pelo \n (não quebrar por palavras!)
+    const lines = cleanText.split('\n');
+    
+    for (const line of lines) {
+      // Verificar espaço
+      if (!this.checkSpace(lineHeight + 10)) {
+        this.addNewPage();
+      }
+      
+      // Se linha vazia, só pular
+      if (line.trim().length === 0) {
+        this.yPosition -= lineHeight / 2; // Meia linha para espaços
+        continue;
+      }
+      
+      // Desenhar linha preservando formatação
+      this.currentPage.drawText(line, {
+        x: LAYOUT.marginLeft + 10, // Pequena indentação
+        y: this.yPosition,
+        size,
+        font,
+        color,
+      });
+      
+      this.yPosition -= lineHeight;
+    }
+  }
+
   addSection(title: string, content: string | null, options: {
     bold?: boolean;
     size?: number;
+    preformatted?: boolean; // NOVO: flag para texto pré-formatado
   } = {}) {
     if (!content || content.trim().length === 0) return;
 
@@ -300,11 +341,17 @@ class PDFBuilder {
     });
     this.moveDown(LAYOUT.paragraphSpacing);
 
-    // Conteúdo
-    this.drawText(content, {
-      size: options.size || 10,
-      bold: options.bold,
-    });
+    // Conteúdo - usar método apropriado
+    if (options.preformatted) {
+      this.drawPreformattedText(content, {
+        size: options.size || 9,
+      });
+    } else {
+      this.drawText(content, {
+        size: options.size || 10,
+        bold: options.bold,
+      });
+    }
     this.moveDown(LAYOUT.sectionSpacing);
   }
 
@@ -482,7 +529,7 @@ export async function GET(
 
     // Título principal (centralizado)
     builder.drawText("PRONTUÁRIO MÉDICO PEDIÁTRICO", {
-      size: 24,
+      size: 18,
       bold: true,
       align: 'center',
       color: COLORS.primary,
@@ -552,7 +599,10 @@ export async function GET(
 
     // === PRESCRIÇÃO MÉDICA (com emojis se disponível) ===
     const prescriptionTitle = builder.fonts.useCustom ? "💊 Prescrição Médica" : "Prescrição Médica";
-    builder.addSection(prescriptionTitle, consultation.prescription);
+    builder.addSection(prescriptionTitle, consultation.prescription, { 
+      preformatted: true, // Preservar formatação da IA
+      size: 9, // Fonte menor para caber mais conteúdo
+    });
 
     // === OBSERVAÇÕES ADICIONAIS ===
     let observations = "";

@@ -41,7 +41,7 @@ import { useRouter } from "next/navigation"
 const menuItems = [
   {
     title: "Dashboard",
-    url: "/",
+    url: "/dashboard",
     icon: Home,
   },
   {
@@ -101,7 +101,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
             <SidebarMenu>
               {menuItems.map((item) => {
                 const isActive = pathname === item.url || 
-                  (item.url !== "/" && pathname.startsWith(item.url))
+                  (item.url !== "/" && item.url !== "/dashboard" && pathname.startsWith(item.url))
                 
                 return (
                   <SidebarMenuItem key={item.title}>

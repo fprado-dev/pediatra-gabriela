@@ -84,7 +84,7 @@ export function SignUpForm({
       // Verificar se o Supabase retornou uma sessão (auto-confirmação habilitada)
       if (data.session) {
         // Login automático funcionou
-        router.push("/");
+        router.push("/dashboard");
         router.refresh();
       } else {
         // Precisa confirmar email

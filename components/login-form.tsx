@@ -41,7 +41,7 @@ export function LoginForm({
       });
       if (error) throw error;
       
-      router.push("/");
+      router.push("/dashboard");
       router.refresh();
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Erro ao fazer login");

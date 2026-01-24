@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { DeployButton } from "@/components/deploy-button";
 import { EnvVarWarning } from "@/components/env-var-warning";
 import { AuthButton } from "@/components/auth-button";
@@ -9,7 +11,21 @@ import { hasEnvVars } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
 
-export default function Home() {
+export const dynamic = 'force-dynamic';
+
+export default async function Home() {
+  // Verificar se o usuário está autenticado
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Se autenticado, redirecionar para o dashboard
+  if (user) {
+    redirect("/dashboard");
+  }
+
+  // Se não autenticado, mostrar landing page
   return (
     <main className="min-h-screen flex flex-col items-center">
       <div className="flex-1 w-full flex flex-col gap-20 items-center">

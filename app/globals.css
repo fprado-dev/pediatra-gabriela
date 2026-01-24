@@ -84,3 +84,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Fix para sidebar não sobrepor conteúdo */
+@media (min-width: 768px) {
+  [data-slot="sidebar-inset"] {
+    margin-left: var(--sidebar-width);
+    transition: margin-left 200ms ease-linear;
+  }
+  
+  .group[data-state="collapsed"] [data-slot="sidebar-inset"] {
+    margin-left: var(--sidebar-width-icon);
+  }
+}

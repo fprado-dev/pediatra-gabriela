@@ -41,7 +41,7 @@ DADOS DO PACIENTE:
 - Peso: ${patient.weight_kg ? `${patient.weight_kg}kg` : "não informado"}
 - Altura: ${patient.height_cm ? `${patient.height_cm}cm` : "não informada"}
 ${patient.head_circumference_cm ? `- Perímetro Cefálico: ${patient.head_circumference_cm}cm` : ""}
-${patient.allergies ? `- ⚠️  ALERGIAS: ${patient.allergies}` : ""}
+${patient.allergies ? `- ALERGIAS: ${patient.allergies}` : ""}
 ${patient.current_medications ? `- Medicações em uso: ${patient.current_medications}` : ""}
 ${patient.medical_history ? `- Histórico: ${patient.medical_history}` : ""}
 
@@ -65,25 +65,29 @@ INSTRUÇÕES:
 
 FORMATO (use formato livre mas mantenha estes tópicos):
 
-💊 PRESCRIÇÃO:
+PRESCRIÇÃO:
 [Escreva as medicações de forma natural e clara, incluindo dosagens calculadas]
 
-📋 ORIENTAÇÕES GERAIS:
+ORIENTAÇÕES GERAIS:
 [Orientações de cuidado e recomendações para os pais/responsáveis]
 
-⚠️ SINAIS DE ALERTA - RETORNAR SE:
+SINAIS DE ALERTA - RETORNAR SE:
 [Liste sinais de que a criança precisa retornar imediatamente]
 
-ℹ️ IMPORTANTE:
+IMPORTANTE:
 [Informações críticas sobre a medicação ou tratamento]
+
 
 DIRETRIZES:
 - Seja ESPECÍFICO (não use "conforme necessário")
 - CALCULE dosagens exatas quando tiver peso
 - Use terminologia CLARA para pais entenderem
 - Seja HUMANO e ACOLHEDOR
-- Use emojis relevantes (💊 💉 🌡️ 🍼 💧 🏥 etc)
+- Use emojis para tornar mais visual
 - Formato livre mas organizado e legível
+- NÃO USE formatação Markdown (asteriscos **, underscores _, etc)
+- Use TEXTO SIMPLES sem marcadores de formatação
+- Os títulos devem ser em texto puro: "PRESCRIÇÃO:" (não **PRESCRIÇÃO:**)
 `;
 
   try {
@@ -133,7 +137,7 @@ ${prescription}
 DADOS DO PACIENTE:
 - Idade: ${patient.age ? `${patient.age} anos` : "não informada"}
 - Peso: ${patient.weight_kg ? `${patient.weight_kg}kg` : "não informado"}
-${patient.allergies ? `- ⚠️  ALERGIAS: ${patient.allergies}` : ""}
+${patient.allergies ? `- ALERGIAS: ${patient.allergies}` : ""}
 ${patient.current_medications ? `- Medicações em uso: ${patient.current_medications}` : ""}
 - Diagnóstico: ${clinical.diagnosis}
 
@@ -146,17 +150,24 @@ SUA TAREFA:
    - Interações medicamentosas
    - Frequências e durações adequadas
    - Clareza das instruções
-   - Uso apropriado de emojis
+   - Formatação sem Markdown
 
 3. CORRIJA quaisquer erros encontrados
 4. MELHORE a clareza e empatia se necessário
 5. Mantenha o FORMATO LIVRE com os tópicos obrigatórios
 6. Mantenha ou melhore os emojis para tornar mais visual
 
+REGRAS DE FORMATAÇÃO:
+- NÃO USE formatação Markdown (asteriscos **, underscores _, etc)
+- Use TEXTO SIMPLES sem marcadores de formatação
+- Os títulos devem ser em texto puro: "PRESCRIÇÃO:" (não **PRESCRIÇÃO:**)
+- REMOVA quaisquer asteriscos ou underscores usados para formatação
+
 RETORNE:
 - A prescrição CORRIGIDA, VALIDADA e HUMANIZADA
 - Se não houver erros, retorne a prescrição original com pequenas melhorias
-- Mantenha os tópicos: 💊 PRESCRIÇÃO, 📋 ORIENTAÇÕES GERAIS, ⚠️ SINAIS DE ALERTA, ℹ️ IMPORTANTE
+- Mantenha os tópicos: PRESCRIÇÃO, ORIENTAÇÕES GERAIS, SINAIS DE ALERTA, IMPORTANTE
+- IMPORTANTE: Texto puro, sem formatação Markdown
 
 NÃO adicione comentários ou explicações, apenas retorne a prescrição final formatada.
 `;
@@ -195,6 +206,24 @@ NÃO adicione comentários ou explicações, apenas retorne a prescrição final
 }
 
 /**
+ * Remove formatação Markdown da prescrição
+ */
+function removeMarkdownFormatting(text: string): string {
+  return text
+    // Remove negrito: **texto** ou __texto__ -> texto
+    .replace(/\*\*([^\*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    // Remove itálico: *texto* ou _texto_ -> texto (apenas se não for bullet point)
+    .replace(/([^\n])\*([^\*\n]+)\*([^\n])/g, '$1$2$3')
+    .replace(/([^\n])_([^_\n]+)_([^\n])/g, '$1$2$3')
+    // Remove asteriscos órfãos (que não são bullets)
+    .replace(/([^\n\s])\*\*([^\n])/g, '$1$2')
+    .replace(/([^\n])\*\*([^\n\s])/g, '$1$2')
+    // Preserva bullets (• ou *) no início de linhas
+    .trim();
+}
+
+/**
  * Função principal: Gera e valida prescrição
  */
 export async function generateValidatedPrescription(
@@ -207,6 +236,9 @@ export async function generateValidatedPrescription(
   console.log("🔍 Revalidando prescrição (2ª passada)...");
   const validatedPrescription = await revalidatePrescription(prescription, context);
 
+  console.log("🧹 Removendo formatação Markdown...");
+  const cleanPrescription = removeMarkdownFormatting(validatedPrescription);
+
   console.log("✅ Prescrição validada e pronta!");
-  return validatedPrescription;
+  return cleanPrescription;
 }

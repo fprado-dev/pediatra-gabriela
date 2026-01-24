@@ -6,7 +6,6 @@ import {
   Users,
   Home,
   LogOut,
-  User,
   Settings,
 } from "lucide-react"
 import Link from "next/link"

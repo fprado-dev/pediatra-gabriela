@@ -13,7 +13,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { TemplateSelectorModal } from "@/components/templates/template-selector-modal";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   ArrowLeft,
   Save,
@@ -21,7 +36,7 @@ import {
   FileText,
   Stethoscope,
   Activity,
-  Pill,
+  Sparkles,
   Ruler,
   StickyNote,
 } from "lucide-react";
@@ -52,7 +67,8 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
   const router = useRouter();
   const supabase = createClient();
   const [isSaving, setIsSaving] = useState(false);
-  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const patient = Array.isArray(consultation.patient)
     ? consultation.patient[0]
@@ -137,13 +153,77 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
     }
   };
 
-  const handleTemplateSelect = (templateText: string) => {
-    const currentPrescription = watch("prescription") || "";
-    const newPrescription = currentPrescription
-      ? `${currentPrescription}\n\n${templateText}`
-      : templateText;
-    setValue("prescription", newPrescription);
-    toast.success("Template adicionado à prescrição!");
+  const handleGeneratePrescription = async (forceGenerate: boolean = false) => {
+    // Validação: campos obrigatórios
+    const diagnosis = watch("diagnosis");
+    const weight_kg = watch("weight_kg");
+
+    if (!diagnosis || diagnosis.trim().length < 2) {
+      toast.error("Diagnóstico é obrigatório para gerar prescrição");
+      return;
+    }
+
+    if (!weight_kg || weight_kg < 0.5) {
+      toast.error("Peso do paciente é obrigatório para calcular dosagens corretas");
+      return;
+    }
+
+    if (!patient?.date_of_birth) {
+      toast.error("Data de nascimento do paciente é necessária");
+      return;
+    }
+
+    // Verificar se campo já está preenchido
+    const currentPrescription = watch("prescription");
+    if (currentPrescription && currentPrescription.trim().length > 0 && !forceGenerate) {
+      setShowConfirmDialog(true);
+      return;
+    }
+
+    // Gerar prescrição
+    setIsGenerating(true);
+    try {
+      toast.info("🤖 Gerando prescrição personalizada...");
+
+      const response = await fetch("/api/consultations/generate-prescription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId: patient.id,
+          clinical: {
+            chief_complaint: watch("chief_complaint"),
+            history: watch("history"),
+            physical_exam: watch("physical_exam"),
+            diagnosis: watch("diagnosis"),
+            plan: watch("plan"),
+          },
+          measurements: {
+            weight_kg: watch("weight_kg"),
+            height_cm: watch("height_cm"),
+            head_circumference_cm: watch("head_circumference_cm"),
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao gerar prescrição");
+      }
+
+      const data = await response.json();
+      setValue("prescription", data.prescription);
+      toast.success("✅ Prescrição gerada e validada com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao gerar prescrição:", error);
+      toast.error(error.message || "Erro ao gerar prescrição. Tente novamente.");
+    } finally {
+      setIsGenerating(false);
+      setShowConfirmDialog(false);
+    }
+  };
+
+  const handleConfirmReplace = () => {
+    handleGeneratePrescription(true);
   };
 
   return (
@@ -248,23 +328,43 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="prescription">Prescrição Médica</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTemplateModalOpen(true)}
-                  className="gap-2"
-                >
-                  <Pill className="h-4 w-4" />
-                  Adicionar Template
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleGeneratePrescription(false)}
+                        disabled={isGenerating || isSaving}
+                        className="gap-2"
+                      >
+                        {isGenerating ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Gerando...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4" />
+                            Gerar Prescrição
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>IA irá gerar prescrição baseada nos dados clínicos</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <Textarea
                 id="prescription"
-                placeholder="Digite ou adicione um template de prescrição..."
+                placeholder="Clique em 'Gerar Prescrição' para criar automaticamente com IA..."
                 rows={8}
                 className="font-mono text-sm"
                 {...register("prescription")}
+                disabled={isGenerating}
               />
             </div>
           </CardContent>
@@ -397,13 +497,24 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
         </div>
       </form>
 
-      {/* Modal de Templates */}
-      <TemplateSelectorModal
-        open={templateModalOpen}
-        onOpenChange={setTemplateModalOpen}
-        onSelectTemplate={handleTemplateSelect}
-        patientWeight={patient?.weight_kg || consultation.weight_kg || null}
-      />
+      {/* Diálogo de Confirmação */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Substituir prescrição existente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O campo de prescrição já contém texto. Deseja substituir pelo conteúdo gerado pela IA?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmReplace}>
+              Sim, substituir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

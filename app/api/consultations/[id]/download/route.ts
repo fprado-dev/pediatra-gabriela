@@ -390,21 +390,9 @@ class PDFBuilder {
     const boxHeight = 50;
     const boxY = this.yPosition - boxHeight;
 
-    // Desenhar caixa de alerta (NOVA: borda amarela, fundo branco)
-    this.drawRectangle(
-      LAYOUT.marginLeft,
-      boxY,
-      LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight,
-      boxHeight,
-      {
-        fillColor: COLORS.warning, // Branco
-        borderColor: COLORS.warningBorder, // Amarelo claro
-        borderWidth: 2,
-      }
-    );
+    
 
     // Texto do alerta
-    const savedY = this.yPosition;
     this.yPosition = boxY + boxHeight - 15;
 
     const alertText = "ATENÇÃO - ALERGIAS";
@@ -435,7 +423,7 @@ class PDFBuilder {
       const logoImage = await this.doc.embedPng(logoBytes);
       
       // Tamanho médio da logo (80px de largura)
-      const logoWidth = 80;
+      const logoWidth = 180;
       const logoDims = logoImage.scale(logoWidth / logoImage.width);
       
       // Centralizar logo
@@ -605,18 +593,31 @@ export async function GET(
 
     // === DADOS DO PACIENTE ===
     let patientInfo = `Nome: ${patient?.full_name || 'N/A'}\n`;
-    if (patientAge !== null) patientInfo += `Idade: ${patientAge} anos\n`;
-    if (patient?.date_of_birth)
+    
+    // Idade
+    if (patientAge !== null) {
+      patientInfo += `Idade: ${patientAge} anos\n`;
+    }
+    
+    // Data de Nascimento
+    if (patient?.date_of_birth) {
       patientInfo += `Data de Nascimento: ${format(new Date(patient.date_of_birth), "dd/MM/yyyy", { locale: ptBR })}\n`;
-    if (patient?.cpf) patientInfo += `CPF: ${patient.cpf}\n`;
-    if (patient?.phone) patientInfo += `Telefone: ${patient.phone}\n`;
-    if (patient?.blood_type) patientInfo += `Tipo Sanguíneo: ${patient.blood_type}`;
-    builder.moveDown(8);
+    }
+    
+    // Nome do Responsável
+    if (patient?.responsible_name) {
+      patientInfo += `Responsável: ${patient.responsible_name}\n`;
+    }
+    
+    // Telefone
+    if (patient?.phone) {
+      patientInfo += `Telefone: ${patient.phone}`;
+    }
 
     builder.addSection("Dados do Paciente", patientInfo);
-      builder.moveDown(10);
+    builder.moveDown(10);
 
-    // === ALERGIAS (MOVIDO: após dados do paciente) ===
+    // === ALERGIAS (se houver) ===
     if (patient?.allergies) {
       builder.addAllergyWarning(patient.allergies);
       builder.moveDown(10);

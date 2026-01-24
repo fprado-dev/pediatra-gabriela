@@ -3,13 +3,11 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { FileText, Home, LogOut, Settings, Users } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { FileText, Home, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { NavUser } from "@/components/layout/nav-user";
 
 type User = {
   name: string;
@@ -26,21 +24,6 @@ const NAV = [
 
 export function AppSidebar({ user }: { user: User }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
-
-  const initials = React.useMemo(() => {
-    const parts = (user.name || "").trim().split(/\s+/).filter(Boolean);
-    const first = parts[0]?.[0] ?? "U";
-    const second = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
-    return (first + second).toUpperCase();
-  }, [user.name]);
-
-  const onLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/auth/login");
-    router.refresh();
-  };
 
   return (
     <div className="flex h-full min-h-svh flex-col">
@@ -82,38 +65,7 @@ export function AppSidebar({ user }: { user: User }) {
         </div>
       </nav>
 
-      <div className="border-t p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-primary text-primary-foreground">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{user.name}</div>
-            <div className="truncate text-xs text-muted-foreground">
-              {user.specialty || "Médico"}
-              {user.crm ? ` • CRM ${user.crm}` : ""}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 grid gap-2">
-          <Button asChild variant="outline" className="justify-start">
-            <Link href="/settings">
-              <Settings className="mr-2 h-4 w-4" />
-              Configurações
-            </Link>
-          </Button>
-
-          <Button variant="destructive" className="justify-start" onClick={onLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
-          </Button>
-        </div>
-      </div>
+      <NavUser user={user} />
     </div>
   );
 }
-

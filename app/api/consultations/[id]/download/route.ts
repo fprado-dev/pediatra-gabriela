@@ -8,8 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(
   request: NextRequest,
@@ -82,7 +85,7 @@ export async function GET(
     pdfDoc.setCreationDate(new Date());
 
     // Adicionar página A4
-    const page = pdfDoc.addPage([595, 842]); // A4 em pontos
+    let page = pdfDoc.addPage([595, 842]); // A4 em pontos
     const { width, height } = page.getSize();
 
     // Carregar fontes
@@ -90,10 +93,43 @@ export async function GET(
     const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const courierFont = await pdfDoc.embedFont(StandardFonts.Courier);
 
+    // Carregar logo
+    let logoImage = null;
+    let logoWidth = 0;
+    let logoHeight = 0;
+    try {
+      const logoPath = join(process.cwd(), "public", "small-logo.png");
+      const logoBytes = readFileSync(logoPath);
+      logoImage = await pdfDoc.embedPng(logoBytes);
+      const logoDims = logoImage.scale(0.15); // Escala para tamanho adequado
+      logoWidth = logoDims.width;
+      logoHeight = logoDims.height;
+      console.log("✅ Logo carregada com sucesso");
+    } catch (error) {
+      console.warn("⚠️ Não foi possível carregar o logo:", error);
+    }
+
     let yPosition = height - 50; // Começar do topo com margem
     const leftMargin = 50;
     const rightMargin = width - 50;
+    const centerX = width / 2;
     const lineHeight = 14;
+
+    // Função para remover emojis e caracteres especiais
+    const removeEmojis = (text: string): string => {
+      return text
+        .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Emojis diversos
+        .replace(/[\u{2600}-\u{26FF}]/gu, '') // Símbolos diversos
+        .replace(/[\u{2700}-\u{27BF}]/gu, '') // Dingbats
+        .replace(/[\u{1F900}-\u{1F9FF}]/gu, '') // Emojis suplementares
+        .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // Emoticons
+        .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // Transporte e símbolos
+        .replace(/[\u{2190}-\u{21FF}]/gu, '') // Setas
+        .replace(/[\u{FE00}-\u{FE0F}]/gu, '') // Variações de emojis
+        .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // Bandeiras
+        .replace(/[^\x20-\x7E\xA0-\xFF]/g, '') // Remove tudo que não é ASCII/Latin-1
+        .trim();
+    };
 
     // Helper para adicionar texto
     const addText = (text: string, options: {
@@ -102,25 +138,19 @@ export async function GET(
       color?: any;
       bold?: boolean;
       x?: number;
+      centered?: boolean;
       maxWidth?: number;
     } = {}) => {
       const font = options.bold ? helveticaBoldFont : (options.font || helveticaFont);
       const size = options.size || 10;
-      const x = options.x || leftMargin;
-      const maxWidth = options.maxWidth || (rightMargin - leftMargin);
+      const color = options.color || rgb(0, 0, 0);
 
-      // Limpeza completa: remover caracteres não suportados por WinAnsi
-      // WinAnsi suporta apenas: 0x20-0x7E (ASCII) + 0xA0-0xFF (Latin-1)
-      let cleanText = text
-        .replace(/\n/g, ' ')  // Line Feed -> espaço
-        .replace(/\r/g, '')   // Carriage Return -> remove
-        .replace(/\t/g, ' ')  // Tab -> espaço
-        // Remover emojis e caracteres Unicode fora do range WinAnsi
-        .replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
+      // Limpar emojis e caracteres especiais
+      const cleanText = removeEmojis(text);
 
-      // Quebra de linha automática por palavras
       const words = cleanText.split(' ').filter(w => w.length > 0);
       let line = '';
+      const maxWidth = options.maxWidth || (rightMargin - leftMargin);
       const lines: string[] = [];
 
       for (const word of words) {
@@ -136,13 +166,19 @@ export async function GET(
       }
       if (line) lines.push(line);
 
-      // Desenhar linhas
+      // Verificar se precisa de nova página
+      const totalHeight = lines.length * size * 1.2;
+      if (yPosition - totalHeight < 100) { // Margem de segurança no rodapé
+        page = pdfDoc.addPage([595, 842]);
+        yPosition = height - 50;
+      }
+
       for (const textLine of lines) {
-        // Verificar se precisa de nova página
-        if (yPosition < 50) {
-          const newPage = pdfDoc.addPage([595, 842]);
-          yPosition = height - 50;
-          page.drawText = newPage.drawText.bind(newPage);
+        let x = options.x || leftMargin;
+        
+        if (options.centered) {
+          const textWidth = font.widthOfTextAtSize(textLine, size);
+          x = centerX - textWidth / 2;
         }
 
         page.drawText(textLine, {
@@ -150,93 +186,143 @@ export async function GET(
           y: yPosition,
           size,
           font,
-          color: options.color || rgb(0, 0, 0),
+          color,
         });
 
-        yPosition -= lineHeight;
+        yPosition -= size * 1.2;
       }
     };
 
-    const addLine = () => {
+    const addMainDivider = () => {
       page.drawLine({
         start: { x: leftMargin, y: yPosition },
         end: { x: rightMargin, y: yPosition },
-        thickness: 1,
-        color: rgb(0.7, 0.7, 0.7),
+        thickness: 1.5,
+        color: rgb(0.3, 0.3, 0.3),
       });
       yPosition -= 20;
     };
 
-    const addSection = (title: string, content: string | null, options: { mono?: boolean } = {}) => {
-      if (!content) return;
+    const addSection = (title: string, content: string | null, options: { 
+      mono?: boolean;
+      removeEmojis?: boolean;
+    } = {}) => {
+      if (!content || content.trim().length === 0) return;
 
-      addText(title.toUpperCase(), { size: 12, bold: true });
-      yPosition -= 5;
-      addText(content, { 
+      addText(title.toUpperCase(), { size: 13, bold: true, color: rgb(0.2, 0.2, 0.2) });
+      yPosition -= 8;
+      
+      const processedContent = options.removeEmojis ? removeEmojis(content) : content;
+      addText(processedContent, { 
         size: 10, 
         font: options.mono ? courierFont : helveticaFont 
       });
-      yPosition -= 10;
+      yPosition -= 15;
+    };
+
+    const addAllergyWarning = (allergies: string) => {
+      // Caixa de alerta para alergias
+      const boxHeight = 40;
+      const boxPadding = 10;
+      
+      // Fundo vermelho claro
+      page.drawRectangle({
+        x: leftMargin,
+        y: yPosition - boxHeight + 10,
+        width: rightMargin - leftMargin,
+        height: boxHeight,
+        color: rgb(1, 0.95, 0.95),
+        borderColor: rgb(0.8, 0.2, 0.2),
+        borderWidth: 2,
+      });
+
+      yPosition -= 15;
+      addText("ALERTA - ALERGIAS", { 
+        size: 11, 
+        bold: true, 
+        color: rgb(0.8, 0, 0),
+        x: leftMargin + boxPadding 
+      });
+      yPosition -= 5;
+      addText(removeEmojis(allergies), { 
+        size: 10, 
+        color: rgb(0.6, 0, 0),
+        x: leftMargin + boxPadding,
+        maxWidth: rightMargin - leftMargin - 2 * boxPadding
+      });
+      yPosition -= 20;
     };
 
     // === CABEÇALHO ===
+    
+    // Logo (se disponível)
+    if (logoImage) {
+      page.drawImage(logoImage, {
+        x: centerX - logoWidth / 2,
+        y: yPosition - logoHeight,
+        width: logoWidth,
+        height: logoHeight,
+      });
+      yPosition -= logoHeight + 10;
+    }
+
+    // Título principal
     addText("PRONTUÁRIO MÉDICO PEDIÁTRICO", { 
-      size: 20, 
+      size: 24, 
       bold: true,
-      x: leftMargin + (rightMargin - leftMargin) / 2 - 150
+      centered: true,
+      color: rgb(0.1, 0.1, 0.1)
     });
     yPosition -= 5;
-    addText(
-      `Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
-      { 
-        size: 10,
-        x: leftMargin + (rightMargin - leftMargin) / 2 - 80
-      }
-    );
-    yPosition -= 10;
-    addLine();
 
-    // === DADOS DO MÉDICO ===
-    addText("DADOS DO MÉDICO", { size: 12, bold: true });
-    yPosition -= 5;
-    if (profile?.full_name) addText(`Nome: ${profile.full_name}`);
-    if (profile?.crm) addText(`CRM: ${profile.crm}`);
-    if (profile?.specialty) addText(`Especialidade: ${profile.specialty}`);
+    // Dados do médico
+    if (profile?.full_name && profile?.crm) {
+      addText(`Dr(a). ${profile.full_name} - CRM: ${profile.crm}`, { 
+        size: 11,
+        centered: true,
+        color: rgb(0.3, 0.3, 0.3)
+      });
+    }
+    yPosition -= 3;
+
+    // Data da consulta
+    if (consultation.created_at) {
+      addText(
+        `Consulta realizada em: ${format(new Date(consultation.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
+        { 
+          size: 10,
+          centered: true,
+          color: rgb(0.4, 0.4, 0.4)
+        }
+      );
+    }
+    
     yPosition -= 10;
+    addMainDivider();
+
+
 
     // === DADOS DO PACIENTE ===
-    addText("DADOS DO PACIENTE", { size: 12, bold: true });
-    yPosition -= 5;
-    if (patient?.full_name) addText(`Nome: ${patient.full_name}`);
-    if (patient?.cpf) addText(`CPF: ${patient.cpf}`);
-    if (patientAge !== null) addText(`Idade: ${patientAge} anos`);
+    addText("DADOS DO PACIENTE", { size: 13, bold: true, color: rgb(0.2, 0.2, 0.2) });
+    yPosition -= 8;
+    if (patient?.full_name) addText(`Nome: ${patient.full_name}`, { size: 10 });
+    if (patientAge !== null) addText(`Idade: ${patientAge} anos`, { size: 10 });
     if (patient?.date_of_birth)
-      addText(`Data de Nascimento: ${format(new Date(patient.date_of_birth), "dd/MM/yyyy")}`);
-    if (patient?.phone) addText(`Telefone: ${patient.phone}`);
-    if (patient?.email) addText(`Email: ${patient.email}`);
-    if (patient?.blood_type) addText(`Tipo Sanguíneo: ${patient.blood_type}`);
-    if (patient?.allergies) addText(`ALERTA - Alergias: ${patient.allergies}`, { bold: true });
-    yPosition -= 10;
-
-    // === DATA DA CONSULTA ===
-    addText("DATA DA CONSULTA", { size: 12, bold: true });
-    yPosition -= 5;
-    addText(
-      format(
-        new Date(consultation.created_at),
-        "dd 'de' MMMM 'de' yyyy 'às' HH:mm",
-        { locale: ptBR }
-      )
-    );
+      addText(`Data de Nascimento: ${format(new Date(patient.date_of_birth), "dd/MM/yyyy")}`, { size: 10 });
+    if (patient?.phone) addText(`Telefone: ${patient.phone}`, { size: 10 });
+    if (patient?.blood_type) addText(`Tipo Sanguíneo: ${patient.blood_type}`, { size: 10 });
+    
     yPosition -= 15;
-    addLine();
+
+    // Alergias com destaque especial
+    if (patient?.allergies && patient.allergies.trim().length > 0) {
+      addAllergyWarning(patient.allergies);
+    }
 
     // === CONTEÚDO CLÍNICO ===
     addSection("Queixa Principal", consultation.chief_complaint);
     addSection("História / Anamnese", consultation.history);
-    addSection("Exame Físico", consultation.physical_exam);
     addSection("Diagnóstico", consultation.diagnosis);
-    addSection("Prescrição Médica", consultation.prescription, { mono: true });
     addSection("Plano Terapêutico", consultation.plan);
 
     // === MEDIDAS ===
@@ -245,40 +331,112 @@ export async function GET(
       consultation.height_cm ||
       consultation.head_circumference_cm
     ) {
-      addText("MEDIDAS ANTROPOMÉTRICAS", { size: 12, bold: true });
-      yPosition -= 5;
-      if (consultation.weight_kg) addText(`Peso: ${consultation.weight_kg} kg`);
-      if (consultation.height_cm) addText(`Altura: ${consultation.height_cm} cm`);
-      if (consultation.head_circumference_cm)
-        addText(`Perímetro Cefálico: ${consultation.head_circumference_cm} cm`);
-      yPosition -= 10;
+      addText("MEDIDAS ANTROPOMÉTRICAS", { size: 13, bold: true, color: rgb(0.2, 0.2, 0.2) });
+      yPosition -= 8;
+      const measures = [];
+      if (consultation.weight_kg) measures.push(`Peso: ${consultation.weight_kg}kg`);
+      if (consultation.height_cm) measures.push(`Altura: ${consultation.height_cm}cm`);
+      if (consultation.head_circumference_cm) measures.push(`PC: ${consultation.head_circumference_cm}cm`);
+      addText(measures.join(' | '), { size: 10 });
+      yPosition -= 15;
     }
 
-    addSection("Desenvolvimento", consultation.development_notes);
-    addSection("Observações Adicionais", consultation.notes);
+    // === PRESCRIÇÃO (com remoção de emojis) ===
+    if (consultation.prescription && consultation.prescription.trim().length > 0) {
+      addText("PRESCRIÇÃO MÉDICA", { size: 13, bold: true, color: rgb(0.2, 0.2, 0.2) });
+      yPosition -= 8;
+      addText(removeEmojis(consultation.prescription), { size: 10, font: helveticaFont });
+      yPosition -= 15;
+    }
 
-    if (patient?.medical_history) {
+    // === OBSERVAÇÕES (incluindo Exame Físico e Desenvolvimento) ===
+    const observationsContent = [
+      consultation.physical_exam ? `Exame Físico:\n${consultation.physical_exam}` : null,
+      consultation.development_notes ? `Desenvolvimento:\n${consultation.development_notes}` : null,
+      consultation.notes ? `Observações Adicionais:\n${consultation.notes}` : null,
+    ].filter(Boolean).join('\n\n');
+
+    if (observationsContent.length > 0) {
+      addSection("Observações", observationsContent);
+    }
+
+    // === HISTÓRICO (se aplicável) ===
+    if (patient?.medical_history && patient.medical_history.trim().length > 0) {
       addSection("Histórico Médico do Paciente", patient.medical_history);
     }
 
+    yPosition -= 10;
+    addMainDivider();
+
+
     // === RODAPÉ ===
-    const footerY = 50;
-    page.drawLine({
-      start: { x: leftMargin, y: footerY + 15 },
-      end: { x: rightMargin, y: footerY + 15 },
-      thickness: 1,
-      color: rgb(0.7, 0.7, 0.7),
+    // Voltar para a última página para adicionar rodapé
+    const pages = pdfDoc.getPages();
+    const lastPage = pages[pages.length - 1];
+    
+    const footerY = 70;
+    
+    // Linha superior do rodapé
+    lastPage.drawLine({
+      start: { x: leftMargin, y: footerY + 40 },
+      end: { x: rightMargin, y: footerY + 40 },
+      thickness: 1.5,
+      color: rgb(0.3, 0.3, 0.3),
     });
 
-    page.drawText(
-      "Este documento foi gerado digitalmente e contém informações confidenciais protegidas por sigilo médico.",
+    // Espaço para carimbo/assinatura (à direita)
+    const stampBoxWidth = 180;
+    const stampBoxHeight = 60;
+    const stampX = rightMargin - stampBoxWidth;
+    
+    lastPage.drawRectangle({
+      x: stampX,
+      y: footerY - 15,
+      width: stampBoxWidth,
+      height: stampBoxHeight,
+      borderColor: rgb(0.7, 0.7, 0.7),
+      borderWidth: 1,
+    });
+
+    lastPage.drawText("Carimbo e Assinatura", {
+      x: stampX + 10,
+      y: footerY + 35,
+      size: 8,
+      font: helveticaFont,
+      color: rgb(0.5, 0.5, 0.5),
+    });
+
+    // Informações à esquerda
+    lastPage.drawText(
+      "Este documento contém informações confidenciais",
       {
         x: leftMargin,
-        y: footerY,
+        y: footerY + 25,
         size: 8,
         font: helveticaFont,
         color: rgb(0.5, 0.5, 0.5),
-        maxWidth: rightMargin - leftMargin,
+      }
+    );
+
+    lastPage.drawText(
+      "protegidas por sigilo médico (Art. 73 do CEM).",
+      {
+        x: leftMargin,
+        y: footerY + 15,
+        size: 8,
+        font: helveticaFont,
+        color: rgb(0.5, 0.5, 0.5),
+      }
+    );
+
+    lastPage.drawText(
+      `Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
+      {
+        x: leftMargin,
+        y: footerY,
+        size: 7,
+        font: helveticaFont,
+        color: rgb(0.6, 0.6, 0.6),
       }
     );
 

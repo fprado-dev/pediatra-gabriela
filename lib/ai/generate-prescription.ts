@@ -61,29 +61,29 @@ INSTRUÇÕES:
 6. Verifique interações com medicações atuais
 7. Inclua orientações gerais de cuidado
 8. Adicione sinais de alerta (quando retornar)
+9. Use EMOJIS para tornar mais visual e amigável
 
-FORMATO OBRIGATÓRIO:
+FORMATO (use formato livre mas mantenha estes tópicos):
 
-PRESCRIÇÃO:
-1. [Medicamento] [dosagem calculada] - [via] - [frequência] - [duração]
-2. [Medicamento] [dosagem calculada] - [via] - [frequência] - [duração]
-(adicione quantos forem necessários)
+💊 PRESCRIÇÃO:
+[Escreva as medicações de forma natural e clara, incluindo dosagens calculadas]
 
-ORIENTAÇÕES GERAIS:
-- [Orientação específica 1]
-- [Orientação específica 2]
-- [Orientação específica 3]
+📋 ORIENTAÇÕES GERAIS:
+[Orientações de cuidado e recomendações para os pais/responsáveis]
 
-SINAIS DE ALERTA - RETORNAR SE:
-- [Sinal de alerta 1]
-- [Sinal de alerta 2]
-- [Sinal de alerta 3]
+⚠️ SINAIS DE ALERTA - RETORNAR SE:
+[Liste sinais de que a criança precisa retornar imediatamente]
 
-IMPORTANTE:
+ℹ️ IMPORTANTE:
+[Informações críticas sobre a medicação ou tratamento]
+
+DIRETRIZES:
 - Seja ESPECÍFICO (não use "conforme necessário")
 - CALCULE dosagens exatas quando tiver peso
-- Use terminologia médica CORRETA
-- Seja CLARO e OBJETIVO
+- Use terminologia CLARA para pais entenderem
+- Seja HUMANO e ACOLHEDOR
+- Use emojis relevantes (💊 💉 🌡️ 🍼 💧 🏥 etc)
+- Formato livre mas organizado e legível
 `;
 
   try {
@@ -92,15 +92,15 @@ IMPORTANTE:
       messages: [
         {
           role: "system",
-          content: "Você é um pediatra especializado em prescrições médicas pediátricas, sempre preciso e cuidadoso.",
+          content: "Você é um pediatra especializado em prescrições médicas pediátricas, sempre preciso, cuidadoso e com comunicação clara e empática com os pais.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
-      temperature: 0.3, // Baixa temperatura para consistência médica
-      max_tokens: 1500,
+      temperature: 0.4, // Temperatura ligeiramente maior para mais naturalidade
+      max_tokens: 2000, // Mais tokens para formato livre com emojis
     });
 
     const prescription = completion.choices[0]?.message?.content?.trim();
@@ -146,16 +146,19 @@ SUA TAREFA:
    - Interações medicamentosas
    - Frequências e durações adequadas
    - Clareza das instruções
+   - Uso apropriado de emojis
 
 3. CORRIJA quaisquer erros encontrados
-4. MELHORE a clareza se necessário
-5. Mantenha o MESMO FORMATO
+4. MELHORE a clareza e empatia se necessário
+5. Mantenha o FORMATO LIVRE com os tópicos obrigatórios
+6. Mantenha ou melhore os emojis para tornar mais visual
 
 RETORNE:
-- A prescrição CORRIGIDA e VALIDADA
-- Se não houver erros, retorne a prescrição original com pequenas melhorias de clareza
+- A prescrição CORRIGIDA, VALIDADA e HUMANIZADA
+- Se não houver erros, retorne a prescrição original com pequenas melhorias
+- Mantenha os tópicos: 💊 PRESCRIÇÃO, 📋 ORIENTAÇÕES GERAIS, ⚠️ SINAIS DE ALERTA, ℹ️ IMPORTANTE
 
-NÃO adicione comentários, apenas retorne a prescrição final formatada.
+NÃO adicione comentários ou explicações, apenas retorne a prescrição final formatada.
 `;
 
   try {
@@ -164,15 +167,15 @@ NÃO adicione comentários, apenas retorne a prescrição final formatada.
       messages: [
         {
           role: "system",
-          content: "Você é um revisor especializado em segurança de prescrições pediátricas.",
+          content: "Você é um revisor especializado em segurança de prescrições pediátricas, focado em precisão técnica e clareza na comunicação.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
-      temperature: 0.1, // Temperatura ainda mais baixa para revisão
-      max_tokens: 1500,
+      temperature: 0.2, // Temperatura baixa mas permitindo alguma flexibilidade na forma
+      max_tokens: 2000,
     });
 
     const validatedPrescription = completion.choices[0]?.message?.content?.trim();

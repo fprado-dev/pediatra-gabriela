@@ -407,7 +407,7 @@ class PDFBuilder {
     const savedY = this.yPosition;
     this.yPosition = boxY + boxHeight - 15;
 
-    const alertText = this.fonts.useCustom ? "⚠️  ATENÇÃO - ALERGIAS" : "ATENÇÃO - ALERGIAS";
+    const alertText = "ATENÇÃO - ALERGIAS";
     this.drawText(alertText, {
       size: 11,
       bold: true,
@@ -422,34 +422,59 @@ class PDFBuilder {
     this.yPosition = boxY - 15;
   }
 
-  addFooter() {
-    // NOVO: Adicionar carimbo no rodapé
+  async addFooter() {
+    // NOVO: Adicionar logo no rodapé
     const footerBaseY = LAYOUT.marginBottom - 30;
     const stampHeight = 60;
-    const stampWidth = 200;
     const stampY = footerBaseY + 50; // Acima do texto do rodapé
-    const stampX = LAYOUT.marginLeft + (LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight - stampWidth) / 2;
 
-    // Caixa pontilhada para carimbo
-    this.currentPage.drawRectangle({
-      x: stampX,
-      y: stampY,
-      width: stampWidth,
-      height: stampHeight,
-      borderColor: COLORS.gray,
-      borderWidth: 1,
-      borderDashArray: [3, 3],
-    });
+    // Carregar e desenhar full-logo.png
+    try {
+      const logoPath = path.join(process.cwd(), 'public/full-logo.png');
+      const logoBytes = fs.readFileSync(logoPath);
+      const logoImage = await this.doc.embedPng(logoBytes);
+      
+      // Tamanho médio da logo (80px de largura)
+      const logoWidth = 80;
+      const logoDims = logoImage.scale(logoWidth / logoImage.width);
+      
+      // Centralizar logo
+      const logoX = LAYOUT.marginLeft + (LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight - logoDims.width) / 2;
+      const logoY = stampY + (stampHeight - logoDims.height) / 2;
 
-    // Texto do carimbo centralizado
-    this.currentPage.drawText("Espaço para Carimbo e Assinatura", {
-      x: LAYOUT.marginLeft,
-      y: stampY + stampHeight / 2 - 4,
-      size: 9,
-      font: this.fonts.regular,
-      color: COLORS.gray,
-      maxWidth: LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight,
-    });
+      this.currentPage.drawImage(logoImage, {
+        x: logoX,
+        y: logoY,
+        width: logoDims.width,
+        height: logoDims.height,
+      });
+
+      console.log("✅ Logo full-logo.png adicionada ao rodapé");
+    } catch (error) {
+      console.warn("⚠️  Logo full-logo.png não encontrada, usando texto:", error);
+      
+      // Fallback: Caixa pontilhada com texto
+      const stampWidth = 200;
+      const stampX = LAYOUT.marginLeft + (LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight - stampWidth) / 2;
+      
+      this.currentPage.drawRectangle({
+        x: stampX,
+        y: stampY,
+        width: stampWidth,
+        height: stampHeight,
+        borderColor: COLORS.gray,
+        borderWidth: 1,
+        borderDashArray: [3, 3],
+      });
+
+      this.currentPage.drawText("Espaço para Carimbo e Assinatura", {
+        x: stampX + 20,
+        y: stampY + stampHeight / 2 - 4,
+        size: 9,
+        font: this.fonts.regular,
+        color: COLORS.gray,
+      });
+    }
 
     // Linha divisória
     this.currentPage.drawLine({
@@ -589,6 +614,7 @@ export async function GET(
     builder.moveDown(8);
 
     builder.addSection("Dados do Paciente", patientInfo);
+      builder.moveDown(10);
 
     // === ALERGIAS (MOVIDO: após dados do paciente) ===
     if (patient?.allergies) {
@@ -623,19 +649,20 @@ export async function GET(
     let observations = "";
     if (consultation.physical_exam) observations += `Exame Físico:\n${consultation.physical_exam}\n\n`;
     if (consultation.development_notes) observations += `Desenvolvimento:\n${consultation.development_notes}\n\n`;
-    if (consultation.notes) observations += `Outras Observações:\n${consultation.notes}`;
+    if (consultation.notes) observations += `${consultation.notes}`;
     
     if (observations.trim()) {
       builder.addSection("Observações Adicionais", observations.trim());
     }
+      builder.moveDown(10);
 
     // === HISTÓRICO MÉDICO ===
     if (patient?.medical_history) {
       builder.addSection("Histórico Médico do Paciente", patient.medical_history);
     }
 
-    // === RODAPÉ (inclui carimbo) ===
-    builder.addFooter();
+    // === RODAPÉ (inclui logo) ===
+    await builder.addFooter();
 
     // Gerar PDF
     console.log("📦 Gerando bytes do PDF...");

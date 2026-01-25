@@ -152,6 +152,15 @@ export function NewConsultationRecording({
       setConsultationId(data.consultationId);
       setFlowState("processing");
       toast.success("Áudio enviado! Processando com IA...");
+
+      // Iniciar processamento (chamada separada para funcionar na Vercel)
+      fetch("/api/consultations/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consultationId: data.consultationId }),
+      }).catch((err) => {
+        console.error("Erro ao iniciar processamento:", err);
+      });
     } catch (err: any) {
       console.error("Erro no upload:", err);
       setError(err.message || "Erro ao processar áudio");

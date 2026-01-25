@@ -149,30 +149,7 @@ export async function POST(request: NextRequest) {
       .eq("id", consultation.id);
 
     console.log(`✅ Upload concluído - Consulta ID: ${consultation.id}`);
-
-    // Disparar processamento em background (importando função diretamente)
-    console.log(`\n🚀 INICIANDO PROCESSAMENTO DIRETO`);
-    console.log(`   Consultation ID: ${consultation.id}`);
-    
-    // Importar e chamar função diretamente (mais confiável que fetch)
-    import("@/lib/openai/process-consultation")
-      .then(({ processConsultation }) => {
-        console.log("✅ Módulo importado, iniciando processamento...");
-        return processConsultation(consultation.id);
-      })
-      .then((result) => {
-        console.log("✅ Processamento concluído com sucesso!", result);
-      })
-      .catch((err) => {
-        console.error("❌ ERRO NO PROCESSAMENTO:", err);
-        console.error("   Tipo:", err.name);
-        console.error("   Mensagem:", err.message);
-        console.error("   Stack:", err.stack);
-        
-        // Erro já foi salvo no banco pela função processConsultation
-      });
-
-    console.log(`📤 Retornando resposta ao cliente (processamento em background)...`);
+    console.log(`📤 Retornando resposta ao cliente (cliente iniciará processamento)...`);
 
     return NextResponse.json({
       consultationId: consultation.id,

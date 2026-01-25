@@ -4,7 +4,12 @@ import { NewConsultationRecording } from "@/components/consultations/new-consult
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewConsultationRecordingPage() {
+interface PageProps {
+  searchParams: Promise<{ patientId?: string }>;
+}
+
+export default async function NewConsultationRecordingPage({ searchParams }: PageProps) {
+  const { patientId } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -27,5 +32,10 @@ export default async function NewConsultationRecordingPage() {
     console.error("Error fetching patients:", error);
   }
 
-  return <NewConsultationRecording patients={patients || []} />;
+  return (
+    <NewConsultationRecording 
+      patients={patients || []} 
+      preSelectedPatientId={patientId}
+    />
+  );
 }

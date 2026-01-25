@@ -20,9 +20,10 @@ interface ProcessingStep {
 interface ProcessingStatusProps {
   consultationId: string;
   onComplete?: (consultationId: string) => void;
+  onError?: (errorMessage: string) => void;
 }
 
-export function ProcessingStatus({ consultationId, onComplete }: ProcessingStatusProps) {
+export function ProcessingStatus({ consultationId, onComplete, onError }: ProcessingStatusProps) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<ProcessingStep[]>([
@@ -122,8 +123,12 @@ export function ProcessingStatus({ consultationId, onComplete }: ProcessingStatu
             setTimeout(() => onComplete(consultationId), 1000);
           }
         } else if (consultation.status === "error") {
-          setError(consultation.processing_error || "Erro desconhecido no processamento");
+          const errorMessage = consultation.processing_error || "Erro desconhecido no processamento";
+          setError(errorMessage);
           clearInterval(pollingInterval);
+          if (onError) {
+            onError(errorMessage);
+          }
         }
       } catch (err: any) {
         console.error("Erro no polling:", err);

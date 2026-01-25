@@ -24,6 +24,8 @@ export interface ConsultationFields {
   development_notes: string | null;
 }
 
+const MIN_WORDS_FOR_EXTRACTION = 20;
+
 /**
  * Extrai campos estruturados de uma consulta médica a partir do texto limpo
  * @param cleanedText - Texto limpo e processado
@@ -36,6 +38,15 @@ export async function extractConsultationFields(
 ): Promise<ConsultationFields> {
   if (!cleanedText || cleanedText.trim().length === 0) {
     throw new Error("Texto para extração está vazio");
+  }
+
+  // Validar quantidade mínima de palavras
+  const wordCount = cleanedText.trim().split(/\s+/).length;
+  if (wordCount < MIN_WORDS_FOR_EXTRACTION) {
+    throw new Error(
+      `DADOS_INSUFICIENTES: O áudio não contém informações médicas suficientes para processar a consulta. ` +
+      `Foram detectadas apenas ${wordCount} palavras. Por favor, grave novamente com mais detalhes sobre a consulta.`
+    );
   }
 
   try {
@@ -133,29 +144,35 @@ TAREFA: Analise a transcrição da consulta médica pediátrica e extraia as seg
 9. **head_circumference_cm**: Perímetro cefálico em cm (número decimal)
 10. **development_notes**: Observações sobre desenvolvimento neuropsicomotor
 
-**INSTRUÇÕES IMPORTANTES:**
-- Se um campo não tiver informação na transcrição, retorne null
-- Seja preciso e objetivo, mas preserve informações clínicas importantes
+**INSTRUÇÕES CRÍTICAS:**
+- NUNCA INVENTE, CRIE OU SUPONHA informações que não estejam EXPLICITAMENTE no texto
+- Se um campo não tiver informação clara na transcrição, RETORNE NULL
+- NÃO preencha campos com informações genéricas ou hipotéticas
+- Seja preciso e objetivo, extraia APENAS o que foi dito
 - Use linguagem médica apropriada
-- Para números, extraia apenas o valor numérico
-- Organize as informações de forma clara e estruturada
-- NÃO invente informações que não estejam no texto
+- Para números, extraia apenas o valor numérico mencionado
+- Se o texto não contiver informações médicas suficientes, retorne has_sufficient_data: false
+
+**CAMPO data_quality (OBRIGATÓRIO):**
+- has_sufficient_data: true/false - indica se o texto contém informações médicas suficientes
+- Se o texto for muito curto, vago, ou não contiver queixa/sintomas claros, marque como false
 
 TRANSCRIÇÃO DA CONSULTA:
 ${cleanedText}
 
 Retorne APENAS um objeto JSON válido no seguinte formato (sem markdown, sem explicações):
 {
-  "chief_complaint": "texto ou null",
-  "history": "texto ou null",
-  "physical_exam": "texto ou null",
-  "diagnosis": "texto ou null",
-  "plan": "texto ou null",
-  "notes": "texto ou null",
+  "has_sufficient_data": true ou false,
+  "chief_complaint": "texto extraído ou null",
+  "history": "texto extraído ou null",
+  "physical_exam": "texto extraído ou null",
+  "diagnosis": "texto extraído ou null",
+  "plan": "texto extraído ou null",
+  "notes": "texto extraído ou null",
   "weight_kg": número ou null,
   "height_cm": número ou null,
   "head_circumference_cm": número ou null,
-  "development_notes": "texto ou null"
+  "development_notes": "texto extraído ou null"
 }`;
 
     const response = await openai.chat.completions.create({
@@ -172,7 +189,18 @@ Retorne APENAS um objeto JSON válido no seguinte formato (sem markdown, sem exp
       throw new Error("Resposta vazia da API");
     }
 
-    const extractedFields = JSON.parse(content) as ConsultationFields;
+    const parsedResponse = JSON.parse(content);
+
+    // Verificar se a IA indicou dados insuficientes
+    if (parsedResponse.has_sufficient_data === false) {
+      throw new Error(
+        "DADOS_INSUFICIENTES: O áudio não contém informações médicas suficientes para processar a consulta. " +
+        "Por favor, grave novamente incluindo: queixa principal, sintomas, e informações relevantes da consulta."
+      );
+    }
+
+    // Remover o campo de controle antes de retornar
+    const { has_sufficient_data, ...extractedFields } = parsedResponse;
 
     // Validar que pelo menos um campo foi preenchido
     const hasContent = Object.values(extractedFields).some(
@@ -180,17 +208,22 @@ Retorne APENAS um objeto JSON válido no seguinte formato (sem markdown, sem exp
     );
 
     if (!hasContent) {
-      throw new Error("Nenhum campo foi extraído da transcrição");
+      throw new Error(
+        "DADOS_INSUFICIENTES: Não foi possível extrair informações médicas do áudio. " +
+        "Por favor, grave novamente com mais detalhes sobre a consulta."
+      );
     }
 
-    console.log("✅ Campos extraídos com sucesso");
-    console.log(`   - Queixa: ${extractedFields.chief_complaint ? '✓' : '✗'}`);
-    console.log(`   - História: ${extractedFields.history ? '✓' : '✗'}`);
-    console.log(`   - Exame: ${extractedFields.physical_exam ? '✓' : '✗'}`);
-    console.log(`   - Diagnóstico: ${extractedFields.diagnosis ? '✓' : '✗'}`);
-    console.log(`   - Plano: ${extractedFields.plan ? '✓' : '✗'}`);
+    const result = extractedFields as ConsultationFields;
     
-    return extractedFields;
+    console.log("✅ Campos extraídos com sucesso");
+    console.log(`   - Queixa: ${result.chief_complaint ? '✓' : '✗'}`);
+    console.log(`   - História: ${result.history ? '✓' : '✗'}`);
+    console.log(`   - Exame: ${result.physical_exam ? '✓' : '✗'}`);
+    console.log(`   - Diagnóstico: ${result.diagnosis ? '✓' : '✗'}`);
+    console.log(`   - Plano: ${result.plan ? '✓' : '✗'}`);
+    
+    return result;
   } catch (error: any) {
     console.error("❌ Erro na extração de campos:", error);
     throw new Error(`Erro ao extrair campos: ${error.message}`);

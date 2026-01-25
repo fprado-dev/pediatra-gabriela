@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, Calendar, Phone, Heart } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { User, Calendar, Phone, Heart, AlertTriangle, ArrowRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -55,64 +55,69 @@ export function PatientCard({ patient }: PatientCardProps) {
   const hasAllergies = patient.allergies && patient.allergies.trim().length > 0;
 
   return (
-    <Link href={`/patients/${patient.id}`}>
-      <Card className="hover:shadow-md transition-shadow cursor-pointer">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-4">
-            {/* Avatar */}
-            <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-primary/10 text-primary">
-                {getInitials(patient.full_name)}
-              </AvatarFallback>
-            </Avatar>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-base truncate">
-                    {patient.full_name}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {calculateAge(patient.date_of_birth)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      {patient.phone}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Badges */}
-                <div className="flex flex-col items-end gap-1">
-                  {patient.blood_type && (
-                    <Badge variant="outline" className="text-xs">
-                      <Heart className="h-3 w-3 mr-1" />
-                      {patient.blood_type}
-                    </Badge>
-                  )}
-                  {hasAllergies && (
-                    <Badge variant="destructive" className="text-xs">
-                      Alergias
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="mt-2 text-xs text-muted-foreground">
-                Cadastrado{" "}
-                {formatDistanceToNow(new Date(patient.created_at), {
-                  addSuffix: true,
-                  locale: ptBR,
-                })}
-              </div>
-            </div>
+    <Card className="hover:shadow-md transition-shadow flex flex-col">
+      <CardContent className="p-4 flex flex-col flex-1">
+        {/* Header: Badges */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            {patient.blood_type && (
+              <Badge variant="outline" className="text-xs">
+                <Heart className="h-3 w-3 mr-1" />
+                {patient.blood_type}
+              </Badge>
+            )}
+            {hasAllergies && (
+              <Badge variant="destructive" className="text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Alergias
+              </Badge>
+            )}
           </div>
-        </CardContent>
-      </Card>
-    </Link>
+          <span className="text-xs text-muted-foreground">
+            {formatDistanceToNow(new Date(patient.created_at), {
+              addSuffix: true,
+              locale: ptBR,
+            })}
+          </span>
+        </div>
+
+        {/* Nome do paciente */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+            {getInitials(patient.full_name)}
+          </div>
+          <span className="font-semibold text-sm truncate">
+            {patient.full_name}
+          </span>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 mb-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {calculateAge(patient.date_of_birth)}
+            </span>
+            <span className="flex items-center gap-1">
+              <Phone className="h-3 w-3" />
+              {patient.phone}
+            </span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-3 border-t">
+          <span className="text-xs text-muted-foreground">
+            Ver perfil
+          </span>
+          <Link href={`/patients/${patient.id}`}>
+            <Button size="sm" variant="default">
+              Abrir
+              <ArrowRight className="h-3 w-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -14,29 +14,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   ArrowLeft,
   Save,
   Loader2,
   FileText,
   Stethoscope,
   Activity,
-  Sparkles,
   Ruler,
   StickyNote,
 } from "lucide-react";
@@ -49,7 +32,6 @@ const consultationSchema = z.object({
   physical_exam: z.string().optional(),
   diagnosis: z.string().min(2, "Diagnóstico é obrigatório (mínimo 2 caracteres)"),
   plan: z.string().optional(),
-  prescription: z.string().optional(),
   weight_kg: z.number().min(0.5).max(150).nullable().optional(),
   height_cm: z.number().min(30).max(200).nullable().optional(),
   head_circumference_cm: z.number().min(25).max(65).nullable().optional(),
@@ -67,8 +49,6 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
   const router = useRouter();
   const supabase = createClient();
   const [isSaving, setIsSaving] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const patient = Array.isArray(consultation.patient)
     ? consultation.patient[0]
@@ -92,7 +72,6 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
       physical_exam: consultation.physical_exam || "",
       diagnosis: consultation.diagnosis || "",
       plan: consultation.plan || "",
-      prescription: consultation.prescription || "",
       weight_kg: defaultWeight,
       height_cm: defaultHeight,
       head_circumference_cm: consultation.head_circumference_cm || null,
@@ -113,7 +92,6 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
         physical_exam: data.physical_exam || null,
         diagnosis: data.diagnosis,
         plan: data.plan || null,
-        prescription: data.prescription || null,
         weight_kg: data.weight_kg || null,
         height_cm: data.height_cm || null,
         head_circumference_cm: data.head_circumference_cm || null,
@@ -130,7 +108,6 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
           physical_exam: consultation.physical_exam,
           diagnosis: consultation.diagnosis,
           plan: consultation.plan,
-          prescription: consultation.prescription,
           weight_kg: consultation.weight_kg,
           height_cm: consultation.height_cm,
           head_circumference_cm: consultation.head_circumference_cm,
@@ -155,79 +132,6 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleGeneratePrescription = async (forceGenerate: boolean = false) => {
-    // Validação: campos obrigatórios
-    const diagnosis = watch("diagnosis");
-    const weight_kg = watch("weight_kg");
-
-    if (!diagnosis || diagnosis.trim().length < 2) {
-      toast.error("Diagnóstico é obrigatório para gerar prescrição");
-      return;
-    }
-
-    if (!weight_kg || weight_kg < 0.5) {
-      toast.error("Peso do paciente é obrigatório para calcular dosagens corretas");
-      return;
-    }
-
-    if (!patient?.date_of_birth) {
-      toast.error("Data de nascimento do paciente é necessária");
-      return;
-    }
-
-    // Verificar se campo já está preenchido
-    const currentPrescription = watch("prescription");
-    if (currentPrescription && currentPrescription.trim().length > 0 && !forceGenerate) {
-      setShowConfirmDialog(true);
-      return;
-    }
-
-    // Gerar prescrição
-    setIsGenerating(true);
-    try {
-      toast.info("🤖 Gerando prescrição personalizada...");
-
-      const response = await fetch("/api/consultations/generate-prescription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patientId: patient.id,
-          clinical: {
-            chief_complaint: watch("chief_complaint"),
-            history: watch("history"),
-            physical_exam: watch("physical_exam"),
-            diagnosis: watch("diagnosis"),
-            plan: watch("plan"),
-          },
-          measurements: {
-            weight_kg: watch("weight_kg"),
-            height_cm: watch("height_cm"),
-            head_circumference_cm: watch("head_circumference_cm"),
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao gerar prescrição");
-      }
-
-      const data = await response.json();
-      setValue("prescription", data.prescription);
-      toast.success("✅ Prescrição gerada e validada com sucesso!");
-    } catch (error: any) {
-      console.error("Erro ao gerar prescrição:", error);
-      toast.error(error.message || "Erro ao gerar prescrição. Tente novamente.");
-    } finally {
-      setIsGenerating(false);
-      setShowConfirmDialog(false);
-    }
-  };
-
-  const handleConfirmReplace = () => {
-    handleGeneratePrescription(true);
   };
 
   return (
@@ -328,50 +232,7 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
               />
             </div>
 
-            {/* Prescrição */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="prescription">Prescrição Médica</Label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleGeneratePrescription(false)}
-                        disabled={isGenerating || isSaving}
-                        className="gap-2"
-                      >
-                        {isGenerating ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Gerando...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4" />
-                            Gerar Prescrição
-                          </>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>IA irá gerar prescrição baseada nos dados clínicos</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              <Textarea
-                id="prescription"
-                placeholder="Clique em 'Gerar Prescrição' para criar automaticamente com IA..."
-                rows={8}
-                className="font-mono text-sm"
-                {...register("prescription")}
-                disabled={isGenerating}
-              />
-            </div>
-          </CardContent>
+            </CardContent>
         </Card>
 
         {/* Dados Pediátricos */}
@@ -500,25 +361,6 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
           </Button>
         </div>
       </form>
-
-      {/* Diálogo de Confirmação */}
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Substituir prescrição existente?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O campo de prescrição já contém texto. Deseja substituir pelo conteúdo gerado pela IA?
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmReplace}>
-              Sim, substituir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

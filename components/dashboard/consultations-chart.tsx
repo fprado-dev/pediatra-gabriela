@@ -9,13 +9,13 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 
-interface WeekData {
-  week: string;
+interface MonthData {
+  month: string;
   total: number;
 }
 
 interface ConsultationsChartProps {
-  data: WeekData[];
+  data: MonthData[];
 }
 
 const chartConfig = {
@@ -30,7 +30,7 @@ export function ConsultationsChart({ data }: ConsultationsChartProps) {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Consultas por Semana</CardTitle>
+          <CardTitle className="text-base">Consultas por Mês</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[200px]">
           <p className="text-sm text-muted-foreground">
@@ -44,7 +44,7 @@ export function ConsultationsChart({ data }: ConsultationsChartProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Consultas por Semana</CardTitle>
+        <CardTitle className="text-base">Consultas por Mês</CardTitle>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[200px] w-full">
@@ -55,7 +55,7 @@ export function ConsultationsChart({ data }: ConsultationsChartProps) {
           >
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="week"
+              dataKey="month"
               tickLine={false}
               axisLine={false}
               tickMargin={8}

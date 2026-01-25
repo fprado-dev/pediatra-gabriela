@@ -6,7 +6,7 @@ import { StatsCards } from "@/components/dashboard/stats-cards";
 import { ConsultationsChart } from "@/components/dashboard/consultations-chart";
 import { AgeDistributionChart } from "@/components/dashboard/age-distribution-chart";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
-import { startOfMonth, format, subWeeks, startOfWeek } from "date-fns";
+import { startOfMonth, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export const dynamic = "force-dynamic";
@@ -54,41 +54,36 @@ export default async function DashboardPage() {
   // Calcular tempo economizado (estimativa: 15min por consulta)
   const timeSavedMinutes = (consultationsCount || 0) * 15;
 
-  // Buscar consultas por semana (últimas 4 semanas)
-  const fourWeeksAgo = subWeeks(new Date(), 4).toISOString();
-  const { data: weeklyData } = await supabase
+  // Buscar consultas por mês (últimos 6 meses)
+  const sixMonthsAgo = subMonths(new Date(), 5);
+  const { data: monthlyData } = await supabase
     .from("consultations")
     .select("created_at")
     .eq("doctor_id", user.id)
-    .gte("created_at", fourWeeksAgo)
+    .gte("created_at", startOfMonth(sixMonthsAgo).toISOString())
     .order("created_at", { ascending: true });
 
-  // Agrupar por semana
-  const weeklyChartData = (() => {
-    const weeks: Record<string, number> = {};
+  // Agrupar por mês
+  const monthlyChartData = (() => {
+    const months: Record<string, number> = {};
     
-    // Inicializar as 4 semanas
-    for (let i = 3; i >= 0; i--) {
-      const weekStart = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 0 });
-      const weekLabel = `Sem ${4 - i}`;
-      weeks[weekLabel] = 0;
+    // Inicializar os últimos 6 meses
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = subMonths(new Date(), i);
+      const monthLabel = format(monthDate, "MMM", { locale: ptBR });
+      months[monthLabel] = 0;
     }
 
-    // Contar consultas por semana
-    weeklyData?.forEach((consultation) => {
+    // Contar consultas por mês
+    monthlyData?.forEach((consultation) => {
       const consultationDate = new Date(consultation.created_at);
-      for (let i = 3; i >= 0; i--) {
-        const weekStart = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 0 });
-        const weekEnd = subWeeks(new Date(), i - 1);
-        if (consultationDate >= weekStart && consultationDate < weekEnd) {
-          const weekLabel = `Sem ${4 - i}`;
-          weeks[weekLabel]++;
-          break;
-        }
+      const monthLabel = format(consultationDate, "MMM", { locale: ptBR });
+      if (months[monthLabel] !== undefined) {
+        months[monthLabel]++;
       }
     });
 
-    return Object.entries(weeks).map(([week, total]) => ({ week, total }));
+    return Object.entries(months).map(([month, total]) => ({ month, total }));
   })();
 
   // Buscar distribuição por faixa etária
@@ -186,7 +181,7 @@ export default async function DashboardPage() {
 
       {/* Charts Grid */}
       <div className="grid gap-4 md:grid-cols-2">
-        <ConsultationsChart data={weeklyChartData} />
+        <ConsultationsChart data={monthlyChartData} />
         <AgeDistributionChart data={ageDistributionData} />
       </div>
 

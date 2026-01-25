@@ -1,26 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from "pdf-lib";
 import fs from "fs";
 import path from "path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Layout constants
+// Layout constants (mesmo padrão do PDF de consulta)
 const LAYOUT = {
+  pageWidth: 595,
+  pageHeight: 842,
   margin: 50,
-  headerHeight: 120,
-  lineHeight: 18,
-  sectionSpacing: 25,
+  lineHeight: 16,
+  sectionSpacing: 20,
+  footerHeight: 80,
 };
 
 const COLORS = {
-  primary: rgb(0.15, 0.23, 0.38), // Azul escuro
+  primary: rgb(0.15, 0.23, 0.38),
   text: rgb(0.1, 0.1, 0.1),
   muted: rgb(0.4, 0.4, 0.4),
-  accent: rgb(0.23, 0.51, 0.77), // Azul médio
-  warning: rgb(0.85, 0.55, 0.15), // Laranja
+  accent: rgb(0.23, 0.51, 0.77),
+  warning: rgb(0.85, 0.55, 0.15),
+  lightGray: rgb(0.85, 0.85, 0.85),
 };
 
 interface Medication {
@@ -39,6 +42,349 @@ interface PrescriptionData {
   returnDays?: number;
   bringExams?: boolean;
   observeFeeding?: boolean;
+}
+
+// Classe para gerenciar o PDF com múltiplas páginas
+class PrescriptionPDFBuilder {
+  private doc: PDFDocument;
+  private currentPage: PDFPage;
+  private font: PDFFont;
+  private fontBold: PDFFont;
+  private y: number;
+  private logoImage: any;
+
+  constructor(
+    doc: PDFDocument,
+    font: PDFFont,
+    fontBold: PDFFont,
+    logoImage: any
+  ) {
+    this.doc = doc;
+    this.font = font;
+    this.fontBold = fontBold;
+    this.logoImage = logoImage;
+    this.currentPage = doc.addPage([LAYOUT.pageWidth, LAYOUT.pageHeight]);
+    this.y = LAYOUT.pageHeight - LAYOUT.margin;
+  }
+
+  private cleanText(text: string | null | undefined): string {
+    if (!text) return "";
+    return text
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, "")
+      .replace(/[^\x00-\x7F\xA0-\xFF]/g, "")
+      .trim();
+  }
+
+  private checkNewPage(requiredSpace: number = 100) {
+    if (this.y < LAYOUT.footerHeight + requiredSpace) {
+      this.currentPage = this.doc.addPage([LAYOUT.pageWidth, LAYOUT.pageHeight]);
+      this.y = LAYOUT.pageHeight - LAYOUT.margin;
+    }
+  }
+
+  private drawText(
+    text: string,
+    x: number,
+    fontSize: number,
+    color = COLORS.text,
+    bold = false
+  ) {
+    const textFont = bold ? this.fontBold : this.font;
+    const cleanedText = this.cleanText(text);
+    const maxWidth = LAYOUT.pageWidth - LAYOUT.margin * 2 - (x - LAYOUT.margin);
+    const words = cleanedText.split(" ");
+    let line = "";
+
+    for (const word of words) {
+      const testLine = line + (line ? " " : "") + word;
+      const testWidth = textFont.widthOfTextAtSize(testLine, fontSize);
+
+      if (testWidth > maxWidth && line) {
+        this.checkNewPage();
+        this.currentPage.drawText(line, {
+          x,
+          y: this.y,
+          size: fontSize,
+          font: textFont,
+          color,
+        });
+        this.y -= LAYOUT.lineHeight;
+        line = word;
+      } else {
+        line = testLine;
+      }
+    }
+
+    if (line) {
+      this.checkNewPage();
+      this.currentPage.drawText(line, {
+        x,
+        y: this.y,
+        size: fontSize,
+        font: textFont,
+        color,
+      });
+      this.y -= LAYOUT.lineHeight;
+    }
+  }
+
+  drawHeader(patientName: string, patientAge: string) {
+    // Logo (pequeno, igual ao PDF de consulta)
+    if (this.logoImage) {
+      const targetHeight = 30;
+      const scale = targetHeight / this.logoImage.height;
+      const logoWidth = this.logoImage.width * scale;
+      const logoHeight = targetHeight;
+
+      this.currentPage.drawImage(this.logoImage, {
+        x: LAYOUT.margin,
+        y: this.y - logoHeight + 10,
+        width: logoWidth,
+        height: logoHeight,
+      });
+    }
+
+    // Título centralizado
+    const title = "RECEITA MEDICA";
+    const titleWidth = this.fontBold.widthOfTextAtSize(title, 16);
+    this.currentPage.drawText(title, {
+      x: (LAYOUT.pageWidth - titleWidth) / 2,
+      y: this.y - 5,
+      size: 16,
+      font: this.fontBold,
+      color: COLORS.primary,
+    });
+    this.y -= 25;
+
+    // Data
+    const today = new Date().toLocaleDateString("pt-BR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const dateText = this.cleanText(today);
+    const dateWidth = this.font.widthOfTextAtSize(dateText, 9);
+    this.currentPage.drawText(dateText, {
+      x: (LAYOUT.pageWidth - dateWidth) / 2,
+      y: this.y,
+      size: 9,
+      font: this.font,
+      color: COLORS.muted,
+    });
+    this.y -= 20;
+
+    // Linha separadora
+    this.currentPage.drawLine({
+      start: { x: LAYOUT.margin, y: this.y },
+      end: { x: LAYOUT.pageWidth - LAYOUT.margin, y: this.y },
+      thickness: 0.5,
+      color: COLORS.lightGray,
+    });
+    this.y -= 20;
+
+    // Paciente
+    this.currentPage.drawText("PACIENTE:", {
+      x: LAYOUT.margin,
+      y: this.y,
+      size: 9,
+      font: this.fontBold,
+      color: COLORS.muted,
+    });
+    this.y -= LAYOUT.lineHeight;
+
+    const patientText = `${this.cleanText(patientName)}${patientAge ? ` - ${patientAge}` : ""}`;
+    this.currentPage.drawText(patientText, {
+      x: LAYOUT.margin,
+      y: this.y,
+      size: 11,
+      font: this.fontBold,
+      color: COLORS.text,
+    });
+    this.y -= LAYOUT.sectionSpacing + 5;
+  }
+
+  drawSectionTitle(title: string, color = COLORS.primary) {
+    this.checkNewPage(60);
+    this.currentPage.drawText(title, {
+      x: LAYOUT.margin,
+      y: this.y,
+      size: 10,
+      font: this.fontBold,
+      color,
+    });
+    this.y -= LAYOUT.lineHeight + 3;
+  }
+
+  drawMedications(medications: Medication[]) {
+    this.drawSectionTitle("USO ORAL:");
+
+    medications.forEach((med, index) => {
+      this.checkNewPage(80);
+
+      // Número + Nome
+      const medName = this.cleanText(med.name);
+      this.currentPage.drawText(`${index + 1})`, {
+        x: LAYOUT.margin,
+        y: this.y,
+        size: 10,
+        font: this.fontBold,
+        color: COLORS.accent,
+      });
+
+      this.currentPage.drawText(medName, {
+        x: LAYOUT.margin + 20,
+        y: this.y,
+        size: 10,
+        font: this.fontBold,
+        color: COLORS.text,
+      });
+
+      // Quantidade
+      if (med.quantity) {
+        const qtyText = this.cleanText(`--- ${med.quantity}`);
+        const nameWidth = this.fontBold.widthOfTextAtSize(medName, 10);
+        this.currentPage.drawText(qtyText, {
+          x: LAYOUT.margin + 25 + nameWidth,
+          y: this.y,
+          size: 10,
+          font: this.font,
+          color: COLORS.muted,
+        });
+      }
+      this.y -= LAYOUT.lineHeight;
+
+      // Dosagem
+      if (med.dosage) {
+        this.currentPage.drawText(`Dosagem: ${this.cleanText(med.dosage)}`, {
+          x: LAYOUT.margin + 20,
+          y: this.y,
+          size: 9,
+          font: this.font,
+          color: COLORS.muted,
+        });
+        this.y -= LAYOUT.lineHeight;
+      }
+
+      // Instruções
+      if (med.instructions) {
+        this.drawText(med.instructions, LAYOUT.margin + 20, 9, COLORS.text);
+      }
+
+      this.y -= 8;
+    });
+
+    this.y -= 10;
+  }
+
+  drawTextSection(title: string, content: string, color = COLORS.primary) {
+    if (!content) return;
+
+    this.drawSectionTitle(title, color);
+
+    const lines = content.split("\n");
+    for (const line of lines) {
+      if (line.trim()) {
+        this.drawText(line, LAYOUT.margin, 9, COLORS.text);
+      }
+    }
+    this.y -= 10;
+  }
+
+  drawNotes(data: PrescriptionData) {
+    const hasNotes =
+      data.notes || data.returnDays || data.bringExams || data.observeFeeding;
+
+    if (!hasNotes) return;
+
+    this.drawSectionTitle("ANOTACOES:");
+
+    if (data.returnDays) {
+      this.checkNewPage();
+      this.currentPage.drawText(`- Retornar em ${data.returnDays} dias`, {
+        x: LAYOUT.margin,
+        y: this.y,
+        size: 9,
+        font: this.font,
+        color: COLORS.text,
+      });
+      this.y -= LAYOUT.lineHeight;
+    }
+
+    if (data.bringExams) {
+      this.checkNewPage();
+      this.currentPage.drawText("- Levar resultados de exames", {
+        x: LAYOUT.margin,
+        y: this.y,
+        size: 9,
+        font: this.font,
+        color: COLORS.text,
+      });
+      this.y -= LAYOUT.lineHeight;
+    }
+
+    if (data.observeFeeding) {
+      this.checkNewPage();
+      this.currentPage.drawText("- Observar aceitacao alimentar", {
+        x: LAYOUT.margin,
+        y: this.y,
+        size: 9,
+        font: this.font,
+        color: COLORS.text,
+      });
+      this.y -= LAYOUT.lineHeight;
+    }
+
+    if (data.notes) {
+      const lines = data.notes.split("\n");
+      for (const line of lines) {
+        if (line.trim()) {
+          this.drawText(line, LAYOUT.margin, 9, COLORS.text);
+        }
+      }
+    }
+  }
+
+  drawFooter(doctorName: string, crm: string) {
+    // Desenhar rodapé na última página
+    const pages = this.doc.getPages();
+    const lastPage = pages[pages.length - 1];
+
+    // Linha separadora
+    lastPage.drawLine({
+      start: { x: LAYOUT.margin, y: LAYOUT.footerHeight + 15 },
+      end: { x: LAYOUT.pageWidth - LAYOUT.margin, y: LAYOUT.footerHeight + 15 },
+      thickness: 0.5,
+      color: COLORS.lightGray,
+    });
+
+    // Nome do médico
+    const cleanDoctorName = this.cleanText(doctorName);
+    const doctorWidth = this.fontBold.widthOfTextAtSize(cleanDoctorName, 10);
+    lastPage.drawText(cleanDoctorName, {
+      x: (LAYOUT.pageWidth - doctorWidth) / 2,
+      y: LAYOUT.footerHeight - 5,
+      size: 10,
+      font: this.fontBold,
+      color: COLORS.text,
+    });
+
+    // CRM
+    if (crm) {
+      const crmText = `CRM ${this.cleanText(crm)}`;
+      const crmWidth = this.font.widthOfTextAtSize(crmText, 9);
+      lastPage.drawText(crmText, {
+        x: (LAYOUT.pageWidth - crmWidth) / 2,
+        y: LAYOUT.footerHeight - 20,
+        size: 9,
+        font: this.font,
+        color: COLORS.muted,
+      });
+    }
+  }
+
+  async save(): Promise<Uint8Array> {
+    return await this.doc.save();
+  }
 }
 
 export async function GET(
@@ -139,359 +485,30 @@ export async function GET(
       console.warn("Logo não encontrada");
     }
 
-    const page = pdfDoc.addPage([595.28, 841.89]); // A4
-    const { width, height } = page.getSize();
-    let y = height - LAYOUT.margin;
+    // Criar builder
+    const builder = new PrescriptionPDFBuilder(pdfDoc, font, fontBold, logoImage);
 
-    // Função auxiliar para limpar texto
-    const cleanText = (text: string | null | undefined): string => {
-      if (!text) return "";
-      // Remover caracteres não suportados pelo WinAnsi
-      return text
-        .replace(/[\u{1F300}-\u{1F9FF}]/gu, "") // Remover emojis
-        .replace(/[^\x00-\x7F\xA0-\xFF]/g, "") // Manter apenas Latin-1
-        .replace(/\s+/g, " ")
-        .trim();
-    };
-
-    // Função para desenhar texto com wrap
-    const drawText = (
-      text: string,
-      x: number,
-      fontSize: number,
-      color = COLORS.text,
-      bold = false
-    ) => {
-      const textFont = bold ? fontBold : font;
-      const cleanedText = cleanText(text);
-      const maxWidth = width - LAYOUT.margin * 2 - (x - LAYOUT.margin);
-      const words = cleanedText.split(" ");
-      let line = "";
-
-      for (const word of words) {
-        const testLine = line + (line ? " " : "") + word;
-        const testWidth = textFont.widthOfTextAtSize(testLine, fontSize);
-
-        if (testWidth > maxWidth && line) {
-          page.drawText(line, { x, y, size: fontSize, font: textFont, color });
-          y -= LAYOUT.lineHeight;
-          line = word;
-        } else {
-          line = testLine;
-        }
-      }
-
-      if (line) {
-        page.drawText(line, { x, y, size: fontSize, font: textFont, color });
-        y -= LAYOUT.lineHeight;
-      }
-    };
-
-    // === HEADER ===
-    // Logo
-    if (logoImage) {
-      const logoScale = 0.5;
-      const logoWidth = logoImage.width * logoScale;
-      const logoHeight = logoImage.height * logoScale;
-      page.drawImage(logoImage, {
-        x: LAYOUT.margin,
-        y: height - LAYOUT.margin - logoHeight + 20,
-        width: logoWidth,
-        height: logoHeight,
-      });
-    }
-
-    // Título
-    const title = "RECEITA MEDICA";
-    const titleWidth = fontBold.widthOfTextAtSize(title, 18);
-    page.drawText(title, {
-      x: (width - titleWidth) / 2,
-      y: y - 10,
-      size: 18,
-      font: fontBold,
-      color: COLORS.primary,
-    });
-    y -= 35;
-
-    // Data
-    const today = new Date().toLocaleDateString("pt-BR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-    const dateText = cleanText(today);
-    const dateWidth = font.widthOfTextAtSize(dateText, 10);
-    page.drawText(dateText, {
-      x: (width - dateWidth) / 2,
-      y,
-      size: 10,
-      font,
-      color: COLORS.muted,
-    });
-    y -= 30;
-
-    // Linha separadora
-    page.drawLine({
-      start: { x: LAYOUT.margin, y },
-      end: { x: width - LAYOUT.margin, y },
-      thickness: 1,
-      color: rgb(0.85, 0.85, 0.85),
-    });
-    y -= 25;
-
-    // === PACIENTE ===
-    page.drawText("PACIENTE:", {
-      x: LAYOUT.margin,
-      y,
-      size: 10,
-      font: fontBold,
-      color: COLORS.muted,
-    });
-    y -= LAYOUT.lineHeight;
-
-    const patientText = `${cleanText(patient?.full_name || "Paciente")}${patientAge ? ` - ${patientAge}` : ""}`;
-    page.drawText(patientText, {
-      x: LAYOUT.margin,
-      y,
-      size: 12,
-      font: fontBold,
-      color: COLORS.text,
-    });
-    y -= LAYOUT.sectionSpacing + 10;
-
-    // === MEDICAMENTOS ===
-    page.drawText("USO ORAL:", {
-      x: LAYOUT.margin,
-      y,
-      size: 11,
-      font: fontBold,
-      color: COLORS.primary,
-    });
-    y -= LAYOUT.lineHeight + 5;
-
-    prescriptionData.medications.forEach((med, index) => {
-      // Verificar se precisa de nova página
-      if (y < 150) {
-        // Nova página
-        const newPage = pdfDoc.addPage([595.28, 841.89]);
-        y = height - LAYOUT.margin;
-      }
-
-      // Número + Nome
-      const medName = cleanText(med.name);
-      page.drawText(`${index + 1})`, {
-        x: LAYOUT.margin,
-        y,
-        size: 11,
-        font: fontBold,
-        color: COLORS.accent,
-      });
-
-      page.drawText(`${medName}`, {
-        x: LAYOUT.margin + 25,
-        y,
-        size: 11,
-        font: fontBold,
-        color: COLORS.text,
-      });
-
-      // Quantidade
-      if (med.quantity) {
-        const qtyText = cleanText(`--- ${med.quantity}`);
-        const nameWidth = fontBold.widthOfTextAtSize(medName, 11);
-        page.drawText(qtyText, {
-          x: LAYOUT.margin + 30 + nameWidth,
-          y,
-          size: 11,
-          font,
-          color: COLORS.muted,
-        });
-      }
-      y -= LAYOUT.lineHeight;
-
-      // Dosagem
-      if (med.dosage) {
-        const dosageText = cleanText(`Dosagem: ${med.dosage}`);
-        page.drawText(dosageText, {
-          x: LAYOUT.margin + 25,
-          y,
-          size: 10,
-          font,
-          color: COLORS.muted,
-        });
-        y -= LAYOUT.lineHeight;
-      }
-
-      // Instruções
-      if (med.instructions) {
-        drawText(cleanText(med.instructions), LAYOUT.margin + 25, 10, COLORS.text);
-      }
-
-      y -= 10;
-    });
-
-    y -= LAYOUT.sectionSpacing;
-
-    // === ORIENTAÇÕES ===
-    if (prescriptionData.orientations) {
-      page.drawText("ORIENTACOES:", {
-        x: LAYOUT.margin,
-        y,
-        size: 11,
-        font: fontBold,
-        color: COLORS.primary,
-      });
-      y -= LAYOUT.lineHeight + 5;
-
-      // Processar linhas
-      const lines = prescriptionData.orientations.split("\n");
-      for (const line of lines) {
-        if (line.trim()) {
-          drawText(cleanText(line), LAYOUT.margin, 10, COLORS.text);
-        }
-      }
-      y -= LAYOUT.sectionSpacing;
-    }
-
-    // === SINAIS DE ALERTA ===
-    if (prescriptionData.alertSigns) {
-      page.drawText("SINAIS DE ALERTA - PROCURAR ATENDIMENTO SE:", {
-        x: LAYOUT.margin,
-        y,
-        size: 11,
-        font: fontBold,
-        color: COLORS.warning,
-      });
-      y -= LAYOUT.lineHeight + 5;
-
-      const lines = prescriptionData.alertSigns.split("\n");
-      for (const line of lines) {
-        if (line.trim()) {
-          drawText(cleanText(line), LAYOUT.margin, 10, COLORS.text);
-        }
-      }
-      y -= LAYOUT.sectionSpacing;
-    }
-
-    // === PREVENÇÃO ===
-    if (prescriptionData.prevention) {
-      page.drawText("COMO PREVENIR:", {
-        x: LAYOUT.margin,
-        y,
-        size: 11,
-        font: fontBold,
-        color: COLORS.primary,
-      });
-      y -= LAYOUT.lineHeight + 5;
-
-      const lines = prescriptionData.prevention.split("\n");
-      for (const line of lines) {
-        if (line.trim()) {
-          drawText(cleanText(line), LAYOUT.margin, 10, COLORS.text);
-        }
-      }
-      y -= LAYOUT.sectionSpacing;
-    }
-
-    // === ANOTAÇÕES ===
-    const hasNotes =
-      prescriptionData.notes ||
-      prescriptionData.returnDays ||
-      prescriptionData.bringExams ||
-      prescriptionData.observeFeeding;
-
-    if (hasNotes) {
-      page.drawText("ANOTACOES:", {
-        x: LAYOUT.margin,
-        y,
-        size: 11,
-        font: fontBold,
-        color: COLORS.primary,
-      });
-      y -= LAYOUT.lineHeight + 5;
-
-      if (prescriptionData.returnDays) {
-        page.drawText(`- Retornar em ${prescriptionData.returnDays} dias`, {
-          x: LAYOUT.margin,
-          y,
-          size: 10,
-          font,
-          color: COLORS.text,
-        });
-        y -= LAYOUT.lineHeight;
-      }
-
-      if (prescriptionData.bringExams) {
-        page.drawText("- Levar resultados de exames", {
-          x: LAYOUT.margin,
-          y,
-          size: 10,
-          font,
-          color: COLORS.text,
-        });
-        y -= LAYOUT.lineHeight;
-      }
-
-      if (prescriptionData.observeFeeding) {
-        page.drawText("- Observar aceitacao alimentar", {
-          x: LAYOUT.margin,
-          y,
-          size: 10,
-          font,
-          color: COLORS.text,
-        });
-        y -= LAYOUT.lineHeight;
-      }
-
-      if (prescriptionData.notes) {
-        const lines = prescriptionData.notes.split("\n");
-        for (const line of lines) {
-          if (line.trim()) {
-            drawText(cleanText(line), LAYOUT.margin, 10, COLORS.text);
-          }
-        }
-      }
-    }
-
-    // === RODAPÉ ===
-    const footerY = 80;
-
-    // Linha separadora
-    page.drawLine({
-      start: { x: LAYOUT.margin, y: footerY + 20 },
-      end: { x: width - LAYOUT.margin, y: footerY + 20 },
-      thickness: 0.5,
-      color: rgb(0.85, 0.85, 0.85),
-    });
-
-    // Nome do médico
-    const doctorName = cleanText(profile?.full_name || "Medico(a)");
-    const doctorWidth = fontBold.widthOfTextAtSize(doctorName, 11);
-    page.drawText(doctorName, {
-      x: (width - doctorWidth) / 2,
-      y: footerY,
-      size: 11,
-      font: fontBold,
-      color: COLORS.text,
-    });
-
-    // CRM
-    if (profile?.crm) {
-      const crmText = `CRM ${cleanText(profile.crm)}`;
-      const crmWidth = font.widthOfTextAtSize(crmText, 10);
-      page.drawText(crmText, {
-        x: (width - crmWidth) / 2,
-        y: footerY - 15,
-        size: 10,
-        font,
-        color: COLORS.muted,
-      });
-    }
+    // Construir PDF
+    builder.drawHeader(patient?.full_name || "Paciente", patientAge);
+    builder.drawMedications(prescriptionData.medications);
+    builder.drawTextSection("ORIENTACOES:", prescriptionData.orientations || "");
+    builder.drawTextSection(
+      "SINAIS DE ALERTA - PROCURAR ATENDIMENTO SE:",
+      prescriptionData.alertSigns || "",
+      COLORS.warning
+    );
+    builder.drawTextSection("COMO PREVENIR:", prescriptionData.prevention || "");
+    builder.drawNotes(prescriptionData);
+    builder.drawFooter(
+      profile?.full_name || "Médico(a)",
+      profile?.crm || ""
+    );
 
     // Gerar PDF
-    const pdfBytes = await pdfDoc.save();
-    const patientName = cleanText(patient?.full_name || "paciente")
+    const pdfBytes = await builder.save();
+    const patientName = (patient?.full_name || "paciente")
       .toLowerCase()
+      .replace(/[^\w\s-]/g, "")
       .replace(/\s+/g, "-");
     const fileName = `receita-${patientName}-${new Date().toISOString().slice(0, 10)}.pdf`;
 

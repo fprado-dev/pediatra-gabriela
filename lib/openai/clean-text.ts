@@ -18,7 +18,7 @@ interface CleaningResult {
  * @returns Texto limpo e estruturado
  */
 export async function cleanTranscription(
-  rawText: string, 
+  rawText: string,
   context?: PatientContext
 ): Promise<string> {
   if (!rawText || rawText.trim().length === 0) {
@@ -29,7 +29,7 @@ export async function cleanTranscription(
     console.log("🧹 Iniciando limpeza de texto...");
 
     // Adicionar contexto do paciente ao prompt
-    const patientInfo = context?.patientName && context?.patientAge 
+    const patientInfo = context?.patientName && context?.patientAge
       ? `\n\nCONTEXTO DO PACIENTE (apenas para referência, NÃO use para inventar dados):\n- Nome: ${context.patientName}\n- Idade: ${context.patientAge} anos\n`
       : "";
 
@@ -46,10 +46,10 @@ Verifique se o texto contém informações médicas REAIS como:
 - Medições (peso, altura, temperatura, etc)
 
 Se o texto for:
-- Um teste de gravação
 - Conversa sem conteúdo médico
-- Texto que menciona explicitamente ser um teste
 - Áudio sem informações clínicas relevantes
+- Áudio sem informações médicas suficientes
+
 
 Então retorne: { "has_medical_content": false, "cleaned_text": null, "reason": "motivo" }
 
@@ -75,7 +75,6 @@ Limpe o texto seguindo estas diretrizes:
 3. REGRAS CRÍTICAS:
    - NUNCA invente, adicione ou suponha informações
    - NUNCA crie uma consulta fictícia
-   - Se o texto diz "isso é um teste", retorne has_medical_content: false
    - Apenas LIMPE o que foi dito, não CRIE conteúdo
 
 TEXTO ORIGINAL:
@@ -122,16 +121,16 @@ Retorne APENAS um JSON válido:
 
     console.log("✅ Texto limpo com sucesso");
     console.log(`   Conteúdo médico detectado: ${result.has_medical_content}`);
-    
+
     return result.cleaned_text;
   } catch (error: any) {
     console.error("❌ Erro na limpeza de texto:", error);
-    
+
     // Propagar erros de dados insuficientes
     if (error.message.includes("DADOS_INSUFICIENTES")) {
       throw error;
     }
-    
+
     throw new Error(`Erro ao limpar texto: ${error.message}`);
   }
 }

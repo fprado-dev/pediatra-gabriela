@@ -41,7 +41,7 @@ export async function processConsultation(consultationId: string) {
     // Buscar dados do paciente para contexto da IA
     const { data: patient, error: patientError } = await supabase
       .from("patients")
-      .select("full_name, date_of_birth, weight_kg, height_cm, allergies, blood_type, medical_history, current_medications")
+      .select("full_name, date_of_birth, weight_kg, height_cm, head_circumference_cm, allergies, blood_type, medical_history, current_medications")
       .eq("id", consultation.patient_id)
       .single();
 
@@ -144,6 +144,7 @@ export async function processConsultation(consultationId: string) {
       patientAge,
       weight: patient?.weight_kg,
       height: patient?.height_cm,
+      headCircumference: patient?.head_circumference_cm,
       allergies: patient?.allergies,
       bloodType: patient?.blood_type,
       medicalHistory: patient?.medical_history,

@@ -6,16 +6,7 @@ import { Home, ArrowLeft } from "lucide-react";
 export default function NotFound() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/5 via-background to-background px-4">
-      {/* Logo grande */}
-      <div className="relative w-48 h-48 mb-8 animate-pulse">
-        <Image
-          src="/full-logo.png"
-          alt="Pediatra Gabriela"
-          fill
-          className="object-contain drop-shadow-lg"
-          priority
-        />
-      </div>
+      
 
       {/* Linha decorativa */}
       <div className="w-24 h-1 bg-gradient-to-r from-transparent via-primary to-transparent mb-8 rounded-full" />

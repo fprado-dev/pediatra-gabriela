@@ -21,7 +21,7 @@ interface ConsultationsChartProps {
 const chartConfig = {
   total: {
     label: "Consultas",
-    color: "var(--chart-1)",
+    color: "hsl(212, 79%, 81%)",
   },
 } satisfies ChartConfig;
 

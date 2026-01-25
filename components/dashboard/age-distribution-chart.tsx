@@ -18,34 +18,37 @@ interface AgeDistributionChartProps {
   data: AgeData[];
 }
 
+// Mapeamento de faixas para chaves CSS válidas
+const faixaToKey: Record<string, string> = {
+  "0-1 ano": "age0to1",
+  "1-3 anos": "age1to3",
+  "4-6 anos": "age4to6",
+  "7+ anos": "age7plus",
+};
+
 const chartConfig = {
   total: {
     label: "Pacientes",
   },
-  "0-1 ano": {
+  age0to1: {
     label: "0-1 ano",
-    color: "var(--chart-1)",
+    color: "hsl(212, 79%, 81%)",
   },
-  "1-3 anos": {
+  age1to3: {
     label: "1-3 anos",
-    color: "var(--chart-2)",
+    color: "hsl(173, 58%, 39%)",
   },
-  "4-6 anos": {
+  age4to6: {
     label: "4-6 anos",
-    color: "var(--chart-3)",
+    color: "hsl(197, 37%, 24%)",
   },
-  "7+ anos": {
+  age7plus: {
     label: "7+ anos",
-    color: "var(--chart-4)",
+    color: "hsl(43, 74%, 66%)",
   },
 } satisfies ChartConfig;
 
 export function AgeDistributionChart({ data }: AgeDistributionChartProps) {
-  const chartData = data.map((item) => ({
-    ...item,
-    fill: `var(--color-${item.faixa.replace(/\s+/g, "-")})`,
-  }));
-
   if (data.length === 0) {
     return (
       <Card>
@@ -60,6 +63,17 @@ export function AgeDistributionChart({ data }: AgeDistributionChartProps) {
       </Card>
     );
   }
+
+  // Mapear dados para usar chaves válidas
+  const chartData = data.map((item) => {
+    const key = faixaToKey[item.faixa] || "age0to1";
+    return {
+      faixa: item.faixa,
+      key,
+      total: item.total,
+      fill: `var(--color-${key})`,
+    };
+  });
 
   const total = data.reduce((acc, curr) => acc + curr.total, 0);
 
@@ -89,12 +103,16 @@ export function AgeDistributionChart({ data }: AgeDistributionChartProps) {
           <div className="flex-1 space-y-2">
             {data.map((item) => {
               const percentage = total > 0 ? Math.round((item.total / total) * 100) : 0;
+              const key = faixaToKey[item.faixa] || "age0to1";
+              const config = chartConfig[key as keyof typeof chartConfig];
+              const color = "color" in config ? config.color : undefined;
+              
               return (
                 <div key={item.faixa} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div 
                       className="h-3 w-3 rounded-full" 
-                      style={{ backgroundColor: `var(--color-${item.faixa.replace(/\s+/g, "-")})` }}
+                      style={{ backgroundColor: color }}
                     />
                     <span className="text-muted-foreground">{item.faixa}</span>
                   </div>

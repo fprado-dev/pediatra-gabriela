@@ -174,10 +174,9 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
   const showBackButton = ["select-mode", "input", "preview"].includes(flowState);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full">
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
-        <div className="container mx-auto px-4 py-4">
+        <div className=" px-4 py-4">
           <div className="flex items-center gap-4">
             <Link href="/consultations">
               <Button variant="ghost" size="icon">
@@ -192,13 +191,13 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
       </header>
 
       {/* Step Indicator */}
-      <div className="container mx-auto px-4 py-6 max-w-3xl">
+      <div className="px-6 py-6 max-w-4xl mx-auto">
         <StepIndicator steps={STEPS} currentStep={currentStepIndex} />
       </div>
 
       {/* Patient Mini Card (shown after selection) */}
       {selectedPatient && flowState !== "select-patient" && flowState !== "completed" && (
-        <div className="container mx-auto px-4 pb-4 max-w-3xl">
+        <div className="px-6 pb-4 max-w-4xl mx-auto">
           <PatientMiniCard
             patient={selectedPatient}
             onClear={flowState === "select-mode" ? handleClearPatient : undefined}
@@ -208,7 +207,7 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
       )}
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 pb-8 max-w-3xl">
+      <main className="px-6 pb-8 max-w-4xl mx-auto">
         <div className="space-y-6">
           {/* Error */}
           {error && (

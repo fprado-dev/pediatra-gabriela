@@ -44,5 +44,25 @@ export default async function EditConsultationPage({
     );
   }
 
-  return <EditConsultationForm consultation={consultation} />;
+  // Buscar última consulta anterior do paciente (para comparar crescimento)
+  const patientId = Array.isArray(consultation.patient) 
+    ? consultation.patient[0]?.id 
+    : consultation.patient?.id;
+
+  const { data: previousConsultations } = await supabase
+    .from("consultations")
+    .select("id, consultation_date, weight_kg, height_cm, head_circumference_cm")
+    .eq("patient_id", patientId)
+    .eq("status", "completed")
+    .neq("id", id)
+    .not("weight_kg", "is", null)
+    .order("consultation_date", { ascending: false })
+    .limit(5);
+
+  return (
+    <EditConsultationForm 
+      consultation={consultation} 
+      previousMeasurements={previousConsultations || []}
+    />
+  );
 }

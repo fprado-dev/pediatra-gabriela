@@ -22,7 +22,12 @@ import {
   Activity,
   Ruler,
   StickyNote,
+  AlertCircle,
+  TrendingUp,
+  Scale,
+  Baby,
 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 
 // Esquema de validação
@@ -41,11 +46,20 @@ const consultationSchema = z.object({
 
 type ConsultationFormData = z.infer<typeof consultationSchema>;
 
-interface EditConsultationFormProps {
-  consultation: any;
+interface PreviousMeasurement {
+  id: string;
+  consultation_date: string;
+  weight_kg: number | null;
+  height_cm: number | null;
+  head_circumference_cm: number | null;
 }
 
-export function EditConsultationForm({ consultation }: EditConsultationFormProps) {
+interface EditConsultationFormProps {
+  consultation: any;
+  previousMeasurements?: PreviousMeasurement[];
+}
+
+export function EditConsultationForm({ consultation, previousMeasurements = [] }: EditConsultationFormProps) {
   const router = useRouter();
   const supabase = createClient();
   const [isSaving, setIsSaving] = useState(false);
@@ -54,9 +68,22 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
     ? consultation.patient[0]
     : consultation.patient;
 
-  // Usar dados do paciente como fallback para peso/altura
-  const defaultWeight = consultation.weight_kg || patient?.weight_kg || null;
-  const defaultHeight = consultation.height_cm || patient?.height_cm || null;
+  // Última consulta com medições
+  const lastMeasurement = previousMeasurements.length > 0 ? previousMeasurements[0] : null;
+
+  // Usar dados: 1) da consulta atual, 2) da última consulta, 3) do cadastro do paciente
+  const defaultWeight = consultation.weight_kg || lastMeasurement?.weight_kg || patient?.weight_kg || null;
+  const defaultHeight = consultation.height_cm || lastMeasurement?.height_cm || patient?.height_cm || null;
+  const defaultHeadCirc = consultation.head_circumference_cm || lastMeasurement?.head_circumference_cm || null;
+
+  // Determinar origem dos dados para exibir ao usuário
+  const measurementSource = consultation.weight_kg 
+    ? { type: "current", label: "desta consulta" }
+    : lastMeasurement?.weight_kg
+    ? { type: "previous", label: `da consulta de ${new Date(lastMeasurement.consultation_date).toLocaleDateString("pt-BR")}`, date: lastMeasurement.consultation_date }
+    : patient?.weight_kg
+    ? { type: "profile", label: "do cadastro do paciente" }
+    : null;
 
   const {
     register,
@@ -74,7 +101,7 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
       plan: consultation.plan || "",
       weight_kg: defaultWeight,
       height_cm: defaultHeight,
-      head_circumference_cm: consultation.head_circumference_cm || null,
+      head_circumference_cm: defaultHeadCirc,
       development_notes: consultation.development_notes || "",
       notes: consultation.notes || "",
     },
@@ -235,22 +262,64 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
             </CardContent>
         </Card>
 
-        {/* Dados Pediátricos */}
-        <Card>
+        {/* Dados Antropométricos - Destacado */}
+        <Card className="border-primary/50 bg-primary/5">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Ruler className="h-5 w-5" />
-              Dados Pediátricos
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <TrendingUp className="h-5 w-5" />
+              Dados Antropométricos
             </CardTitle>
             <CardDescription>
-              Medidas antropométricas e desenvolvimento
+              <span className="font-medium">Importante:</span> Registre as medidas atuais para acompanhamento do crescimento
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Grid de Medidas */}
+            {/* Alerta de último registro */}
+            {measurementSource && measurementSource.type !== "current" && (
+              <Alert className="bg-white border-primary/20">
+                <AlertCircle className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-sm">
+                  <span className="font-medium">
+                    Dados pré-preenchidos {measurementSource.label}:
+                  </span>{" "}
+                  {defaultWeight && <span>Peso: {defaultWeight}kg</span>}
+                  {defaultWeight && defaultHeight && " • "}
+                  {defaultHeight && <span>Altura: {defaultHeight}cm</span>}
+                  {defaultHeadCirc && ` • P.C.: ${defaultHeadCirc}cm`}
+                  <span className="text-yellow-600 ml-2 font-medium">
+                    → Atualize com as medidas de hoje!
+                  </span>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Histórico de medições anteriores */}
+            {previousMeasurements.length > 0 && (
+              <div className="bg-white rounded-lg border p-3">
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  📊 Últimas medições registradas:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {previousMeasurements.slice(0, 3).map((m) => (
+                    <span 
+                      key={m.id} 
+                      className="text-xs bg-gray-100 px-2 py-1 rounded"
+                    >
+                      {new Date(m.consultation_date).toLocaleDateString("pt-BR")}:{" "}
+                      {m.weight_kg}kg, {m.height_cm}cm
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Grid de Medidas - Destacado */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="weight_kg">Peso (kg)</Label>
+              <div className="space-y-2 bg-white p-4 rounded-lg border">
+                <Label htmlFor="weight_kg" className="flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-muted-foreground" />
+                  Peso (kg) <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="weight_kg"
                   type="number"
@@ -258,6 +327,7 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
                   min="0.5"
                   max="150"
                   placeholder="12.5"
+                  className="text-lg font-medium h-12"
                   {...register("weight_kg", {
                     setValueAs: (v) => (v === "" ? null : parseFloat(v)),
                   })}
@@ -267,8 +337,11 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="height_cm">Altura (cm)</Label>
+              <div className="space-y-2 bg-white p-4 rounded-lg border">
+                <Label htmlFor="height_cm" className="flex items-center gap-2">
+                  <Ruler className="h-4 w-4 text-muted-foreground" />
+                  Altura (cm) <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="height_cm"
                   type="number"
@@ -276,6 +349,7 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
                   min="30"
                   max="200"
                   placeholder="98.5"
+                  className="text-lg font-medium h-12"
                   {...register("height_cm", {
                     setValueAs: (v) => (v === "" ? null : parseFloat(v)),
                   })}
@@ -285,9 +359,10 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="head_circumference_cm">
-                  Perímetro Cefálico (cm)
+              <div className="space-y-2 bg-white p-4 rounded-lg border">
+                <Label htmlFor="head_circumference_cm" className="flex items-center gap-2">
+                  <Baby className="h-4 w-4 text-muted-foreground" />
+                  P. Cefálico (cm)
                 </Label>
                 <Input
                   id="head_circumference_cm"
@@ -296,6 +371,7 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
                   min="25"
                   max="65"
                   placeholder="48.5"
+                  className="text-lg font-medium h-12"
                   {...register("head_circumference_cm", {
                     setValueAs: (v) => (v === "" ? null : parseFloat(v)),
                   })}
@@ -309,12 +385,13 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
             </div>
 
             {/* Desenvolvimento */}
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <Label htmlFor="development_notes">Notas de Desenvolvimento</Label>
               <Textarea
                 id="development_notes"
                 placeholder="Marcos do desenvolvimento, observações..."
                 rows={4}
+                className="bg-white"
                 {...register("development_notes")}
               />
             </div>

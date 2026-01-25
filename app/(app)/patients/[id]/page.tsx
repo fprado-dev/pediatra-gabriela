@@ -23,6 +23,7 @@ import {
 import Link from "next/link";
 import { DeletePatientButton } from "@/components/patients/delete-patient-button";
 import { ConsultationList } from "@/components/consultations/consultation-list";
+import { PatientGrowthSection } from "@/components/growth";
 
 export const dynamic = 'force-dynamic';
 
@@ -159,6 +160,14 @@ export default async function PatientProfilePage({
           <DeletePatientButton patientId={id} patientName={patient.full_name} />
         </div>
       </div>
+
+      {/* Alertas de Crescimento */}
+      <PatientGrowthSection 
+        patientId={id}
+        patientName={patient.full_name}
+        dateOfBirth={patient.date_of_birth}
+        medicalHistory={patient.medical_history}
+      />
 
       {/* Info Cards */}
       <div className="grid gap-6 md:grid-cols-2">

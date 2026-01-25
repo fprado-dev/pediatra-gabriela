@@ -1,68 +1,72 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Home, ArrowLeft, Search } from "lucide-react";
+import { Home, ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
-      <div className="text-center max-w-lg">
-        {/* Logo */}
-        <div className="relative mx-auto mb-8 w-32 h-32">
-          <Image
-            src="/full-logo.png"
-            alt="Pediatra Gabriela"
-            fill
-            className="object-contain opacity-80"
-            priority
-          />
-        </div>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/5 via-background to-background px-4">
+      {/* Logo grande */}
+      <div className="relative w-48 h-48 mb-8 animate-pulse">
+        <Image
+          src="/full-logo.png"
+          alt="Pediatra Gabriela"
+          fill
+          className="object-contain drop-shadow-lg"
+          priority
+        />
+      </div>
 
-        {/* 404 Number */}
-        <div className="relative mb-6">
-          <span className="text-[120px] font-bold text-primary/20 leading-none">
-            404
-          </span>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Search className="h-16 w-16 text-primary/40" />
-          </div>
-        </div>
+      {/* Linha decorativa */}
+      <div className="w-24 h-1 bg-gradient-to-r from-transparent via-primary to-transparent mb-8 rounded-full" />
 
-        {/* Message */}
-        <h1 className="text-2xl font-bold mb-3">
-          Página não encontrada
-        </h1>
-        <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-          A página que você está procurando pode ter sido removida, 
-          teve seu nome alterado ou está temporariamente indisponível.
-        </p>
+      {/* 404 estilizado */}
+      <h1 className="text-8xl font-bold text-primary/30 mb-4 tracking-tight">
+        404
+      </h1>
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button asChild size="lg">
-            <Link href="/dashboard">
-              <Home className="h-4 w-4 mr-2" />
-              Ir para o Dashboard
-            </Link>
-          </Button>
-          <Button variant="outline" size="lg" asChild>
-            <Link href="javascript:history.back()">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Link>
-          </Button>
-        </div>
+      {/* Mensagem */}
+      <h2 className="text-2xl font-semibold mb-2 text-center">
+        Página não encontrada
+      </h2>
+      <p className="text-muted-foreground text-center max-w-md mb-10 leading-relaxed">
+        A página que você está procurando não existe ou foi movida. 
+        Verifique o endereço digitado ou volte para o início.
+      </p>
 
-        {/* Help text */}
-        <p className="text-xs text-muted-foreground mt-8">
-          Se você acredita que isso é um erro, entre em contato com{" "}
+      {/* Ações */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Button asChild size="lg" className="min-w-[180px]">
+          <Link href="/dashboard">
+            <Home className="h-5 w-5 mr-2" />
+            Ir para o Dashboard
+          </Link>
+        </Button>
+        <Button variant="outline" size="lg" className="min-w-[180px]" asChild>
+          <Link href="javascript:history.back()">
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Voltar
+          </Link>
+        </Button>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-16 text-center">
+        <p className="text-xs text-muted-foreground">
+          Precisa de ajuda?{" "}
           <a 
             href="mailto:suporte@pediatragabriela.com.br" 
-            className="text-primary hover:underline"
+            className="text-primary hover:underline font-medium"
           >
-            nosso suporte
+            Fale com o suporte
           </a>
         </p>
+      </div>
+
+      {/* Decoração de fundo */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
       </div>
     </div>
   );

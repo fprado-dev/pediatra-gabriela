@@ -40,7 +40,7 @@ export default async function DashboardPage() {
     .from("consultations")
     .select("*", { count: "exact", head: true })
     .eq("doctor_id", user.id)
-    .gte("created_at", monthStart);
+    .gte("consultation_date", monthStart);
 
   // Buscar pacientes com alergias
   const { count: allergiesCount } = await supabase
@@ -58,10 +58,10 @@ export default async function DashboardPage() {
   const sixMonthsAgo = subMonths(new Date(), 5);
   const { data: monthlyData } = await supabase
     .from("consultations")
-    .select("created_at")
+    .select("consultation_date")
     .eq("doctor_id", user.id)
-    .gte("created_at", startOfMonth(sixMonthsAgo).toISOString())
-    .order("created_at", { ascending: true });
+    .gte("consultation_date", startOfMonth(sixMonthsAgo).toISOString())
+    .order("consultation_date", { ascending: true });
 
   // Agrupar por mês
   const monthlyChartData = (() => {
@@ -76,7 +76,7 @@ export default async function DashboardPage() {
 
     // Contar consultas por mês
     monthlyData?.forEach((consultation) => {
-      const consultationDate = new Date(consultation.created_at);
+      const consultationDate = new Date(consultation.consultation_date);
       const monthLabel = format(consultationDate, "MMM", { locale: ptBR });
       if (months[monthLabel] !== undefined) {
         months[monthLabel]++;

@@ -85,35 +85,35 @@ export function CTAWaitlist() {
                 a plataforma. Acesso gratuito para os primeiros 50 médicos!
               </p>
 
-              <form onSubmit={handleSubmit} className="max-w-xl mx-auto">
-                <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <form onSubmit={handleSubmit} className="max-w-md mx-auto">
+                <div className="flex flex-col gap-4 mb-4">
                   <Input
                     type="text"
                     placeholder="Seu nome (opcional)"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-12"
+                    className="h-14 text-base px-4"
                   />
                   <Input
                     type="email"
                     placeholder="Seu melhor email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 flex-1"
+                    className="h-14 text-base px-4"
                     required
                   />
                   <Button
                     type="submit"
                     size="lg"
-                    className="h-12 px-8 bg-primary hover:bg-primary/90"
+                    className="h-14 text-base bg-primary hover:bg-primary/90"
                     disabled={status === "loading"}
                   >
                     {status === "loading" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
                       <>
-                        <Mail className="h-4 w-4 mr-2" />
-                        Entrar na Lista
+                        <Mail className="h-5 w-5 mr-2" />
+                        Entrar na Lista de Espera
                       </>
                     )}
                   </Button>

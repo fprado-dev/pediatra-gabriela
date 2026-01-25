@@ -306,14 +306,10 @@ export function PrescriptionForm({
         observeFeeding,
       };
 
-      // Gerar texto formatado para o campo prescription
-      const prescriptionText = formatPrescriptionText(prescriptionData);
-
       const { error } = await supabase
         .from("consultations")
         .update({
           prescription_data: prescriptionData,
-          prescription: prescriptionText,
           updated_at: new Date().toISOString(),
         })
         .eq("id", consultationId);
@@ -321,58 +317,13 @@ export function PrescriptionForm({
       if (error) throw error;
 
       toast.success("Receita salva com sucesso!");
-      router.push(`/consultations/${consultationId}/preview`);
+      router.push(`/consultations/${consultationId}/prescription/view`);
     } catch (error) {
       console.error("Erro ao salvar:", error);
       toast.error("Erro ao salvar receita");
     } finally {
       setIsSaving(false);
     }
-  };
-
-  // Formatar texto da receita
-  const formatPrescriptionText = (data: PrescriptionData): string => {
-    let text = "";
-
-    // Medicamentos
-    if (data.medications.length > 0) {
-      text += "💊 USO ORAL:\n\n";
-      data.medications.forEach((med, index) => {
-        text += `${index + 1}) ${med.name} --- ${med.quantity}\n`;
-        if (med.dosage) text += `   Dosagem: ${med.dosage}\n`;
-        if (med.instructions) text += `   ${med.instructions}\n`;
-        text += "\n";
-      });
-    }
-
-    // Orientações
-    if (data.orientations) {
-      text += "\n💡 ORIENTAÇÕES:\n\n";
-      text += data.orientations + "\n";
-    }
-
-    // Sinais de alerta
-    if (data.alertSigns) {
-      text += "\n⚠️ SINAIS DE ALERTA - PROCURAR ATENDIMENTO SE:\n\n";
-      text += data.alertSigns + "\n";
-    }
-
-    // Prevenção
-    if (data.prevention) {
-      text += "\n🛡️ COMO PREVENIR:\n\n";
-      text += data.prevention + "\n";
-    }
-
-    // Anotações
-    if (data.notes || data.returnDays || data.bringExams || data.observeFeeding) {
-      text += "\n📝 ANOTAÇÕES:\n\n";
-      if (data.returnDays) text += `• Retornar em ${data.returnDays} dias\n`;
-      if (data.bringExams) text += `• Levar resultados de exames\n`;
-      if (data.observeFeeding) text += `• Observar aceitação alimentar\n`;
-      if (data.notes) text += data.notes + "\n";
-    }
-
-    return text.trim();
   };
 
   const today = new Date().toLocaleDateString("pt-BR", {

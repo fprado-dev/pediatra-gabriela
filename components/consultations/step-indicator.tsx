@@ -17,8 +17,8 @@ interface StepIndicatorProps {
 
 export function StepIndicator({ steps, currentStep, className }: StepIndicatorProps) {
   return (
-    <div className={cn("w-full", className)}>
-      <div className="flex items-center justify-between">
+    <div className={cn("w-full flex justify-center", className)}>
+      <div className="flex items-center justify-between max-w-2xl w-full">
         {steps.map((step, index) => {
           const isCompleted = index < currentStep;
           const isCurrent = index === currentStep;

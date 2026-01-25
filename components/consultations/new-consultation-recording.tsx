@@ -191,13 +191,13 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
       </header>
 
       {/* Step Indicator */}
-      <div className="px-6 py-6 max-w-4xl mx-auto">
+      <div className="px-6 py-6 w-full container mx-auto bg-red-200">
         <StepIndicator steps={STEPS} currentStep={currentStepIndex} />
       </div>
 
       {/* Patient Mini Card (shown after selection) */}
       {selectedPatient && flowState !== "select-patient" && flowState !== "completed" && (
-        <div className="px-6 pb-4 max-w-4xl mx-auto">
+        <div className="px-6 pb-4 wf mx-auto">
           <PatientMiniCard
             patient={selectedPatient}
             onClear={flowState === "select-mode" ? handleClearPatient : undefined}
@@ -207,7 +207,7 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
       )}
 
       {/* Main Content */}
-      <main className="px-6 pb-8 max-w-4xl mx-auto">
+      <main className="px-6 pb-8 wf mx-auto">
         <div className="space-y-6">
           {/* Error */}
           {error && (

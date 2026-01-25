@@ -83,82 +83,75 @@ export function ConsultationList({ consultations }: ConsultationListProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {consultations.map((consultation) => (
-        <Card key={consultation.id} className="hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between gap-4">
-              {/* Info principal */}
-              <div className="flex-1 space-y-3">
-                {/* Linha 1: Paciente e Status */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 flex-1">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold">
-                      {consultation.patient?.full_name || "Paciente não encontrado"}
-                    </span>
-                  </div>
-                  {getStatusBadge(consultation.status)}
-                </div>
+        <Card key={consultation.id} className="hover:shadow-md transition-shadow flex flex-col">
+          <CardContent className="p-4 flex flex-col flex-1">
+            {/* Header: Status */}
+            <div className="flex items-center justify-between mb-3">
+              {getStatusBadge(consultation.status)}
+              <span className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(consultation.created_at), {
+                  addSuffix: true,
+                  locale: ptBR,
+                })}
+              </span>
+            </div>
 
-                {/* Linha 2: Queixa principal ou placeholder */}
-                {consultation.chief_complaint ? (
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {consultation.chief_complaint}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    {consultation.status === "processing" 
-                      ? "Processando com IA..."
-                      : "Queixa principal não disponível"}
-                  </p>
-                )}
+            {/* Paciente */}
+            <div className="flex items-center gap-2 mb-2">
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="font-semibold text-sm truncate">
+                {consultation.patient?.full_name || "Paciente não encontrado"}
+              </span>
+            </div>
 
-                {/* Linha 3: Metadados */}
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span>
-                      {formatDistanceToNow(new Date(consultation.created_at), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    <span>Áudio: {formatDuration(consultation.audio_duration_seconds)}</span>
-                  </div>
-                </div>
+            {/* Queixa principal */}
+            <div className="flex-1 mb-3">
+              {consultation.chief_complaint ? (
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {consultation.chief_complaint}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  {consultation.status === "processing" 
+                    ? "Processando com IA..."
+                    : "Queixa não disponível"}
+                </p>
+              )}
+            </div>
+
+            {/* Footer: Metadados + Ação */}
+            <div className="flex items-center justify-between pt-3 border-t">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                <span>{formatDuration(consultation.audio_duration_seconds)}</span>
               </div>
 
-              {/* Ações */}
-              <div className="flex flex-col gap-2">
-                {consultation.status === "completed" && (
-                  <Link href={`/consultations/${consultation.id}/preview`}>
-                    <Button size="sm" variant="default">
-                      Ver Consulta
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
-                )}
-                {consultation.status === "processing" && (
-                  <Link href={`/consultations/${consultation.id}/preview`}>
-                    <Button size="sm" variant="outline">
-                      Acompanhar
-                      <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                    </Button>
-                  </Link>
-                )}
-                {consultation.status === "error" && (
-                  <Link href={`/consultations/${consultation.id}/preview`}>
-                    <Button size="sm" variant="outline">
-                      Ver Erro
-                      <AlertCircle className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
-                )}
-              </div>
+              {consultation.status === "completed" && (
+                <Link href={`/consultations/${consultation.id}/preview`}>
+                  <Button size="sm" variant="default">
+                    Ver
+                    <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </Link>
+              )}
+              {consultation.status === "processing" && (
+                <Link href={`/consultations/${consultation.id}/preview`}>
+                  <Button size="sm" variant="outline">
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Aguardar
+                  </Button>
+                </Link>
+              )}
+              {consultation.status === "error" && (
+                <Link href={`/consultations/${consultation.id}/preview`}>
+                  <Button size="sm" variant="destructive">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Ver Erro
+                  </Button>
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>

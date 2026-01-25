@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, ClipboardList } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, ClipboardList, Pill } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -102,6 +102,12 @@ export default async function ConsultationPreviewPage({
           </div>
 
           <div className="flex items-center gap-2">
+            <Button asChild variant="default" size="sm">
+              <Link href={`/consultations/${id}/prescription`}>
+                <Pill className="h-4 w-4 mr-2" />
+                Criar Receita
+              </Link>
+            </Button>
             <Button asChild variant="outline" size="sm">
               <a href={`/api/consultations/${id}/download`} download>
                 <Download className="h-4 w-4 mr-2" />

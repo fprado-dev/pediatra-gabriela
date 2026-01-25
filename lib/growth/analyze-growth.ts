@@ -269,8 +269,17 @@ export function generateInsightsPrompt(
     prompt += `- P. Cefálico: Percentil ${analysis.current.headCircumference.percentile}\n`;
   }
 
-  if (analysis.previous) {
-    prompt += `\n**Medições Anteriores (${analysis.previous.date.toLocaleDateString('pt-BR')}):**\n`;
+  if (analysis.previous && analysis.previous.date) {
+    let prevDateStr: string;
+    try {
+      const prevDate = typeof analysis.previous.date === 'string' 
+        ? new Date(analysis.previous.date)
+        : analysis.previous.date;
+      prevDateStr = prevDate.toLocaleDateString('pt-BR');
+    } catch {
+      prevDateStr = 'data anterior';
+    }
+    prompt += `\n**Medições Anteriores (${prevDateStr}):**\n`;
     if (analysis.previous.weight) {
       prompt += `- Peso: Percentil ${analysis.previous.weight.percentile}\n`;
     }

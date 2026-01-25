@@ -86,8 +86,37 @@ export async function GET(
       previousMeasurements
     );
 
+    // Prepare measurements for charts
+    const chartMeasurements = {
+      weight: measurements
+        .filter((m) => m.weight_kg)
+        .map((m) => {
+          const ageInMonths = Math.floor((m.date.getTime() - dateOfBirth.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+          return {
+            date: m.date.toISOString(),
+            value: m.weight_kg!,
+            percentile: analysis.current.weight?.percentile || 50,
+          };
+        }),
+      height: measurements
+        .filter((m) => m.height_cm)
+        .map((m) => ({
+          date: m.date.toISOString(),
+          value: m.height_cm!,
+          percentile: analysis.current.height?.percentile || 50,
+        })),
+      hc: measurements
+        .filter((m) => m.head_circumference_cm)
+        .map((m) => ({
+          date: m.date.toISOString(),
+          value: m.head_circumference_cm!,
+          percentile: analysis.current.headCircumference?.percentile || 50,
+        })),
+    };
+
     return NextResponse.json({
       analysis,
+      measurements: chartMeasurements,
       patient: {
         name: patient.full_name,
         dateOfBirth: patient.date_of_birth,

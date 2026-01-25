@@ -2,10 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { GrowthAlertCard } from "./growth-alert-card";
+import { GrowthChart } from "./growth-chart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, AlertTriangle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  TrendingUp, 
+  AlertTriangle, 
+  Scale, 
+  Ruler, 
+  Brain,
+  LineChart,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { GrowthAnalysis } from "@/lib/growth";
+
+interface GrowthMeasurement {
+  date: string;
+  value: number;
+  percentile: number;
+}
 
 interface PatientGrowthSectionProps {
   patientId: string;
@@ -21,8 +40,14 @@ export function PatientGrowthSection({
   medicalHistory,
 }: PatientGrowthSectionProps) {
   const [analysis, setAnalysis] = useState<GrowthAnalysis | null>(null);
+  const [measurements, setMeasurements] = useState<{
+    weight: GrowthMeasurement[];
+    height: GrowthMeasurement[];
+    hc: GrowthMeasurement[];
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showChart, setShowChart] = useState(false);
 
   // Calculate age in months
   const calculateAgeInMonths = () => {
@@ -42,6 +67,7 @@ export function PatientGrowthSection({
         }
         const data = await response.json();
         setAnalysis(data.analysis);
+        setMeasurements(data.measurements);
       } catch (err: any) {
         console.error("Erro ao buscar dados de crescimento:", err);
         setError(err.message);
@@ -75,13 +101,17 @@ export function PatientGrowthSection({
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-muted-foreground" />
-          <Skeleton className="h-6 w-48" />
-        </div>
-        <Skeleton className="h-32 w-full" />
-      </div>
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-muted-foreground" />
+            <Skeleton className="h-6 w-48" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-32 w-full" />
+        </CardContent>
+      </Card>
     );
   }
 
@@ -93,34 +123,150 @@ export function PatientGrowthSection({
     return null; // No data available
   }
 
-  // Only show if there are alerts
-  if (analysis.alerts.length === 0) {
-    // Show a small success indicator instead
-    return (
-      <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
-        <TrendingUp className="h-4 w-4 text-green-600" />
-        <span className="text-sm text-green-700">
-          Crescimento dentro dos parâmetros esperados
-        </span>
-        {analysis.current.weight && (
-          <span className="text-xs text-green-600 ml-auto">
-            Peso: P{analysis.current.weight.percentile}
-          </span>
-        )}
-        {analysis.current.height && (
-          <span className="text-xs text-green-600">
-            Altura: P{analysis.current.height.percentile}
-          </span>
-        )}
-      </div>
-    );
-  }
+  const hasAlerts = analysis.alerts.length > 0;
+  const hasMeasurements = measurements && (
+    measurements.weight.length > 1 ||
+    measurements.height.length > 1 ||
+    measurements.hc.length > 1
+  );
 
   return (
-    <GrowthAlertCard
-      analysis={analysis}
-      patientName={patientName}
-      onGenerateInsights={handleGenerateInsights}
-    />
+    <div className="space-y-4">
+      {/* Card de Status / Alertas */}
+      {hasAlerts ? (
+        <GrowthAlertCard
+          analysis={analysis}
+          patientName={patientName}
+          onGenerateInsights={handleGenerateInsights}
+        />
+      ) : (
+        <Card className="border-green-200 bg-gradient-to-r from-green-50/50 to-white">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Crescimento Saudável</p>
+                  <p className="text-xs text-muted-foreground">
+                    Dentro dos parâmetros esperados para a idade
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                {analysis.current.weight && (
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Peso</p>
+                    <p className="font-semibold text-green-700">P{analysis.current.weight.percentile}</p>
+                  </div>
+                )}
+                {analysis.current.height && (
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Altura</p>
+                    <p className="font-semibold text-green-700">P{analysis.current.height.percentile}</p>
+                  </div>
+                )}
+                {analysis.current.headCircumference && (
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">P. Cefálico</p>
+                    <p className="font-semibold text-green-700">P{analysis.current.headCircumference.percentile}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Gráfico de Crescimento */}
+      {hasMeasurements && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <LineChart className="h-5 w-5" />
+                Curvas de Crescimento
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChart(!showChart)}
+                className="text-sm"
+              >
+                {showChart ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-1" />
+                    Ocultar
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                    Expandir
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          
+          {showChart && (
+            <CardContent className="pt-2">
+              <Tabs defaultValue="weight" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 mb-4">
+                  <TabsTrigger value="weight" className="gap-1.5 text-xs">
+                    <Scale className="h-3.5 w-3.5" />
+                    Peso
+                  </TabsTrigger>
+                  <TabsTrigger value="height" className="gap-1.5 text-xs">
+                    <Ruler className="h-3.5 w-3.5" />
+                    Altura
+                  </TabsTrigger>
+                  <TabsTrigger value="hc" className="gap-1.5 text-xs">
+                    <Brain className="h-3.5 w-3.5" />
+                    P. Cefálico
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="weight">
+                  {measurements.weight.length > 1 ? (
+                    <GrowthChart measurements={measurements.weight} type="weight" />
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Dados insuficientes para gerar o gráfico de peso.
+                      <br />
+                      Pelo menos 2 medições são necessárias.
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="height">
+                  {measurements.height.length > 1 ? (
+                    <GrowthChart measurements={measurements.height} type="height" />
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Dados insuficientes para gerar o gráfico de altura.
+                      <br />
+                      Pelo menos 2 medições são necessárias.
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="hc">
+                  {measurements.hc.length > 1 ? (
+                    <GrowthChart measurements={measurements.hc} type="hc" />
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Dados insuficientes para gerar o gráfico de perímetro cefálico.
+                      <br />
+                      Pelo menos 2 medições são necessárias.
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          )}
+        </Card>
+      )}
+    </div>
   );
 }

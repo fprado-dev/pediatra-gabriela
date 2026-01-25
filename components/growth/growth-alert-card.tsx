@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertTriangle,
   TrendingDown,
@@ -14,10 +13,10 @@ import {
   Brain,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
-  X,
   Loader2,
   Sparkles,
+  ArrowRight,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { GrowthAlert, GrowthAnalysis } from "@/lib/growth";
@@ -26,7 +25,6 @@ interface GrowthAlertCardProps {
   analysis: GrowthAnalysis;
   patientName: string;
   onDismiss?: (alertType: string) => void;
-  onAddToConsultation?: (alert: GrowthAlert) => void;
   onGenerateInsights?: () => Promise<string>;
   className?: string;
 }
@@ -35,7 +33,6 @@ export function GrowthAlertCard({
   analysis,
   patientName,
   onDismiss,
-  onAddToConsultation,
   onGenerateInsights,
   className,
 }: GrowthAlertCardProps) {
@@ -48,6 +45,7 @@ export function GrowthAlertCard({
   if (alerts.length === 0) return null;
 
   const highSeverityCount = alerts.filter((a) => a.severity === "high").length;
+  const hasHighSeverity = highSeverityCount > 0;
 
   const handleGenerateInsights = async () => {
     if (!onGenerateInsights) return;
@@ -62,60 +60,88 @@ export function GrowthAlertCard({
     }
   };
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityStyles = (severity: string) => {
     switch (severity) {
       case "high":
-        return "border-red-200 bg-red-50";
+        return {
+          bg: "bg-red-50",
+          border: "border-red-200",
+          icon: "text-red-600",
+          badge: "bg-red-100 text-red-700 border-red-200",
+        };
       case "moderate":
-        return "border-yellow-200 bg-yellow-50";
+        return {
+          bg: "bg-amber-50",
+          border: "border-amber-200",
+          icon: "text-amber-600",
+          badge: "bg-amber-100 text-amber-700 border-amber-200",
+        };
       default:
-        return "border-blue-200 bg-blue-50";
+        return {
+          bg: "bg-blue-50",
+          border: "border-blue-200",
+          icon: "text-blue-600",
+          badge: "bg-blue-100 text-blue-700 border-blue-200",
+        };
     }
   };
 
-  const getSeverityIcon = (type: string) => {
+  const getAlertIcon = (type: string) => {
     switch (type) {
       case "weight_drop":
       case "weight_drop_severe":
-        return <TrendingDown className="h-4 w-4 text-red-600" />;
+        return TrendingDown;
       case "weight_excess":
-        return <TrendingUp className="h-4 w-4 text-orange-600" />;
+        return TrendingUp;
       case "height_stagnation":
-        return <Ruler className="h-4 w-4 text-yellow-600" />;
+        return Ruler;
       case "head_circ_abnormal":
-        return <Brain className="h-4 w-4 text-purple-600" />;
+        return Brain;
       default:
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+        return AlertTriangle;
     }
   };
 
   return (
-    <Card className={cn("border-yellow-300 bg-yellow-50/50", className)}>
-      <CardHeader className="pb-2">
+    <Card
+      className={cn(
+        "overflow-hidden",
+        hasHighSeverity
+          ? "border-red-300 bg-gradient-to-r from-red-50/50 to-white"
+          : "border-amber-300 bg-gradient-to-r from-amber-50/50 to-white",
+        className
+      )}
+    >
+      {/* Header Compacto */}
+      <CardHeader className="py-3 px-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <AlertTriangle
+          <div className="flex items-center gap-3">
+            <div
               className={cn(
-                "h-5 w-5",
-                highSeverityCount > 0 ? "text-red-600" : "text-yellow-600"
-              )}
-            />
-            Alertas de Crescimento
-            <Badge
-              variant="secondary"
-              className={cn(
-                "ml-2",
-                highSeverityCount > 0
-                  ? "bg-red-100 text-red-700"
-                  : "bg-yellow-100 text-yellow-700"
+                "p-2 rounded-lg",
+                hasHighSeverity ? "bg-red-100" : "bg-amber-100"
               )}
             >
-              {alerts.length}
-            </Badge>
-          </CardTitle>
+              <AlertTriangle
+                className={cn(
+                  "h-5 w-5",
+                  hasHighSeverity ? "text-red-600" : "text-amber-600"
+                )}
+              />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold">
+                Alertas de Crescimento
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {alerts.length} {alerts.length === 1 ? "alerta detectado" : "alertas detectados"}
+              </p>
+            </div>
+          </div>
           <Button
             variant="ghost"
             size="sm"
+            className="h-8 w-8 p-0"
             onClick={() => setIsExpanded(!isExpanded)}
           >
             {isExpanded ? (
@@ -128,152 +154,135 @@ export function GrowthAlertCard({
       </CardHeader>
 
       {isExpanded && (
-        <CardContent className="space-y-4">
-          {/* Resumo de Percentis */}
-          <div className="flex flex-wrap gap-4 p-3 bg-white rounded-lg border">
+        <CardContent className="px-4 pb-4 pt-0 space-y-4">
+          {/* Cards de Percentis */}
+          <div className="grid grid-cols-3 gap-3">
             {current.weight && (
-              <div className="text-center">
-                <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
-                  <Scale className="h-3 w-3" />
-                  Peso
+              <div className="bg-white rounded-lg border p-3 text-center">
+                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                  <Scale className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">Peso</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="font-semibold">P{current.weight.percentile}</span>
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="text-lg font-bold">P{current.weight.percentile}</span>
                   {previous?.weight && (
                     <span
                       className={cn(
-                        "text-xs",
+                        "text-xs font-medium px-1.5 py-0.5 rounded",
                         current.weight.percentile < previous.weight.percentile
-                          ? "text-red-600"
-                          : "text-green-600"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700"
                       )}
                     >
-                      ({current.weight.percentile >= previous.weight.percentile ? "+" : ""}
-                      {current.weight.percentile - previous.weight.percentile})
+                      {current.weight.percentile >= previous.weight.percentile ? "+" : ""}
+                      {current.weight.percentile - previous.weight.percentile}
                     </span>
                   )}
                 </div>
               </div>
             )}
             {current.height && (
-              <div className="text-center">
-                <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
-                  <Ruler className="h-3 w-3" />
-                  Altura
+              <div className="bg-white rounded-lg border p-3 text-center">
+                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                  <Ruler className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">Altura</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="font-semibold">P{current.height.percentile}</span>
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="text-lg font-bold">P{current.height.percentile}</span>
                   {previous?.height && (
                     <span
                       className={cn(
-                        "text-xs",
+                        "text-xs font-medium px-1.5 py-0.5 rounded",
                         current.height.percentile < previous.height.percentile
-                          ? "text-red-600"
-                          : "text-green-600"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700"
                       )}
                     >
-                      ({current.height.percentile >= previous.height.percentile ? "+" : ""}
-                      {current.height.percentile - previous.height.percentile})
+                      {current.height.percentile >= previous.height.percentile ? "+" : ""}
+                      {current.height.percentile - previous.height.percentile}
                     </span>
                   )}
                 </div>
               </div>
             )}
             {current.headCircumference && (
-              <div className="text-center">
-                <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
-                  <Brain className="h-3 w-3" />
-                  P. Cefálico
+              <div className="bg-white rounded-lg border p-3 text-center">
+                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                  <Brain className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">P. Cefálico</span>
                 </div>
-                <span className="font-semibold">P{current.headCircumference.percentile}</span>
+                <span className="text-lg font-bold">P{current.headCircumference.percentile}</span>
               </div>
             )}
           </div>
 
           {/* Lista de Alertas */}
-          <div className="space-y-3">
-            {alerts.map((alert, index) => (
-              <Alert
-                key={index}
-                className={cn("relative", getSeverityColor(alert.severity))}
-              >
-                <div className="flex items-start gap-3">
-                  {getSeverityIcon(alert.type)}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-sm">{alert.title}</span>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs",
-                          alert.severity === "high"
-                            ? "border-red-300 text-red-700"
-                            : "border-yellow-300 text-yellow-700"
-                        )}
-                      >
-                        {alert.severity === "high" ? "Alto" : "Moderado"}
-                      </Badge>
+          <div className="space-y-2">
+            {alerts.map((alert, index) => {
+              const styles = getSeverityStyles(alert.severity);
+              const Icon = getAlertIcon(alert.type);
+
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "rounded-lg border p-3",
+                    styles.bg,
+                    styles.border
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={cn("mt-0.5", styles.icon)}>
+                      <Icon className="h-4 w-4" />
                     </div>
-                    <AlertDescription className="text-sm">
-                      {alert.description}
-                    </AlertDescription>
-
-                    {/* Ações Sugeridas */}
-                    {alert.suggestedActions.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                          Investigar:
-                        </p>
-                        <ul className="text-xs space-y-0.5">
-                          {alert.suggestedActions.slice(0, 3).map((action, i) => (
-                            <li key={i} className="flex items-center gap-1">
-                              <span className="text-muted-foreground">•</span>
-                              {action}
-                            </li>
-                          ))}
-                        </ul>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-medium text-sm">{alert.title}</span>
+                        <Badge
+                          variant="outline"
+                          className={cn("text-[10px] px-1.5 py-0", styles.badge)}
+                        >
+                          {alert.severity === "high" ? "ALTO" : "MODERADO"}
+                        </Badge>
                       </div>
-                    )}
-                  </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {alert.description}
+                      </p>
 
-                  {/* Ações */}
-                  <div className="flex gap-1">
-                    {onAddToConsultation && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        title="Adicionar à consulta"
-                        onClick={() => onAddToConsultation(alert)}
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {onDismiss && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        title="Ignorar"
-                        onClick={() => onDismiss(alert.type)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
+                      {/* Ações Sugeridas Compactas */}
+                      {alert.suggestedActions.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-dashed">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                            <Info className="h-3 w-3" />
+                            <span className="font-medium">Investigar:</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {alert.suggestedActions.slice(0, 3).map((action, i) => (
+                              <span
+                                key={i}
+                                className="text-xs bg-white/70 px-2 py-0.5 rounded border"
+                              >
+                                {action}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </Alert>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Insights IA */}
+          {/* Botão Gerar Insights IA */}
           {onGenerateInsights && (
-            <div className="pt-2 border-t">
+            <div className="pt-2">
               {!aiInsights ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full"
+                  className="w-full bg-white hover:bg-primary/5 hover:border-primary/50 transition-colors"
                   onClick={handleGenerateInsights}
                   disabled={isLoadingInsights}
                 >
@@ -286,16 +295,19 @@ export function GrowthAlertCard({
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
                       Gerar análise com IA
+                      <ArrowRight className="h-4 w-4 ml-auto" />
                     </>
                   )}
                 </Button>
               ) : (
-                <div className="bg-white rounded-lg p-3 border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span className="font-medium text-sm">Análise da IA</span>
+                <div className="bg-gradient-to-br from-primary/5 to-white rounded-lg p-4 border border-primary/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 bg-primary/10 rounded">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="font-semibold text-sm">Análise da IA</span>
                   </div>
-                  <p className="text-sm text-muted-foreground whitespace-pre-line">
+                  <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
                     {aiInsights}
                   </p>
                 </div>

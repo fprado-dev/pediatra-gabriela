@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AudioRecorder } from "./audio-recorder";
 import { AudioUploader } from "./audio-uploader";
+import { AudioPreview } from "./audio-preview";
 import { ModeSelector } from "./mode-selector";
 import { PatientSelector } from "./patient-selector";
+import { PatientMiniCard } from "./patient-mini-card";
 import { ProcessingStatus } from "./processing-status";
+import { StepIndicator } from "./step-indicator";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, AlertCircle } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, AlertCircle, CheckCircle2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface Patient {
@@ -26,7 +30,21 @@ interface NewConsultationRecordingProps {
 }
 
 type InputMode = "record" | "upload";
-type FlowState = "select-patient" | "select-mode" | "input" | "processing" | "completed";
+type FlowState = 
+  | "select-patient" 
+  | "select-mode" 
+  | "input" 
+  | "preview"
+  | "processing" 
+  | "completed";
+
+const STEPS = [
+  { id: "patient", label: "Paciente" },
+  { id: "method", label: "Método" },
+  { id: "audio", label: "Áudio" },
+  { id: "review", label: "Revisão" },
+  { id: "process", label: "Processar" },
+];
 
 export function NewConsultationRecording({ patients }: NewConsultationRecordingProps) {
   const router = useRouter();
@@ -36,6 +54,27 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
   const [consultationId, setConsultationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Audio state
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
+
+  const selectedPatient = useMemo(
+    () => patients.find((p) => p.id === selectedPatientId),
+    [patients, selectedPatientId]
+  );
+
+  const currentStepIndex = useMemo(() => {
+    switch (flowState) {
+      case "select-patient": return 0;
+      case "select-mode": return 1;
+      case "input": return 2;
+      case "preview": return 3;
+      case "processing": return 4;
+      case "completed": return 5;
+      default: return 0;
+    }
+  }, [flowState]);
 
   const handlePatientSelected = () => {
     if (!selectedPatientId) {
@@ -50,9 +89,15 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
     setFlowState("input");
   };
 
-  const handleAudioComplete = async (audioBlob: Blob, duration: number) => {
-    if (!selectedPatientId) {
-      toast.error("Paciente não selecionado");
+  const handleAudioCaptured = (blob: Blob, duration: number) => {
+    setAudioBlob(blob);
+    setAudioDuration(duration);
+    setFlowState("preview");
+  };
+
+  const handleConfirmAndUpload = async () => {
+    if (!selectedPatientId || !audioBlob) {
+      toast.error("Dados incompletos");
       return;
     }
 
@@ -60,16 +105,12 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
     setError(null);
 
     try {
-      // Criar FormData para upload
       const formData = new FormData();
-      
-      // Determinar extensão baseada no modo
       const fileName = inputMode === "record" ? "consultation.webm" : "consultation.mp3";
       formData.append("audio", audioBlob, fileName);
       formData.append("patientId", selectedPatientId);
-      formData.append("duration", duration.toString());
+      formData.append("duration", audioDuration.toString());
 
-      // Upload do áudio
       const response = await fetch("/api/consultations/upload-audio", {
         method: "POST",
         body: formData,
@@ -83,8 +124,7 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
       const data = await response.json();
       setConsultationId(data.consultationId);
       setFlowState("processing");
-      
-      toast.success("Áudio enviado! Processando...");
+      toast.success("Áudio enviado! Processando com IA...");
     } catch (err: any) {
       console.error("Erro no upload:", err);
       setError(err.message || "Erro ao processar áudio");
@@ -94,30 +134,49 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
     }
   };
 
-  const handleProcessingComplete = (consultationId: string) => {
+  const handleReRecord = () => {
+    setAudioBlob(null);
+    setAudioDuration(0);
+    setFlowState("input");
+  };
+
+  const handleProcessingComplete = (id: string) => {
     setFlowState("completed");
     toast.success("Consulta processada com sucesso!");
-    
-    // Redirecionar para preview da consulta
     setTimeout(() => {
-      router.push(`/consultations/${consultationId}/preview`);
+      router.push(`/consultations/${id}/preview`);
     }, 1500);
   };
 
-  const handleBackToPatientSelection = () => {
+  const handleClearPatient = () => {
+    setSelectedPatientId(null);
     setFlowState("select-patient");
     setInputMode(null);
+    setAudioBlob(null);
+    setAudioDuration(0);
   };
 
-  const handleBackToModeSelection = () => {
-    setFlowState("select-mode");
-    setInputMode(null);
+  const handleBack = () => {
+    switch (flowState) {
+      case "select-mode":
+        setFlowState("select-patient");
+        break;
+      case "input":
+        setFlowState("select-mode");
+        setInputMode(null);
+        break;
+      case "preview":
+        setFlowState("input");
+        break;
+    }
   };
+
+  const showBackButton = ["select-mode", "input", "preview"].includes(flowState);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Header */}
-      <header className="border-b">
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <Link href="/consultations">
@@ -125,25 +184,33 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <div>
-              <h1 className="text-2xl font-bold">Nova Consulta</h1>
-              <p className="text-sm text-muted-foreground">
-                {flowState === "select-patient" && "Selecione o paciente"}
-                {flowState === "select-mode" && "Escolha como adicionar o áudio"}
-                {flowState === "input" && inputMode === "record" && "Grave a consulta"}
-                {flowState === "input" && inputMode === "upload" && "Envie o arquivo de áudio"}
-                {flowState === "processing" && "Processando com IA..."}
-                {flowState === "completed" && "Consulta processada!"}
-              </p>
+            <div className="flex-1">
+              <h1 className="text-xl font-bold">Nova Consulta</h1>
             </div>
           </div>
         </div>
       </header>
 
+      {/* Step Indicator */}
+      <div className="container mx-auto px-4 py-6 max-w-3xl">
+        <StepIndicator steps={STEPS} currentStep={currentStepIndex} />
+      </div>
+
+      {/* Patient Mini Card (shown after selection) */}
+      {selectedPatient && flowState !== "select-patient" && flowState !== "completed" && (
+        <div className="container mx-auto px-4 pb-4 max-w-3xl">
+          <PatientMiniCard
+            patient={selectedPatient}
+            onClear={flowState === "select-mode" ? handleClearPatient : undefined}
+            showClear={flowState === "select-mode"}
+          />
+        </div>
+      )}
+
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+      <main className="container mx-auto px-4 pb-8 max-w-3xl">
         <div className="space-y-6">
-          {/* Erro global */}
+          {/* Error */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -151,7 +218,7 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
             </Alert>
           )}
 
-          {/* Fluxo: Seleção de Paciente */}
+          {/* Step 1: Select Patient */}
           {flowState === "select-patient" && (
             <>
               <PatientSelector
@@ -171,15 +238,12 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
             </>
           )}
 
-          {/* Fluxo: Seleção de Modo */}
+          {/* Step 2: Select Mode */}
           {flowState === "select-mode" && (
             <>
               <ModeSelector onSelectMode={handleModeSelected} />
               <div className="flex justify-start">
-                <Button
-                  variant="ghost"
-                  onClick={handleBackToPatientSelection}
-                >
+                <Button variant="ghost" onClick={handleBack}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Voltar
                 </Button>
@@ -187,73 +251,71 @@ export function NewConsultationRecording({ patients }: NewConsultationRecordingP
             </>
           )}
 
-          {/* Fluxo: Input (Gravação ou Upload) */}
+          {/* Step 3: Input (Record/Upload) */}
           {flowState === "input" && (
             <>
-              {/* Info do paciente selecionado */}
-              <div className="bg-muted/50 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Paciente selecionado:</p>
-                    <p className="font-semibold">
-                      {patients.find((p) => p.id === selectedPatientId)?.full_name}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBackToModeSelection}
-                  >
-                    Alterar Método
-                  </Button>
-                </div>
-              </div>
-
               {inputMode === "record" && (
                 <AudioRecorder
-                  onRecordingComplete={handleAudioComplete}
-                  onCancel={handleBackToModeSelection}
+                  onRecordingComplete={handleAudioCaptured}
+                  onCancel={handleBack}
                 />
               )}
-
               {inputMode === "upload" && (
                 <AudioUploader
-                  onUploadComplete={handleAudioComplete}
-                  onCancel={handleBackToModeSelection}
+                  onUploadComplete={handleAudioCaptured}
+                  onCancel={handleBack}
                 />
-              )}
-
-              {isUploading && (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">
-                    Enviando áudio...
-                  </p>
-                </div>
               )}
             </>
           )}
 
-          {/* Fluxo: Processamento */}
-          {flowState === "processing" && consultationId && (
-            <ProcessingStatus
-              consultationId={consultationId}
-              onComplete={handleProcessingComplete}
+          {/* Step 4: Preview */}
+          {flowState === "preview" && audioBlob && (
+            <AudioPreview
+              audioBlob={audioBlob}
+              duration={audioDuration}
+              onConfirm={handleConfirmAndUpload}
+              onReRecord={handleReRecord}
+              isUploading={isUploading}
             />
           )}
 
-          {/* Fluxo: Concluído (temporário, antes do redirect) */}
-          {flowState === "completed" && (
-            <div className="text-center py-12">
-              <div className="mb-4">
-                <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                  <span className="text-3xl">✓</span>
+          {/* Step 5: Processing */}
+          {flowState === "processing" && consultationId && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center mb-6">
+                  <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+                    <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+                  </div>
+                  <h2 className="text-xl font-bold mb-2">Processando com IA</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Estamos transcrevendo e analisando a consulta...
+                  </p>
                 </div>
-              </div>
-              <h2 className="text-2xl font-bold mb-2">Consulta Processada!</h2>
-              <p className="text-muted-foreground">
-                Redirecionando para revisão...
-              </p>
-            </div>
+                <ProcessingStatus
+                  consultationId={consultationId}
+                  onComplete={handleProcessingComplete}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 6: Completed */}
+          {flowState === "completed" && (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-6">
+                    <CheckCircle2 className="h-10 w-10 text-green-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold mb-2">Consulta Processada!</h2>
+                  <p className="text-muted-foreground">
+                    Redirecionando para revisão...
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </main>

@@ -11,7 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
+
+const ITEMS_PER_PAGE = 6;
 
 interface Patient {
   id: string;
@@ -32,6 +34,7 @@ export function PatientList({ patients }: PatientListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [ageFilter, setAgeFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const calculateAge = (birthDate: string) => {
     const birth = new Date(birthDate);
@@ -95,6 +98,31 @@ export function PatientList({ patients }: PatientListProps) {
     return sorted;
   }, [patients, searchTerm, ageFilter, sortBy]);
 
+  // Reset para página 1 quando filtros mudam
+  const resetToFirstPage = () => setCurrentPage(1);
+
+  // Paginação
+  const totalPages = Math.ceil(filteredAndSortedPatients.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedPatients = filteredAndSortedPatients.slice(startIndex, endIndex);
+
+  // Handlers com reset de página
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    resetToFirstPage();
+  };
+
+  const handleAgeFilterChange = (value: string) => {
+    setAgeFilter(value);
+    resetToFirstPage();
+  };
+
+  const handleSortChange = (value: string) => {
+    setSortBy(value);
+    resetToFirstPage();
+  };
+
   return (
     <div className="space-y-4">
       {/* Busca e Filtros */}
@@ -105,13 +133,13 @@ export function PatientList({ patients }: PatientListProps) {
           <Input
             placeholder="Buscar por nome..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
 
         {/* Filtro de Idade */}
-        <Select value={ageFilter} onValueChange={setAgeFilter}>
+        <Select value={ageFilter} onValueChange={handleAgeFilterChange}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SlidersHorizontal className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Idade" />
@@ -126,7 +154,7 @@ export function PatientList({ patients }: PatientListProps) {
         </Select>
 
         {/* Ordenação */}
-        <Select value={sortBy} onValueChange={setSortBy}>
+        <Select value={sortBy} onValueChange={handleSortChange}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Ordenar" />
           </SelectTrigger>
@@ -151,16 +179,55 @@ export function PatientList({ patients }: PatientListProps) {
       ) : (
         <>
           <div className="text-sm text-muted-foreground">
+            Mostrando {startIndex + 1}-{Math.min(endIndex, filteredAndSortedPatients.length)} de{" "}
             {filteredAndSortedPatients.length} paciente
-            {filteredAndSortedPatients.length !== 1 ? "s" : ""} encontrado
             {filteredAndSortedPatients.length !== 1 ? "s" : ""}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {filteredAndSortedPatients.map((patient) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedPatients.map((patient) => (
               <PatientCard key={patient.id} patient={patient} />
             ))}
           </div>
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    className="w-8 h-8 p-0"
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Próximo
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>

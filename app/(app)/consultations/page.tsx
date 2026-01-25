@@ -6,15 +6,34 @@ import { Badge } from "@/components/ui/badge";
 import { Mic, FileText, X } from "lucide-react";
 import Link from "next/link";
 import { ConsultationList } from "@/components/consultations/consultation-list";
+import { ConsultationFilters } from "@/components/consultations/consultation-filters";
+import { Pagination } from "@/components/consultations/pagination";
 
 export const dynamic = 'force-dynamic';
+
+const ITEMS_PER_PAGE = 6;
 
 export default async function ConsultationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ patient?: string }>;
+  searchParams: Promise<{ 
+    patient?: string;
+    status?: string;
+    period?: string;
+    search?: string;
+    page?: string;
+  }>;
 }) {
-  const { patient: patientId } = await searchParams;
+  const params = await searchParams;
+  const { 
+    patient: patientId, 
+    status: statusFilter,
+    period: periodFilter,
+    search: searchTerm,
+    page: pageParam 
+  } = params;
+  
+  const currentPage = Math.max(1, parseInt(pageParam || "1", 10));
   const supabase = await createClient();
 
   const {
@@ -38,7 +57,7 @@ export default async function ConsultationsPage({
     filteredPatient = patientData;
   }
 
-  // Buscar consultas do médico com dados do paciente
+  // Construir query base
   let query = supabase
     .from("consultations")
     .select(`
@@ -53,17 +72,57 @@ export default async function ConsultationsPage({
         full_name,
         date_of_birth
       )
-    `)
+    `, { count: 'exact' })
     .eq("doctor_id", user.id);
 
-  // Aplicar filtro de paciente se fornecido
+  // Aplicar filtro de paciente
   if (patientId) {
     query = query.eq("patient_id", patientId);
   }
 
+  // Aplicar filtro de status
+  if (statusFilter && statusFilter !== "all") {
+    query = query.eq("status", statusFilter);
+  }
+
+  // Aplicar filtro de período
+  if (periodFilter && periodFilter !== "all") {
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (periodFilter) {
+      case "week":
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "month":
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "3months":
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case "6months":
+        startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(0);
+    }
+    
+    query = query.gte("created_at", startDate.toISOString());
+  }
+
+  // Aplicar busca por nome do paciente ou queixa
+  if (searchTerm) {
+    query = query.or(`chief_complaint.ilike.%${searchTerm}%`);
+  }
+
+  // Contar total antes de paginar
+  const { count: totalCount } = await query;
+
+  // Aplicar paginação
+  const offset = (currentPage - 1) * ITEMS_PER_PAGE;
   const { data: rawConsultations, error } = await query
     .order("created_at", { ascending: false })
-    .limit(patientId ? 50 : 20); // Mostrar mais se filtrado por paciente
+    .range(offset, offset + ITEMS_PER_PAGE - 1);
 
   if (error) {
     console.error("Erro ao buscar consultas:", error);
@@ -74,6 +133,19 @@ export default async function ConsultationsPage({
     ...c,
     patient: Array.isArray(c.patient) ? c.patient[0] : c.patient,
   })) || [];
+
+  const totalPages = Math.ceil((totalCount || 0) / ITEMS_PER_PAGE);
+
+  // Construir URL base para paginação (mantendo filtros)
+  const buildPageUrl = (page: number) => {
+    const params = new URLSearchParams();
+    if (patientId) params.set("patient", patientId);
+    if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+    if (periodFilter && periodFilter !== "all") params.set("period", periodFilter);
+    if (searchTerm) params.set("search", searchTerm);
+    params.set("page", page.toString());
+    return `/consultations?${params.toString()}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -96,7 +168,7 @@ export default async function ConsultationsPage({
         </Link>
       </div>
 
-      {/* Filtro ativo */}
+      {/* Filtro de paciente ativo */}
       {filteredPatient && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Filtrando por:</span>
@@ -109,8 +181,16 @@ export default async function ConsultationsPage({
         </div>
       )}
 
+      {/* Filtros */}
+      <ConsultationFilters 
+        currentStatus={statusFilter || "all"}
+        currentPeriod={periodFilter || "all"}
+        currentSearch={searchTerm || ""}
+        patientId={patientId}
+      />
+
       {/* CTA para nova consulta (apenas se não houver consultas) */}
-      {(!consultations || consultations.length === 0) && (
+      {(!consultations || consultations.length === 0) && !statusFilter && !periodFilter && !searchTerm && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -136,18 +216,25 @@ export default async function ConsultationsPage({
       <Card>
         <CardHeader>
           <CardTitle>
-            {filteredPatient ? `Consultas de ${filteredPatient.full_name}` : "Consultas Recentes"}
+            {filteredPatient ? `Consultas de ${filteredPatient.full_name}` : "Consultas"}
           </CardTitle>
           <CardDescription>
-            {consultations && consultations.length > 0
-              ? `${consultations.length} consulta${consultations.length > 1 ? 's' : ''} encontrada${consultations.length > 1 ? 's' : ''}`
-              : filteredPatient
-              ? `Nenhuma consulta encontrada para ${filteredPatient.full_name}`
-              : "Suas últimas consultas processadas"}
+            {totalCount && totalCount > 0
+              ? `${totalCount} consulta${totalCount > 1 ? 's' : ''} encontrada${totalCount > 1 ? 's' : ''}`
+              : "Nenhuma consulta encontrada"}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <ConsultationList consultations={consultations || []} />
+          
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <Pagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              buildPageUrl={buildPageUrl}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

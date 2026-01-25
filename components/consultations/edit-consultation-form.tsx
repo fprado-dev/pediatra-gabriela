@@ -74,6 +74,10 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
     ? consultation.patient[0]
     : consultation.patient;
 
+  // Usar dados do paciente como fallback para peso/altura
+  const defaultWeight = consultation.weight_kg || patient?.weight_kg || null;
+  const defaultHeight = consultation.height_cm || patient?.height_cm || null;
+
   const {
     register,
     handleSubmit,
@@ -89,8 +93,8 @@ export function EditConsultationForm({ consultation }: EditConsultationFormProps
       diagnosis: consultation.diagnosis || "",
       plan: consultation.plan || "",
       prescription: consultation.prescription || "",
-      weight_kg: consultation.weight_kg || null,
-      height_cm: consultation.height_cm || null,
+      weight_kg: defaultWeight,
+      height_cm: defaultHeight,
       head_circumference_cm: consultation.head_circumference_cm || null,
       development_notes: consultation.development_notes || "",
       notes: consultation.notes || "",

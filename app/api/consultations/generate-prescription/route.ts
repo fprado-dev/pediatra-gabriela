@@ -46,10 +46,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar dados do paciente
+    // Buscar dados COMPLETOS do paciente (incluindo peso, altura)
     const { data: patient, error: patientError } = await supabase
       .from("patients")
-      .select("full_name, date_of_birth, allergies, current_medications, medical_history")
+      .select("full_name, date_of_birth, weight_kg, height_cm, allergies, current_medications, medical_history")
       .eq("id", patientId)
       .eq("doctor_id", user.id)
       .single();
@@ -73,10 +73,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Usar peso do formulário OU do cadastro do paciente
+    const weight = measurements.weight_kg || patient.weight_kg;
+    const height = measurements.height_cm || patient.height_cm;
+
     // Validação: peso e idade são necessários para dosagens corretas
-    if (!measurements.weight_kg) {
+    if (!weight) {
       return NextResponse.json(
-        { error: "Peso do paciente é obrigatório para calcular dosagens corretas" },
+        { error: "Peso do paciente é obrigatório para calcular dosagens. Atualize o cadastro do paciente ou informe o peso na consulta." },
         { status: 400 }
       );
     }
@@ -88,14 +92,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🤖 Gerando prescrição para ${patient.full_name} (${age} anos, ${measurements.weight_kg}kg)`);
+    console.log(`🤖 Gerando prescrição para ${patient.full_name} (${age} anos, ${weight}kg)`);
+    console.log(`   Peso: ${measurements.weight_kg ? 'formulário' : 'cadastro'}, Altura: ${measurements.height_cm ? 'formulário' : (patient.height_cm ? 'cadastro' : 'n/a')}`);
 
-    // Preparar contexto para IA
+    // Preparar contexto para IA (usar dados do formulário OU do cadastro)
     const context = {
       patient: {
         age,
-        weight_kg: measurements.weight_kg,
-        height_cm: measurements.height_cm,
+        weight_kg: weight,
+        height_cm: height,
         head_circumference_cm: measurements.head_circumference_cm,
         allergies: patient.allergies || undefined,
         current_medications: patient.current_medications || undefined,
@@ -118,7 +123,8 @@ export async function POST(request: NextRequest) {
       prescription,
       metadata: {
         patient_age: age,
-        patient_weight: measurements.weight_kg,
+        patient_weight: weight,
+        weight_source: measurements.weight_kg ? 'consultation' : 'profile',
         diagnosis: clinical.diagnosis,
       },
     });

@@ -20,12 +20,12 @@ export default async function EditConsultationPage({
     redirect("/auth/login");
   }
 
-  // Buscar consulta com dados do paciente
+  // Buscar consulta com dados COMPLETOS do paciente
   const { data: consultation, error } = await supabase
     .from("consultations")
     .select(`
       *,
-      patient:patients(id, full_name, date_of_birth, weight_kg, height_cm)
+      patient:patients(id, full_name, date_of_birth, weight_kg, height_cm, allergies, current_medications, medical_history, blood_type)
     `)
     .eq("id", id)
     .eq("doctor_id", user.id)

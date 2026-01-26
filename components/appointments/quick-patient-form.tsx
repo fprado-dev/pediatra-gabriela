@@ -30,6 +30,7 @@ export function QuickPatientForm({
     full_name: "",
     date_of_birth: "",
     sex: "female" as "male" | "female",
+    cpf: "",
     phone: "",
     responsible_name: "",
     responsible_cpf: "",
@@ -43,6 +44,7 @@ export function QuickPatientForm({
     if (
       !formData.full_name ||
       !formData.date_of_birth ||
+      !formData.cpf ||
       !formData.phone ||
       !formData.responsible_name ||
       !formData.responsible_cpf
@@ -56,13 +58,24 @@ export function QuickPatientForm({
     try {
       const supabase = createClient();
 
+      // Buscar o ID do médico logado
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setError("Usuário não autenticado");
+        setLoading(false);
+        return;
+      }
+
       // Criar paciente com campos mínimos obrigatórios
       const { data: patient, error: createError } = await supabase
         .from("patients")
         .insert({
+          doctor_id: user.id,
           full_name: formData.full_name,
           date_of_birth: formData.date_of_birth,
           sex: formData.sex,
+          cpf: formData.cpf,
           phone: formData.phone,
           responsible_name: formData.responsible_name,
           responsible_cpf: formData.responsible_cpf,
@@ -70,12 +83,15 @@ export function QuickPatientForm({
         .select()
         .single();
 
-      if (createError) throw createError;
+      if (createError) {
+        console.error("Supabase error:", createError);
+        throw createError;
+      }
 
       onSuccess(patient.id, patient.full_name);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating patient:", err);
-      setError("Erro ao cadastrar paciente. Tente novamente.");
+      setError(err.message || "Erro ao cadastrar paciente. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -140,6 +156,19 @@ export function QuickPatientForm({
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cpf">
+          CPF do Paciente <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="cpf"
+          value={formData.cpf}
+          onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+          placeholder="000.000.000-00"
+          required
+        />
       </div>
 
       <div className="space-y-2">

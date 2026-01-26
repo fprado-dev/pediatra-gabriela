@@ -326,7 +326,7 @@ export function NewAppointmentModal({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
-                  className="p-0 shadow-lg border-2" 
+                  className="p-0 shadow-lg border-2 flex justify-center" 
                   align="start"
                   style={{ width: 'var(--radix-popover-trigger-width)' }}
                 >
@@ -339,14 +339,7 @@ export function NewAppointmentModal({
                     }
                     initialFocus
                     locale={ptBR}
-                    className="rounded-md w-full"
-                    classNames={{
-                      root: "w-full",
-                      month: "w-full",
-                      table: "w-full",
-                      weekdays: "w-full",
-                      week: "w-full",
-                    }}
+                    className="rounded-md"
                   />
                 </PopoverContent>
               </Popover>

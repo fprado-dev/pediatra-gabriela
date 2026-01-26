@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
+import { PhysicalExamTemplateSelector } from "./physical-exam-template-selector";
 
 // Esquema de validação
 const consultationSchema = z.object({
@@ -224,7 +225,23 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
 
             {/* Exame Físico */}
             <div className="space-y-2">
-              <Label htmlFor="physical_exam">Exame Físico</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="physical_exam">Exame Físico</Label>
+                <PhysicalExamTemplateSelector
+                  patientId={patient?.id}
+                  patientName={patient?.full_name}
+                  dateOfBirth={patient?.date_of_birth}
+                  sex={patient?.sex}
+                  onInsert={(text, mode) => {
+                    const currentText = watch("physical_exam") || "";
+                    if (mode === "replace") {
+                      setValue("physical_exam", text);
+                    } else {
+                      setValue("physical_exam", currentText ? `${currentText}\n\n${text}` : text);
+                    }
+                  }}
+                />
+              </div>
               <Textarea
                 id="physical_exam"
                 placeholder="Descreva os achados do exame físico..."

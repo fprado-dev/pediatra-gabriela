@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AppSidebar } from "@/components/layout/sidebar";
+import { TimerWidget } from "@/components/timers";
 
 export type AppShellUser = {
   name: string;
@@ -28,6 +29,9 @@ export function AppShell({
           <main className="min-w-0 flex-1 p-4">{children}</main>
         </div>
       </div>
+      
+      {/* Timer Widget - Aparece em todas as páginas autenticadas */}
+      <TimerWidget />
     </div>
   );
 }

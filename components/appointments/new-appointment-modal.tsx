@@ -328,7 +328,7 @@ export function NewAppointmentModal({
                 <PopoverContent 
                   className="p-0 shadow-lg border-2 flex justify-center" 
                   align="start"
-                  style={{ width: 'var(--radix-popover-trigger-width)', maxWidth: '100%' }}
+                  style={{ width: '120%', }}
                 >
                   <Calendar
                     mode="single"
@@ -342,8 +342,8 @@ export function NewAppointmentModal({
                     locale={ptBR}
                     className="rounded-md w-full p-2"
                     classNames={{
-                      day: "p-0",
-                      weekday: "p-1 text-xs",
+                      day_button: "p-2",
+                      
                     }}
                   />
                 </PopoverContent>

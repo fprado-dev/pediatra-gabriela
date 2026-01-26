@@ -1,4 +1,4 @@
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
 export type AppointmentType = 'consultation' | 'return' | 'urgent';
 
 export interface Appointment {
@@ -94,6 +94,7 @@ export const DEFAULT_SCHEDULE = {
 export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   pending: 'Pendente',
   confirmed: 'Confirmado',
+  in_progress: 'Em Atendimento',
   completed: 'Finalizado',
   cancelled: 'Cancelado',
 };

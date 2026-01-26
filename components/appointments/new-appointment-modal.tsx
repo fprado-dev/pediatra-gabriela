@@ -66,7 +66,7 @@ export function NewAppointmentModal({
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [date, setDate] = useState<Date | undefined>(preselectedDate);
   const [time, setTime] = useState<string>("");
-  const [duration, setDuration] = useState<number>(30);
+  const [duration, setDuration] = useState<number>(60);
   const [appointmentType, setAppointmentType] =
     useState<AppointmentType>("consultation");
   const [notes, setNotes] = useState("");
@@ -84,12 +84,12 @@ export function NewAppointmentModal({
     }
   }, [open, step, searchTerm]);
 
-  // Buscar slots disponíveis quando a data mudar
+  // Buscar slots disponíveis quando a data ou duração mudar
   useEffect(() => {
     if (date) {
-      fetchAvailableSlots(date);
+      fetchAvailableSlots(date, duration);
     }
-  }, [date]);
+  }, [date, duration]);
 
   const fetchPatients = async () => {
     try {
@@ -110,12 +110,13 @@ export function NewAppointmentModal({
     }
   };
 
-  const fetchAvailableSlots = async (selectedDate: Date) => {
+  const fetchAvailableSlots = async (selectedDate: Date, requestedDuration?: number) => {
     setLoadingSlots(true);
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const dur = requestedDuration || duration;
       const response = await fetch(
-        `/api/appointments/available-slots?date=${dateStr}&count=5`
+        `/api/appointments/available-slots?date=${dateStr}&count=5&duration=${dur}`
       );
       const data = await response.json();
 
@@ -387,19 +388,21 @@ export function NewAppointmentModal({
             {/* 4. Duração e Tipo */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Duração</Label>
+                <Label>Duração da Consulta</Label>
                 <Select
                   value={duration.toString()}
-                  onValueChange={(v) => setDuration(parseInt(v))}
+                  onValueChange={(v) => {
+                    setDuration(parseInt(v));
+                    setTime(""); // Limpa horário selecionado ao mudar duração
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="15">15 min</SelectItem>
-                    <SelectItem value="30">30 min</SelectItem>
-                    <SelectItem value="45">45 min</SelectItem>
                     <SelectItem value="60">1 hora</SelectItem>
+                    <SelectItem value="90">1h 30min</SelectItem>
+                    <SelectItem value="120">2 horas</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

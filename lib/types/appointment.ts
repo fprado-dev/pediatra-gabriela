@@ -82,11 +82,11 @@ export interface UpdateAppointmentData {
 
 // Configurações padrão de horário
 export const DEFAULT_SCHEDULE = {
-  startHour: 8,
-  endHour: 18,
+  startHour: 10,
+  endHour: 17,
   lunchStart: 12,
-  lunchEnd: 14,
-  slotDuration: 30, // minutos
+  lunchEnd: 13,
+  slotDuration: 60, // minutos (1 hora)
   workDays: [1, 2, 3, 4, 5], // Segunda a Sexta
 };
 

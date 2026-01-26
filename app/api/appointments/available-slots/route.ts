@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const date = searchParams.get("date");
   const count = parseInt(searchParams.get("count") || "5");
+  const duration = parseInt(searchParams.get("duration") || "60"); // duração padrão 1h
 
   if (!date) {
     return NextResponse.json(
@@ -65,14 +66,15 @@ export async function GET(request: NextRequest) {
       .lte("start_datetime", `${date}T23:59:59`)
       .gte("end_datetime", `${date}T00:00:00`);
 
-    // Gerar slots para o dia específico
+    // Gerar slots para o dia específico considerando duração solicitada
     const daySlots = generateTimeSlots(
       targetDate,
       scheduleData as DoctorSchedule | undefined,
       ((appointments || []) as AppointmentWithPatient[]).filter(
         (apt) => apt.appointment_date === date
       ),
-      (blocks || []) as ScheduleBlock[]
+      (blocks || []) as ScheduleBlock[],
+      duration
     );
 
     // Encontrar próximos slots disponíveis

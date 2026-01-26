@@ -124,10 +124,10 @@ export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
     }
   };
 
-  const timeSlots = Array.from({ length: 21 }, (_, i) => {
-    const hour = 8 + Math.floor(i / 2);
-    const minute = i % 2 === 0 ? "00" : "30";
-    return `${hour.toString().padStart(2, "0")}:${minute}`;
+  // Gerar slots de 10h às 17h com intervalos de 1h
+  const timeSlots = Array.from({ length: 7 }, (_, i) => {
+    const hour = 10 + i;
+    return `${hour.toString().padStart(2, "0")}:00`;
   });
 
   const getAppointmentForSlot = (time: string) => {

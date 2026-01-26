@@ -35,13 +35,54 @@ export function isWithinWorkingHours(time: string, schedule?: DoctorSchedule): b
 }
 
 /**
+ * Verifica se um horário está disponível considerando duração da consulta
+ */
+function isSlotAvailable(
+  slotTime: Date,
+  durationMinutes: number,
+  existingAppointments: AppointmentWithPatient[],
+  blocks: ScheduleBlock[]
+): { available: boolean; reason?: string } {
+  const slotTimeString = format(slotTime, 'HH:mm');
+  const slotEnd = addMinutes(slotTime, durationMinutes);
+
+  // Verifica se algum agendamento existente conflita
+  for (const apt of existingAppointments) {
+    if (apt.status === 'cancelled') continue;
+
+    const aptTime = new Date(slotTime);
+    const [hours, minutes] = apt.appointment_time.substring(0, 5).split(':');
+    aptTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    const aptEnd = addMinutes(aptTime, apt.duration_minutes);
+
+    // Verifica overlap: slot inicia antes do apt terminar E slot termina depois do apt iniciar
+    if (isBefore(slotTime, aptEnd) && isAfter(slotEnd, aptTime)) {
+      return { available: false, reason: 'occupied' };
+    }
+  }
+
+  // Verifica bloqueios
+  for (const block of blocks) {
+    const blockStart = new Date(block.start_datetime);
+    const blockEnd = new Date(block.end_datetime);
+    
+    if (isBefore(slotTime, blockEnd) && isAfter(slotEnd, blockStart)) {
+      return { available: false, reason: 'blocked' };
+    }
+  }
+
+  return { available: true };
+}
+
+/**
  * Gera lista de horários disponíveis para um dia
  */
 export function generateTimeSlots(
   date: Date,
   schedule?: DoctorSchedule,
   existingAppointments: AppointmentWithPatient[] = [],
-  blocks: ScheduleBlock[] = []
+  blocks: ScheduleBlock[] = [],
+  requestedDuration: number = DEFAULT_SCHEDULE.slotDuration
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
   
@@ -68,30 +109,19 @@ export function generateTimeSlots(
       continue;
     }
 
-    // Verifica se está ocupado por agendamento
-    const isOccupied = existingAppointments.some(apt => 
-      apt.appointment_time === timeString && 
-      apt.status !== 'cancelled'
-    );
+    // Verifica se há tempo suficiente até o fim do expediente
+    const slotEnd = addMinutes(currentTime, requestedDuration);
+    if (isAfter(slotEnd, endTime)) {
+      break; // Não cabe mais consultas neste dia
+    }
 
-    // Verifica se está bloqueado
-    const isBlocked = blocks.some(block => {
-      const blockStart = new Date(block.start_datetime);
-      const blockEnd = new Date(block.end_datetime);
-      const slotDateTime = new Date(date);
-      const [hours, minutes] = timeString.split(':');
-      slotDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-      
-      return (
-        (isAfter(slotDateTime, blockStart) || isEqual(slotDateTime, blockStart)) &&
-        isBefore(slotDateTime, blockEnd)
-      );
-    });
+    // Verifica disponibilidade considerando duração
+    const availability = isSlotAvailable(currentTime, requestedDuration, existingAppointments, blocks);
 
     slots.push({
       time: timeString,
-      available: !isOccupied && !isBlocked,
-      reason: isOccupied ? 'occupied' : isBlocked ? 'blocked' : undefined,
+      available: availability.available,
+      reason: availability.reason,
     });
 
     currentTime = addMinutes(currentTime, slotDuration);

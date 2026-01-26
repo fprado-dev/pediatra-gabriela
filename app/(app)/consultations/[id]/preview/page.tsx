@@ -8,6 +8,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AudioPlayer } from "@/components/consultations/audio-player";
+import { MedicalCertificateModal } from "@/components/consultations/medical-certificate-modal";
 
 export const dynamic = 'force-dynamic';
 
@@ -27,12 +28,12 @@ export default async function ConsultationPreviewPage({
     redirect("/auth/login");
   }
 
-  // Buscar consulta
+  // Buscar consulta com dados do paciente e responsável
   const { data: consultation, error } = await supabase
     .from("consultations")
     .select(`
       *,
-      patient:patients(id, full_name, date_of_birth)
+      patient:patients(id, full_name, date_of_birth, responsible_name)
     `)
     .eq("id", id)
     .eq("doctor_id", user.id)
@@ -56,6 +57,13 @@ export default async function ConsultationPreviewPage({
   }
 
   const patient = consultation.patient as any;
+
+  // Buscar perfil do médico
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, crm, specialty")
+    .eq("id", user.id)
+    .single();
 
   // Calcular idade
   let patientAge = null;
@@ -117,6 +125,16 @@ export default async function ConsultationPreviewPage({
                 </Link>
               </Button>
             )}
+            <MedicalCertificateModal
+              consultationId={id}
+              patientName={patient?.full_name || ""}
+              patientDateOfBirth={patient?.date_of_birth || ""}
+              responsibleName={patient?.responsible_name}
+              consultationDate={consultation.created_at}
+              doctorName={profile?.full_name || ""}
+              doctorCRM={profile?.crm || ""}
+              doctorSpecialty={profile?.specialty}
+            />
             <Button asChild variant="outline" size="sm">
               <a href={`/api/consultations/${id}/download`} download>
                 <Download className="h-4 w-4 mr-2" />

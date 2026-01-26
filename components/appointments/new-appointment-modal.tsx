@@ -51,6 +51,7 @@ interface NewAppointmentModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   preselectedDate?: Date;
+  preselectedTime?: string;
 }
 
 export function NewAppointmentModal({
@@ -58,6 +59,7 @@ export function NewAppointmentModal({
   onOpenChange,
   onSuccess,
   preselectedDate,
+  preselectedTime = "",
 }: NewAppointmentModalProps) {
   const [step, setStep] = useState<"form" | "quick-patient">("form");
   const [loading, setLoading] = useState(false);
@@ -65,7 +67,7 @@ export function NewAppointmentModal({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [date, setDate] = useState<Date | undefined>(preselectedDate);
-  const [time, setTime] = useState<string>("");
+  const [time, setTime] = useState<string>(preselectedTime);
   const [duration, setDuration] = useState<number>(60);
   const [appointmentType, setAppointmentType] =
     useState<AppointmentType>("consultation");
@@ -83,6 +85,14 @@ export function NewAppointmentModal({
       fetchPatients();
     }
   }, [open, step, searchTerm]);
+
+  // Atualizar estados quando props mudarem (ao abrir modal com pré-seleção)
+  useEffect(() => {
+    if (open) {
+      setDate(preselectedDate);
+      setTime(preselectedTime);
+    }
+  }, [open, preselectedDate, preselectedTime]);
 
   // Buscar slots disponíveis quando a data ou duração mudar
   useEffect(() => {
@@ -303,11 +313,11 @@ export function NewAppointmentModal({
                     variant="outline"
                     data-empty={!date}
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal h-11",
                       !date && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon />
+                    <CalendarIcon className="mr-2 h-4 w-4" />
                     {date ? (
                       format(date, "PPP", { locale: ptBR })
                     ) : (
@@ -315,7 +325,7 @@ export function NewAppointmentModal({
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 shadow-lg border-2" align="start">
                   <Calendar
                     mode="single"
                     selected={date}
@@ -324,6 +334,8 @@ export function NewAppointmentModal({
                       date < new Date() || date.getDay() === 0 || date.getDay() === 6
                     }
                     initialFocus
+                    locale={ptBR}
+                    className="rounded-md"
                   />
                 </PopoverContent>
               </Popover>

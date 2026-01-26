@@ -35,6 +35,7 @@ import { calculateAge } from "@/lib/utils/date-helpers";
 
 interface AppointmentCalendarProps {
   onRefresh?: () => void;
+  onSlotClick?: (date: Date, time: string) => void;
 }
 
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
@@ -44,7 +45,7 @@ const STATUS_COLORS: Record<AppointmentStatus, string> = {
   cancelled: "bg-gray-100 text-gray-600 border-gray-300",
 };
 
-export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
+export function AppointmentCalendar({ onRefresh, onSlotClick }: AppointmentCalendarProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [appointments, setAppointments] = useState<AppointmentWithPatient[]>([]);
   const [loading, setLoading] = useState(false);
@@ -233,8 +234,13 @@ export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
                     "flex items-center gap-4 p-3 rounded-lg border transition-colors",
                     appointment
                       ? STATUS_COLORS[appointment.status]
-                      : "bg-muted/30 hover:bg-muted/50"
+                      : "bg-muted/30 hover:bg-muted/50 cursor-pointer hover:border-primary/50"
                   )}
+                  onClick={() => {
+                    if (!appointment && onSlotClick) {
+                      onSlotClick(selectedDate, time);
+                    }
+                  }}
                 >
                   <div className="flex items-center gap-2 min-w-[80px]">
                     <Clock className="h-4 w-4 text-muted-foreground" />
@@ -313,7 +319,12 @@ export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
                       </div>
                     </>
                   ) : (
-                    <span className="text-muted-foreground text-sm">Horário livre</span>
+                    <div className="flex-1 flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Disponível</span>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                        Clique para agendar
+                      </span>
+                    </div>
                   )}
                 </div>
               );

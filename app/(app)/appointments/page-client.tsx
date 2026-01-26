@@ -10,9 +10,26 @@ import { NewAppointmentModal } from "@/components/appointments/new-appointment-m
 export function AppointmentsPageClient() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [preselectedDate, setPreselectedDate] = useState<Date | undefined>();
+  const [preselectedTime, setPreselectedTime] = useState<string>("");
 
   const handleSuccess = () => {
     setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleSlotClick = (date: Date, time: string) => {
+    setPreselectedDate(date);
+    setPreselectedTime(time);
+    setShowNewModal(true);
+  };
+
+  const handleModalClose = (open: boolean) => {
+    setShowNewModal(open);
+    if (!open) {
+      // Limpar pré-seleções ao fechar modal
+      setPreselectedDate(undefined);
+      setPreselectedTime("");
+    }
   };
 
   return (
@@ -24,12 +41,18 @@ export function AppointmentsPageClient() {
         </Button>
       </div>
 
-      <AppointmentCalendar key={refreshKey} onRefresh={handleSuccess} />
+      <AppointmentCalendar 
+        key={refreshKey} 
+        onRefresh={handleSuccess}
+        onSlotClick={handleSlotClick}
+      />
 
       <NewAppointmentModal
         open={showNewModal}
-        onOpenChange={setShowNewModal}
+        onOpenChange={handleModalClose}
         onSuccess={handleSuccess}
+        preselectedDate={preselectedDate}
+        preselectedTime={preselectedTime}
       />
     </>
   );

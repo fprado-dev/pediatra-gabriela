@@ -4,21 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
   Edit,
   User,
-  Calendar,
   Phone,
   Mail,
   MapPin,
   Heart,
   Pill,
   FileText,
-  Trash2,
   UserCheck,
   Mic,
   Stethoscope,
+  AlertTriangle,
+  Droplets,
+  Ruler,
+  Scale,
 } from "lucide-react";
 import Link from "next/link";
 import { DeletePatientButton } from "@/components/patients/delete-patient-button";
@@ -120,6 +123,8 @@ export default async function PatientProfilePage({
     return new Date(date).toLocaleDateString("pt-BR");
   };
 
+  const hasAllergies = patient.allergies && patient.allergies.trim().length > 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -162,6 +167,118 @@ export default async function PatientProfilePage({
         </div>
       </div>
 
+      {/* Cards de Resumo - Contato/Responsável e Saúde/Alergias */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Contato & Responsável */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <User className="h-5 w-5" />
+              Contato & Responsável
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Contato */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span>{patient.phone}</span>
+              </div>
+              {patient.email && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{patient.email}</span>
+                </div>
+              )}
+              {patient.address && (
+                <div className="flex items-start gap-2 text-sm">
+                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <span>{patient.address}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Separador */}
+            {(patient.responsible_name || patient.responsible_cpf) && (
+              <>
+                <Separator />
+                {/* Responsável */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <UserCheck className="h-3.5 w-3.5" />
+                    Responsável Legal
+                  </div>
+                  {patient.responsible_name && (
+                    <p className="text-sm font-medium">{patient.responsible_name}</p>
+                  )}
+                  {patient.responsible_cpf && (
+                    <p className="text-sm text-muted-foreground">
+                      CPF: {patient.responsible_cpf}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Saúde & Alergias */}
+        <Card className={hasAllergies ? "border-red-200" : ""}>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Heart className="h-5 w-5" />
+              Saúde & Alergias
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Dados de Saúde */}
+            <div className="flex flex-wrap gap-3">
+              {patient.blood_type && (
+                <div className="flex items-center gap-1.5 bg-muted/50 px-3 py-1.5 rounded-lg">
+                  <Droplets className="h-4 w-4 text-red-500" />
+                  <span className="text-sm font-medium">{patient.blood_type}</span>
+                </div>
+              )}
+              {patient.weight_kg && (
+                <div className="flex items-center gap-1.5 bg-muted/50 px-3 py-1.5 rounded-lg">
+                  <Scale className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{patient.weight_kg} kg</span>
+                </div>
+              )}
+              {patient.height_cm && (
+                <div className="flex items-center gap-1.5 bg-muted/50 px-3 py-1.5 rounded-lg">
+                  <Ruler className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{patient.height_cm} cm</span>
+                </div>
+              )}
+              {!patient.blood_type && !patient.weight_kg && !patient.height_cm && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum dado registrado
+                </p>
+              )}
+            </div>
+
+            {/* Separador e Alergias */}
+            <Separator />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <AlertTriangle className={`h-3.5 w-3.5 ${hasAllergies ? "text-red-500" : ""}`} />
+                Alergias
+              </div>
+              {hasAllergies ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-800 whitespace-pre-wrap">
+                    {patient.allergies}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-green-600">Nenhuma alergia registrada ✓</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Alertas de Crescimento */}
       <PatientGrowthSection 
         patientId={id}
@@ -176,116 +293,12 @@ export default async function PatientProfilePage({
         patientName={patient.full_name}
       />
 
-      {/* Info Cards */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Informações de Contato */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Informações de Contato
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <span>{patient.phone}</span>
-            </div>
-            {patient.email && (
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{patient.email}</span>
-              </div>
-            )}
-            {patient.address && (
-              <div className="flex items-start gap-2 text-sm">
-                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                <span>{patient.address}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Responsável */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5" />
-              Responsável Legal
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {patient.responsible_name && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Nome: </span>
-                <span className="font-medium">{patient.responsible_name}</span>
-              </div>
-            )}
-            <div className="text-sm">
-              <span className="text-muted-foreground">CPF: </span>
-              <span className="font-medium">{patient.responsible_cpf}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Informações Médicas */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Heart className="h-5 w-5" />
-              Informações Médicas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {patient.blood_type && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Tipo Sanguíneo:</span>
-                <Badge variant="outline">{patient.blood_type}</Badge>
-              </div>
-            )}
-            {patient.weight_kg && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Peso: </span>
-                <span>{patient.weight_kg} kg</span>
-              </div>
-            )}
-            {patient.height_cm && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Altura: </span>
-                <span>{patient.height_cm} cm</span>
-              </div>
-            )}
-            {!patient.blood_type && !patient.weight_kg && !patient.height_cm && (
-              <p className="text-sm text-muted-foreground">
-                Nenhuma informação médica adicional
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Alergias */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Heart className="h-5 w-5 text-red-500" />
-              Alergias
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {patient.allergies ? (
-              <p className="text-sm whitespace-pre-wrap">{patient.allergies}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Nenhuma alergia registrada
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
+      {/* Medicações e Histórico */}
+      <div className="grid gap-4 md:grid-cols-2">
         {/* Medicações */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Pill className="h-5 w-5" />
               Medicações Atuais
             </CardTitle>
@@ -304,41 +317,41 @@ export default async function PatientProfilePage({
         </Card>
 
         {/* Histórico Médico */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
               <FileText className="h-5 w-5" />
               Histórico Médico
             </CardTitle>
           </CardHeader>
           <CardContent>
             {patient.medical_history ? (
-              <p className="text-sm whitespace-pre-wrap">
+              <p className="text-sm whitespace-pre-wrap line-clamp-6">
                 {patient.medical_history}
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Nenhum histórico médico registrado
+                Nenhum histórico registrado
               </p>
             )}
           </CardContent>
         </Card>
-
-        {/* Observações */}
-        {patient.notes && (
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Observações
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{patient.notes}</p>
-            </CardContent>
-          </Card>
-        )}
       </div>
+
+      {/* Observações */}
+      {patient.notes && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="h-5 w-5" />
+              Observações
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm whitespace-pre-wrap">{patient.notes}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Histórico de Consultas */}
       <Card>

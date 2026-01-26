@@ -310,12 +310,12 @@ export function PhysicalExamTemplateSelector({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <Button
               onClick={() => handleConfirmInsert("append")}
               variant="outline"
             >
               Adicionar ao Final
-            </AlertDialogAction>
+            </Button>
             <AlertDialogAction onClick={() => handleConfirmInsert("replace")}>
               Substituir Tudo
             </AlertDialogAction>

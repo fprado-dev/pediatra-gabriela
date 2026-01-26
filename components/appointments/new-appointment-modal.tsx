@@ -328,18 +328,23 @@ export function NewAppointmentModal({
                 <PopoverContent 
                   className="p-0 shadow-lg border-2 flex justify-center" 
                   align="start"
-                  style={{ width: 'var(--radix-popover-trigger-width)' }}
+                  style={{ width: 'var(--radix-popover-trigger-width)', maxWidth: '100%' }}
                 >
                   <Calendar
                     mode="single"
                     selected={date}
                     onSelect={setDate}
+                    buttonVariant="outline"
                     disabled={(date) =>
                       date < new Date() || date.getDay() === 0 || date.getDay() === 6
                     }
-                    initialFocus
+                    autoFocus
                     locale={ptBR}
-                    className="rounded-md"
+                    className="rounded-md w-full p-2"
+                    classNames={{
+                      day: "p-0",
+                      weekday: "p-1 text-xs",
+                    }}
                   />
                 </PopoverContent>
               </Popover>

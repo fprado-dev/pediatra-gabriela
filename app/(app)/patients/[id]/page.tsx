@@ -24,6 +24,7 @@ import Link from "next/link";
 import { DeletePatientButton } from "@/components/patients/delete-patient-button";
 import { ConsultationList } from "@/components/consultations/consultation-list";
 import { PatientGrowthSection } from "@/components/growth";
+import { VaccineCalendar } from "@/components/vaccines";
 
 export const dynamic = 'force-dynamic';
 
@@ -167,6 +168,12 @@ export default async function PatientProfilePage({
         patientName={patient.full_name}
         dateOfBirth={patient.date_of_birth}
         medicalHistory={patient.medical_history}
+      />
+
+      {/* Calendário Vacinal */}
+      <VaccineCalendar 
+        patientId={id}
+        patientName={patient.full_name}
       />
 
       {/* Info Cards */}

@@ -446,3 +446,8 @@ Para cada feature implementada, verificar:
 **Última atualização**: Janeiro 2026
 **Versão atual**: v0.1.0 (Autenticação e Perfil)
 **Próxima versão**: v0.2.0 (Gestão de Pacientes)
+
+
+
+
+# Inserir templates de Exames Fisicos baseado em faixa etaria e sexo

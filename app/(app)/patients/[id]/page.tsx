@@ -28,6 +28,7 @@ import { DeletePatientButton } from "@/components/patients/delete-patient-button
 import { ConsultationList } from "@/components/consultations/consultation-list";
 import { PatientGrowthSection } from "@/components/growth";
 import { VaccineCalendar } from "@/components/vaccines";
+import { PatientCertificatesHistory } from "@/components/patients/patient-certificates-history";
 
 export const dynamic = 'force-dynamic';
 
@@ -398,6 +399,9 @@ export default async function PatientProfilePage({
           )}
         </CardContent>
       </Card>
+
+      {/* Histórico de Atestados */}
+      <PatientCertificatesHistory patientId={id} />
     </div>
   );
 }

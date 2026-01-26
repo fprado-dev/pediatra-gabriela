@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AudioPlayer } from "@/components/consultations/audio-player";
 import { MedicalCertificateModal } from "@/components/consultations/medical-certificate-modal";
+import { MedicalCertificatesList } from "@/components/consultations/medical-certificates-list";
 
 export const dynamic = 'force-dynamic';
 
@@ -287,6 +288,9 @@ export default async function ConsultationPreviewPage({
       {consultation.audio_url && (
         <AudioPlayer consultationId={id} />
       )}
+
+      {/* Atestados Gerados */}
+      <MedicalCertificatesList consultationId={id} />
 
       {/* Debug Info - Colapsável */}
       {process.env.NODE_ENV === 'development' && (consultation.raw_transcription || consultation.cleaned_transcription) && (

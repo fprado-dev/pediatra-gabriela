@@ -7,6 +7,7 @@ import { ConsultationsChart } from "@/components/dashboard/consultations-chart";
 import { AgeDistributionChart } from "@/components/dashboard/age-distribution-chart";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { OverdueVaccines } from "@/components/dashboard/overdue-vaccines";
+import { TodayAppointments } from "@/components/dashboard/today-appointments";
 import { startOfMonth, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -185,6 +186,9 @@ export default async function DashboardPage() {
         <ConsultationsChart data={monthlyChartData} />
         <AgeDistributionChart data={ageDistributionData} />
       </div>
+
+      {/* Agendamentos de Hoje */}
+      <TodayAppointments />
 
       {/* Recent Activity & Overdue Vaccines */}
       <div className="grid gap-4 md:grid-cols-2">

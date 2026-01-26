@@ -131,8 +131,14 @@ export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
   });
 
   const getAppointmentForSlot = (time: string) => {
-    return appointments.find((apt) => apt.appointment_time === time && apt.status !== "cancelled");
+    return appointments.find((apt) => {
+      // Comparar apenas HH:mm (remover segundos se existir)
+      const aptTime = apt.appointment_time.substring(0, 5);
+      return aptTime === time && apt.status !== "cancelled";
+    });
   };
+
+  const isWeekend = selectedDate.getDay() === 0 || selectedDate.getDay() === 6;
 
   return (
     <div className="space-y-4">
@@ -154,6 +160,11 @@ export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
             <p className="text-muted-foreground">
               {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </p>
+            {isWeekend && (
+              <p className="text-sm text-orange-600 font-medium mt-1">
+                Final de semana - Sem atendimento
+              </p>
+            )}
           </div>
 
           <Button
@@ -188,6 +199,14 @@ export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">
             Carregando...
+          </div>
+        ) : isWeekend ? (
+          <div className="text-center py-12">
+            <CalendarIcon className="h-12 w-12 mx-auto mb-3 text-orange-500 opacity-50" />
+            <p className="text-orange-600 font-medium">Final de Semana</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Sem atendimento aos sábados e domingos
+            </p>
           </div>
         ) : appointments.length === 0 ? (
           <div className="text-center py-12">

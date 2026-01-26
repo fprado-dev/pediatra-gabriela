@@ -325,7 +325,11 @@ export function NewAppointmentModal({
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 shadow-lg border-2" align="start">
+                <PopoverContent 
+                  className="p-0 shadow-lg border-2" 
+                  align="start"
+                  style={{ width: 'var(--radix-popover-trigger-width)' }}
+                >
                   <Calendar
                     mode="single"
                     selected={date}

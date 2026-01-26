@@ -28,6 +28,7 @@ interface Patient {
 interface NewConsultationRecordingProps {
   patients: Patient[];
   preSelectedPatientId?: string;
+  appointmentId?: string;
 }
 
 type InputMode = "record" | "upload";
@@ -52,10 +53,13 @@ const MIN_AUDIO_DURATION_SECONDS = 30;
 
 export function NewConsultationRecording({ 
   patients,
-  preSelectedPatientId 
+  preSelectedPatientId,
+  appointmentId 
 }: NewConsultationRecordingProps) {
   const router = useRouter();
-  const [flowState, setFlowState] = useState<FlowState>("select-patient");
+  const [flowState, setFlowState] = useState<FlowState>(
+    preSelectedPatientId ? "select-mode" : "select-patient"
+  );
   const [inputMode, setInputMode] = useState<InputMode | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(
     preSelectedPatientId || null
@@ -68,6 +72,15 @@ export function NewConsultationRecording({
   // Audio state
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioDuration, setAudioDuration] = useState<number>(0);
+
+  // Avança automaticamente se paciente já está selecionado (vindo da agenda)
+  useEffect(() => {
+    if (preSelectedPatientId && appointmentId) {
+      toast.success("Paciente pré-selecionado do agendamento", {
+        description: selectedPatient?.full_name || "Paciente selecionado"
+      });
+    }
+  }, [preSelectedPatientId, appointmentId]);
 
   const selectedPatient = useMemo(
     () => patients.find((p) => p.id === selectedPatientId),

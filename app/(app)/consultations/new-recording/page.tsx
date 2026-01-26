@@ -5,11 +5,13 @@ import { NewConsultationRecording } from "@/components/consultations/new-consult
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: Promise<{ patientId?: string }>;
+  searchParams: Promise<{ patient_id?: string; appointment_id?: string }>;
 }
 
 export default async function NewConsultationRecordingPage({ searchParams }: PageProps) {
-  const { patientId } = await searchParams;
+  const params = await searchParams;
+  const patientId = params.patient_id;
+  const appointmentId = params.appointment_id;
   const supabase = await createClient();
 
   const {
@@ -36,6 +38,7 @@ export default async function NewConsultationRecordingPage({ searchParams }: Pag
     <NewConsultationRecording 
       patients={patients || []} 
       preSelectedPatientId={patientId}
+      appointmentId={appointmentId}
     />
   );
 }

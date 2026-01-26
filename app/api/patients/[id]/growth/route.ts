@@ -25,7 +25,7 @@ export async function GET(
     // Fetch patient data
     const { data: patient, error: patientError } = await supabase
       .from("patients")
-      .select("id, full_name, date_of_birth, weight_kg, height_cm, medical_history")
+      .select("id, full_name, date_of_birth, sex, weight_kg, height_cm, medical_history")
       .eq("id", patientId)
       .eq("doctor_id", user.id)
       .single();
@@ -70,9 +70,10 @@ export async function GET(
       });
     }
 
-    // Determine sex (default to female if not specified - can be added to patient profile later)
-    // For now, we'll use a simple heuristic or default
-    const sex: Sex = "female"; // TODO: Add sex field to patient profile
+    // Determine sex from patient profile (default to female if not specified)
+    const sex: Sex = (patient.sex === "male" || patient.sex === "female") 
+      ? patient.sex 
+      : "female";
 
     const dateOfBirth = new Date(patient.date_of_birth);
     const currentMeasurement = measurements[0];

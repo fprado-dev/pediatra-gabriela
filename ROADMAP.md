@@ -451,3 +451,7 @@ Para cada feature implementada, verificar:
 
 
 # Inserir templates de Exames Fisicos baseado em faixa etaria e sexo
+
+# Calendário Vacinal
+
+# Modelos de Atestados (Comparecimento, Aptidão fisica, Atestado Médico, Acompanhante)

@@ -145,6 +145,7 @@ export default async function PatientProfilePage({
               <h1 className="text-3xl font-bold">{patient.full_name}</h1>
               <p className="text-muted-foreground">
                 {calculateAge(patient.date_of_birth)} •{" "}
+                {patient.sex === "male" ? "Masculino" : patient.sex === "female" ? "Feminino" : "Não informado"} •{" "}
                 {formatDate(patient.date_of_birth)}
               </p>
             </div>

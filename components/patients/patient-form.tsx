@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { User, Phone, Mail, MapPin, Heart, Pill, AlertCircle, FileText } from "lucide-react";
@@ -17,6 +18,7 @@ interface PatientFormProps {
     id: string;
     full_name: string;
     date_of_birth: string;
+    sex?: string;
     cpf: string;
     phone: string;
     email?: string;
@@ -43,6 +45,7 @@ export function PatientForm({ patient, mode }: PatientFormProps) {
   const [formData, setFormData] = useState({
     full_name: patient?.full_name || "",
     date_of_birth: patient?.date_of_birth || "",
+    sex: patient?.sex || "",
     cpf: patient?.cpf || "",
     phone: patient?.phone || "",
     email: patient?.email || "",
@@ -90,7 +93,7 @@ export function PatientForm({ patient, mode }: PatientFormProps) {
     setError(null);
 
     // Validações
-    if (!formData.full_name || !formData.date_of_birth || !formData.cpf || !formData.phone || !formData.responsible_cpf) {
+    if (!formData.full_name || !formData.date_of_birth || !formData.sex || !formData.cpf || !formData.phone || !formData.responsible_cpf) {
       setError("Por favor, preencha todos os campos obrigatórios");
       setIsLoading(false);
       return;
@@ -117,6 +120,7 @@ export function PatientForm({ patient, mode }: PatientFormProps) {
         doctor_id: user.id,
         full_name: formData.full_name,
         date_of_birth: formData.date_of_birth,
+        sex: formData.sex,
         cpf: formData.cpf.replace(/\D/g, ""),
         phone: formData.phone.replace(/\D/g, ""),
         email: formData.email || null,
@@ -188,7 +192,7 @@ export function PatientForm({ patient, mode }: PatientFormProps) {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="date_of_birth">Data de Nascimento *</Label>
               <Input
@@ -199,6 +203,23 @@ export function PatientForm({ patient, mode }: PatientFormProps) {
                 required
                 disabled={isLoading}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sex">Sexo *</Label>
+              <Select
+                value={formData.sex}
+                onValueChange={(value) => handleChange("sex", value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="sex">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Masculino</SelectItem>
+                  <SelectItem value="female">Feminino</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

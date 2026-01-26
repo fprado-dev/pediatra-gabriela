@@ -58,11 +58,29 @@ export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
     setLoading(true);
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      console.log("Fetching appointments for date:", dateStr);
       const response = await fetch(`/api/appointments?date=${dateStr}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error:", response.status, errorData);
+        setAppointments([]);
+        return;
+      }
+      
       const data = await response.json();
-      setAppointments(data);
+      console.log("Appointments received:", data);
+      
+      // Garantir que data é um array
+      if (Array.isArray(data)) {
+        setAppointments(data);
+      } else {
+        console.error("Expected array, got:", typeof data, data);
+        setAppointments([]);
+      }
     } catch (error) {
       console.error("Error fetching appointments:", error);
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
@@ -170,6 +188,14 @@ export function AppointmentCalendar({ onRefresh }: AppointmentCalendarProps) {
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">
             Carregando...
+          </div>
+        ) : appointments.length === 0 ? (
+          <div className="text-center py-12">
+            <CalendarIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground">Nenhum agendamento para este dia</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Use os botões de navegação para ver outros dias
+            </p>
           </div>
         ) : (
           <div className="space-y-2">

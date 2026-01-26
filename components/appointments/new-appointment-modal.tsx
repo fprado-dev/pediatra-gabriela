@@ -339,7 +339,14 @@ export function NewAppointmentModal({
                     }
                     initialFocus
                     locale={ptBR}
-                    className="rounded-md"
+                    className="rounded-md w-full"
+                    classNames={{
+                      root: "w-full",
+                      month: "w-full",
+                      table: "w-full",
+                      weekdays: "w-full",
+                      week: "w-full",
+                    }}
                   />
                 </PopoverContent>
               </Popover>

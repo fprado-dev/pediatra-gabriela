@@ -120,7 +120,8 @@ export function ProcessingStatus({ consultationId, onComplete, onError }: Proces
           setProgress(100);
           clearInterval(pollingInterval);
           if (onComplete) {
-            setTimeout(() => onComplete(consultationId), 1000);
+            // Chamar onComplete imediatamente sem setTimeout
+            onComplete(consultationId);
           }
         } else if (consultation.status === "error") {
           const errorMessage = consultation.processing_error || "Erro desconhecido no processamento";
@@ -151,103 +152,85 @@ export function ProcessingStatus({ consultationId, onComplete, onError }: Proces
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-5 w-5 animate-pulse" />
-          Processando Consulta com IA
-        </CardTitle>
-        <CardDescription>
-          Aguarde enquanto processamos a gravação e geramos a documentação
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Barra de progresso principal */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Progresso</span>
-            <span className="font-semibold">{progress}%</span>
-          </div>
-          <Progress value={progress} className="h-2" />
+    <div className="space-y-6">
+      {/* Barra de progresso principal */}
+      <div className="space-y-3">
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600 font-medium">Progresso</span>
+          <span className="font-semibold text-gray-900">{progress}%</span>
         </div>
+        <Progress value={progress} className="h-3" />
+      </div>
 
-        {/* Lista de steps */}
-        <div className="space-y-3">
-          {steps.map((step, index) => (
-            <div
-              key={step.id}
-              className={cn(
-                "flex items-start gap-3 p-3 rounded-lg transition-all",
-                step.status === "completed" && "bg-green-50 dark:bg-green-950/20",
-                step.status === "processing" && "bg-primary/5 animate-pulse",
-                step.status === "pending" && "opacity-50"
+      {/* Lista de steps */}
+      <div className="space-y-3">
+        {steps.map((step, index) => (
+          <div
+            key={step.id}
+            className={cn(
+              "flex items-start gap-4 p-4 rounded-lg border transition-all",
+              step.status === "completed" && "bg-green-50 border-green-200",
+              step.status === "processing" && "bg-blue-50 border-blue-200 animate-pulse",
+              step.status === "pending" && "bg-gray-50 border-gray-200 opacity-60"
+            )}
+          >
+            {/* Ícone de status */}
+            <div className="flex-shrink-0 mt-0.5">
+              {step.status === "completed" && (
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
               )}
-            >
-              {/* Ícone de status */}
-              <div className="flex-shrink-0 mt-0.5">
+              {step.status === "processing" && (
+                <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+              )}
+              {step.status === "pending" && (
+                <div className="h-6 w-6 rounded-full border-2 border-gray-300" />
+              )}
+            </div>
+
+            {/* Conteúdo */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-base text-gray-900">{step.label}</span>
                 {step.status === "completed" && (
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
+                    Concluído
+                  </Badge>
                 )}
                 {step.status === "processing" && (
-                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                  <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+                    Em andamento
+                  </Badge>
                 )}
-                {step.status === "pending" && (
-                  <div className="h-5 w-5 rounded-full border-2 border-muted" />
-                )}
               </div>
-
-              {/* Conteúdo */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-sm">{step.label}</span>
-                  {step.status === "completed" && (
-                    <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 text-xs">
-                      Concluído
-                    </Badge>
-                  )}
-                  {step.status === "processing" && (
-                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs">
-                      Em andamento
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">{step.description}</p>
-              </div>
-
-              {/* Ícone do step */}
-              <div className="flex-shrink-0 text-muted-foreground">
-                {step.icon}
-              </div>
+              <p className="text-sm text-gray-600">{step.description}</p>
             </div>
-          ))}
+
+            {/* Ícone do step */}
+            <div className="flex-shrink-0 text-gray-400">
+              {step.icon}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Erro */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
         </div>
+      )}
 
-        {/* Mensagem de conclusão */}
-        {progress === 100 && (
-          <div className="text-center py-4 space-y-2">
-            <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
-            <p className="font-semibold text-green-600">Processamento Concluído!</p>
-            <p className="text-sm text-muted-foreground">
-              Redirecionando para revisão da consulta...
-            </p>
-          </div>
-        )}
-
-        {/* Erro */}
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Informação */}
-        {progress < 100 && !error && (
-          <div className="text-xs text-center text-muted-foreground">
+      {/* Informação */}
+      {progress < 100 && !error && (
+        <div className="text-center py-4">
+          <p className="text-sm text-gray-500">
             Este processo pode levar de 30 segundos a 2 minutos, dependendo do tamanho do áudio.
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

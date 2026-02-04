@@ -3,10 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft,
   Edit,
   User,
   Phone,
@@ -22,6 +20,7 @@ import {
   Droplets,
   Ruler,
   Scale,
+  Cake,
 } from "lucide-react";
 import Link from "next/link";
 import { DeletePatientButton } from "@/components/patients/delete-patient-button";
@@ -29,6 +28,7 @@ import { ConsultationList } from "@/components/consultations/consultation-list";
 import { PatientGrowthSection } from "@/components/growth";
 import { VaccineCalendar } from "@/components/vaccines";
 import { PatientCertificatesHistory } from "@/components/patients/patient-certificates-history";
+import { BackButton } from "@/components/consultations/back-button";
 
 export const dynamic = 'force-dynamic';
 
@@ -103,11 +103,11 @@ export default async function PatientProfilePage({
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
       age--;
     }
-    
+
     if (age === 0) {
       const months = monthDiff + (today.getDate() >= birth.getDate() ? 0 : -1);
       if (months === 0) {
@@ -116,7 +116,7 @@ export default async function PatientProfilePage({
       }
       return `${months} ${months === 1 ? 'mês' : 'meses'}`;
     }
-    
+
     return `${age} ano${age !== 1 ? 's' : ''}`;
   };
 
@@ -127,247 +127,220 @@ export default async function PatientProfilePage({
   const hasAllergies = patient.allergies && patient.allergies.trim().length > 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/patients">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              <AvatarFallback className="bg-primary/10 text-primary text-xl">
-                {getInitials(patient.full_name)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-3xl font-bold">{patient.full_name}</h1>
-              <p className="text-muted-foreground">
-                {calculateAge(patient.date_of_birth)} •{" "}
-                {patient.sex === "male" ? "Masculino" : patient.sex === "female" ? "Feminino" : "Não informado"} •{" "}
-                {formatDate(patient.date_of_birth)}
-              </p>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="px-6 max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {patient.full_name}
+            </h1>
+            <div className="flex items-center gap-4 text-sm text-gray-600 mt-4">
+              <div className="flex items-center gap-1.5">
+                <Cake className="h-3.5 w-3.5 text-gray-400" />
+                <span>{formatDate(patient.date_of_birth)}</span>
+                <span className="text-gray-300">•</span>
+                <span className="text-gray-700 font-medium">{calculateAge(patient.date_of_birth)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-gray-400" />
+                <span>{patient.sex === "male" ? "Masculino" : patient.sex === "female" ? "Feminino" : "Não informado"}</span>
+              </div>
             </div>
           </div>
+          <div className="flex gap-2">
+            <Link className="p-0 m-0" href={`/patients/${id}/edit`}>
+              <Button variant="outline" className="gap-2" size="sm">
+                <Edit className="h-4 w-4" />
+                Editar
+              </Button>
+            </Link>
+            <BackButton />
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Link href={`/consultations/new-recording?patient_id=${id}`}>
-            <Button className="gap-2" size="lg">
-              <Mic className="h-4 w-4" />
-              Nova Consulta
-            </Button>
-          </Link>
-          <Link href={`/patients/${id}/edit`}>
-            <Button variant="outline">
-              <Edit className="h-4 w-4 mr-2" />
-              Editar
-            </Button>
-          </Link>
-          <DeletePatientButton patientId={id} patientName={patient.full_name} />
-        </div>
-      </div>
 
-      {/* Cards de Resumo - Contato/Responsável e Saúde/Alergias */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Contato & Responsável */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <User className="h-5 w-5" />
-              Contato & Responsável
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Contato */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{patient.phone}</span>
+        <Separator className="my-4" />
+
+        {/* Conteúdo Principal - Cards Limpos */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-100">
+
+          {/* Contato */}
+          <div className="p-6">
+            <div className="flex justify-end">
+              <DeletePatientButton patientId={id} patientName={patient.full_name} />
+            </div>
+
+            <div className="flex items-center gap-2 mb-3">
+              <Phone className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-medium text-gray-500">
+                Informações de Contato
+              </h2>
+            </div>
+            <div className="space-y-2 px-6">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-gray-400" />
+                <span className="text-base text-gray-900">{patient.phone}</span>
               </div>
               {patient.email && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{patient.email}</span>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-gray-400" />
+                  <span className="text-base text-gray-900">{patient.email}</span>
                 </div>
               )}
               {patient.address && (
-                <div className="flex items-start gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <span>{patient.address}</span>
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                  <span className="text-base text-gray-900">{patient.address}</span>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Separador */}
-            {(patient.responsible_name || patient.responsible_cpf) && (
-              <>
-                <Separator />
-                {/* Responsável */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    <UserCheck className="h-3.5 w-3.5" />
-                    Responsável Legal
-                  </div>
-                  {patient.responsible_name && (
-                    <p className="text-sm font-medium">{patient.responsible_name}</p>
-                  )}
-                  {patient.responsible_cpf && (
-                    <p className="text-sm text-muted-foreground">
-                      CPF: {patient.responsible_cpf}
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Saúde & Alergias */}
-        <Card className={hasAllergies ? "border-red-200" : ""}>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Heart className="h-5 w-5" />
-              Saúde & Alergias
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Dados de Saúde */}
-            <div className="flex flex-wrap gap-3">
-              {patient.blood_type && (
-                <div className="flex items-center gap-1.5 bg-muted/50 px-3 py-1.5 rounded-lg">
-                  <Droplets className="h-4 w-4 text-red-500" />
-                  <span className="text-sm font-medium">{patient.blood_type}</span>
-                </div>
-              )}
-              {patient.weight_kg && (
-                <div className="flex items-center gap-1.5 bg-muted/50 px-3 py-1.5 rounded-lg">
-                  <Scale className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{patient.weight_kg} kg</span>
-                </div>
-              )}
-              {patient.height_cm && (
-                <div className="flex items-center gap-1.5 bg-muted/50 px-3 py-1.5 rounded-lg">
-                  <Ruler className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{patient.height_cm} cm</span>
-                </div>
-              )}
-              {!patient.blood_type && !patient.weight_kg && !patient.height_cm && (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum dado registrado
-                </p>
-              )}
-            </div>
-
-            {/* Separador e Alergias */}
-            <Separator />
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                <AlertTriangle className={`h-3.5 w-3.5 ${hasAllergies ? "text-red-500" : ""}`} />
-                Alergias
+          {/* Responsável Legal */}
+          {(patient.responsible_name || patient.responsible_cpf) && (
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <UserCheck className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-medium text-gray-500">
+                  Responsável Legal
+                </h2>
               </div>
-              {hasAllergies ? (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm text-red-800 whitespace-pre-wrap">
-                    {patient.allergies}
+              <div className="space-y-2 px-6">
+                {patient.responsible_name && (
+                  <p className="text-base text-gray-900">{patient.responsible_name}</p>
+                )}
+                {patient.responsible_cpf && (
+                  <p className="text-sm text-gray-600">
+                    CPF: {patient.responsible_cpf}
                   </p>
-                </div>
-              ) : (
-                <p className="text-sm text-green-600">Nenhuma alergia registrada ✓</p>
-              )}
+                )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
 
-      {/* Alertas de Crescimento */}
-      <PatientGrowthSection 
-        patientId={id}
-        patientName={patient.full_name}
-        dateOfBirth={patient.date_of_birth}
-        medicalHistory={patient.medical_history}
-      />
+          {/* Dados de Saúde */}
+          {(patient.blood_type || patient.weight_kg || patient.height_cm) && (
+            <div className="p-6">
+              <h2 className="text-sm font-medium text-gray-500 mb-4">
+                Dados de Saúde
+              </h2>
+              <div className="grid grid-cols-3 gap-6">
+                {patient.blood_type && (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-2">Tipo Sanguíneo</p>
+                    <p className="text-2xl font-semibold text-gray-900">{patient.blood_type}</p>
+                  </div>
+                )}
+                {patient.weight_kg && (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-2">Peso</p>
+                    <p className="text-2xl font-semibold text-gray-900">{patient.weight_kg}</p>
+                    <p className="text-xs text-gray-500 mt-1">kg</p>
+                  </div>
+                )}
+                {patient.height_cm && (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-2">Altura</p>
+                    <p className="text-2xl font-semibold text-gray-900">{patient.height_cm}</p>
+                    <p className="text-xs text-gray-500 mt-1">cm</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-      {/* Calendário Vacinal */}
-      <VaccineCalendar 
-        patientId={id}
-        patientName={patient.full_name}
-      />
+          {/* Alergias */}
+          {hasAllergies && (
+            <div className="p-6 bg-red-50/30">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <h2 className="text-sm font-medium text-red-900">
+                  Alergias
+                </h2>
+                <span className="ml-auto text-xs font-medium text-red-700 bg-red-100 px-2 py-1 rounded">
+                  Importante
+                </span>
+              </div>
+              <p className="text-base leading-relaxed whitespace-pre-wrap text-gray-900 px-6">
+                {patient.allergies}
+              </p>
+            </div>
+          )}
 
-      {/* Medicações e Histórico */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Medicações */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Pill className="h-5 w-5" />
-              Medicações Atuais
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {patient.current_medications ? (
-              <p className="text-sm whitespace-pre-wrap">
+          {/* Medicações Atuais */}
+          {patient.current_medications && (
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Pill className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-medium text-gray-500">
+                  Medicações Atuais
+                </h2>
+              </div>
+              <p className="text-base leading-relaxed whitespace-pre-wrap text-gray-900 px-6">
                 {patient.current_medications}
               </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Nenhuma medicação em uso
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
 
-        {/* Histórico Médico */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="h-5 w-5" />
-              Histórico Médico
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {patient.medical_history ? (
-              <p className="text-sm whitespace-pre-wrap line-clamp-6">
+          {/* Histórico Médico */}
+          {patient.medical_history && (
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-medium text-gray-500">
+                  Histórico Médico
+                </h2>
+              </div>
+              <p className="text-base leading-relaxed whitespace-pre-wrap text-gray-900 px-6">
                 {patient.medical_history}
               </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Nenhum histórico registrado
+            </div>
+          )}
+
+          {/* Observações */}
+          {patient.notes && (
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-medium text-gray-500">
+                  Observações
+                </h2>
+              </div>
+              <p className="text-base leading-relaxed whitespace-pre-wrap text-gray-900 px-6">
+                {patient.notes}
               </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+        </div>
 
-      {/* Observações */}
-      {patient.notes && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="h-5 w-5" />
-              Observações
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm whitespace-pre-wrap">{patient.notes}</p>
-          </CardContent>
-        </Card>
-      )}
+        {/* Alertas de Crescimento */}
+        <PatientGrowthSection
+          patientId={id}
+          patientName={patient.full_name}
+          dateOfBirth={patient.date_of_birth}
+          medicalHistory={patient.medical_history}
+        />
 
-      {/* Histórico de Consultas */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Stethoscope className="h-5 w-5" />
-              Histórico de Consultas
+        {/* Calendário Vacinal */}
+        <VaccineCalendar
+          patientId={id}
+          patientName={patient.full_name}
+        />
+
+        {/* Histórico de Consultas */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Stethoscope className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold text-gray-900">
+                Histórico de Consultas
+              </h2>
               {consultationsWithPatient.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
+                <Badge variant="outline" className="ml-2">
                   {consultationsWithPatient.length}
                 </Badge>
               )}
-            </CardTitle>
+            </div>
             {consultationsWithPatient.length >= 10 && (
               <Link href={`/consultations?patient=${id}`}>
                 <Button variant="ghost" size="sm">
@@ -376,32 +349,31 @@ export default async function PatientProfilePage({
               </Link>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
+
           {consultationsWithPatient.length > 0 ? (
             <ConsultationList consultations={consultationsWithPatient} />
           ) : (
             <div className="text-center py-12">
-              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-              <h3 className="text-lg font-semibold mb-2">
+              <Stethoscope className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
                 Nenhuma consulta registrada
               </h3>
-              <p className="text-sm text-muted-foreground mb-6">
+              <p className="text-gray-500 mb-6">
                 {patient.full_name} ainda não possui consultas gravadas.
               </p>
               <Link href={`/consultations/new-recording?patient_id=${id}`}>
-                <Button>
-                  <Mic className="h-4 w-4 mr-2" />
+                <Button size="sm" className="gap-2">
+                  <Mic className="h-4 w-4" />
                   Gravar Primeira Consulta
                 </Button>
               </Link>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Histórico de Atestados */}
-      <PatientCertificatesHistory patientId={id} />
+        {/* Histórico de Atestados */}
+        <PatientCertificatesHistory patientId={id} />
+      </div>
     </div>
   );
 }

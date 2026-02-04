@@ -37,19 +37,6 @@ export function DeletePatientButton({
     setError(null);
 
     try {
-      // Verificar se tem consultas vinculadas (quando a tabela existir)
-      // const { count } = await supabase
-      //   .from("consultations")
-      //   .select("*", { count: "exact", head: true })
-      //   .eq("patient_id", patientId);
-      
-      // if (count && count > 0) {
-      //   setError(
-      //     `Este paciente possui ${count} consulta${count !== 1 ? 's' : ''} registrada${count !== 1 ? 's' : ''}. Não é possível excluir.`
-      //   );
-      //   setIsDeleting(false);
-      //   return;
-      // }
 
       // Soft delete
       const { error: deleteError } = await supabase
@@ -74,7 +61,7 @@ export function DeletePatientButton({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="destructive" size="icon">
+        <Button variant="destructive" size="icon-sm">
           <Trash2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>

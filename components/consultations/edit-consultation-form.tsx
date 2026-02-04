@@ -26,10 +26,12 @@ import {
   TrendingUp,
   Scale,
   Baby,
+  Cake,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { PhysicalExamTemplateSelector } from "./physical-exam-template-selector";
+import { BackButton } from "./back-button";
 
 // Esquema de validação
 const consultationSchema = z.object({
@@ -79,13 +81,13 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
   const defaultHeadCirc = consultation.head_circumference_cm || lastMeasurement?.head_circumference_cm || null;
 
   // Determinar origem dos dados para exibir ao usuário
-  const measurementSource = consultation.weight_kg 
+  const measurementSource = consultation.weight_kg
     ? { type: "current", label: "desta consulta" }
     : lastMeasurement?.weight_kg
-    ? { type: "previous", label: `da consulta de ${new Date(lastMeasurement.consultation_date).toLocaleDateString("pt-BR")}`, date: lastMeasurement.consultation_date }
-    : patient?.weight_kg
-    ? { type: "profile", label: "do cadastro do paciente" }
-    : null;
+      ? { type: "previous", label: `da consulta de ${new Date(lastMeasurement.consultation_date).toLocaleDateString("pt-BR")}`, date: lastMeasurement.consultation_date }
+      : patient?.weight_kg
+        ? { type: "profile", label: "do cadastro do paciente" }
+        : null;
 
   const {
     register,
@@ -167,320 +169,317 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href={`/consultations/${consultation.id}/preview`}>
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="px-6 max-w-7xl mx-auto space-y-6">
+
+        <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Editar Consulta</h1>
-            <p className="text-muted-foreground mt-1">
-              Paciente: <span className="font-medium">{patient?.full_name}</span>
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {patient?.full_name}
+            </h1>
+
           </div>
+          <BackButton />
         </div>
-      </div>
 
-      <Separator />
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Dados Clínicos */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Dados Clínicos
-            </CardTitle>
-            <CardDescription>
-              Informações principais sobre a consulta
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Queixa Principal */}
-            <div className="space-y-2">
-              <Label htmlFor="chief_complaint">
-                Queixa Principal <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="chief_complaint"
-                placeholder="Ex: Febre há 2 dias..."
-                rows={3}
-                {...register("chief_complaint")}
-              />
-              {errors.chief_complaint && (
-                <p className="text-sm text-red-500">{errors.chief_complaint.message}</p>
-              )}
-            </div>
+        <Separator />
 
-            {/* História/Anamnese */}
-            <div className="space-y-2">
-              <Label htmlFor="history">História Clínica / Anamnese</Label>
-              <Textarea
-                id="history"
-                placeholder="Descreva a história clínica do paciente..."
-                rows={8}
-                {...register("history")}
-              />
-            </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Dados Clínicos */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Dados Clínicos
+              </CardTitle>
+              <CardDescription>
+                Informações principais sobre a consulta
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Queixa Principal */}
+              <div className="space-y-2">
+                <Label htmlFor="chief_complaint">
+                  Queixa Principal <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="chief_complaint"
+                  placeholder="Ex: Febre há 2 dias..."
+                  rows={3}
+                  {...register("chief_complaint")}
+                />
+                {errors.chief_complaint && (
+                  <p className="text-sm text-red-500">{errors.chief_complaint.message}</p>
+                )}
+              </div>
 
-            {/* Exame Físico */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="physical_exam">Exame Físico</Label>
-                <PhysicalExamTemplateSelector
-                  patientId={patient?.id}
-                  patientName={patient?.full_name}
-                  dateOfBirth={patient?.date_of_birth}
-                  sex={patient?.sex}
-                  onInsert={(text, mode) => {
-                    const currentText = watch("physical_exam") || "";
-                    if (mode === "replace") {
-                      setValue("physical_exam", text);
-                    } else {
-                      setValue("physical_exam", currentText ? `${currentText}\n\n${text}` : text);
-                    }
-                  }}
+              {/* História/Anamnese */}
+              <div className="space-y-2">
+                <Label htmlFor="history">História Clínica / Anamnese</Label>
+                <Textarea
+                  id="history"
+                  placeholder="Descreva a história clínica do paciente..."
+                  rows={8}
+                  {...register("history")}
                 />
               </div>
-              <Textarea
-                id="physical_exam"
-                placeholder="Descreva os achados do exame físico..."
-                rows={6}
-                {...register("physical_exam")}
-              />
-            </div>
 
-            {/* Diagnóstico */}
-            <div className="space-y-2">
-              <Label htmlFor="diagnosis">
-                Diagnóstico <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="diagnosis"
-                placeholder="Ex: Faringoamigdalite aguda"
-                {...register("diagnosis")}
-              />
-              {errors.diagnosis && (
-                <p className="text-sm text-red-500">{errors.diagnosis.message}</p>
-              )}
-            </div>
+              {/* Exame Físico */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="physical_exam">Exame Físico</Label>
+                  <PhysicalExamTemplateSelector
+                    patientId={patient?.id}
+                    patientName={patient?.full_name}
+                    dateOfBirth={patient?.date_of_birth}
+                    sex={patient?.sex}
+                    onInsert={(text, mode) => {
+                      const currentText = watch("physical_exam") || "";
+                      if (mode === "replace") {
+                        setValue("physical_exam", text);
+                      } else {
+                        setValue("physical_exam", currentText ? `${currentText}\n\n${text}` : text);
+                      }
+                    }}
+                  />
+                </div>
+                <Textarea
+                  id="physical_exam"
+                  placeholder="Descreva os achados do exame físico..."
+                  rows={6}
+                  {...register("physical_exam")}
+                />
+              </div>
 
-            {/* Plano Terapêutico */}
-            <div className="space-y-2">
-              <Label htmlFor="plan">Plano Terapêutico</Label>
-              <Textarea
-                id="plan"
-                placeholder="Descreva o plano de tratamento..."
-                rows={6}
-                {...register("plan")}
-              />
-            </div>
+              {/* Diagnóstico */}
+              <div className="space-y-2">
+                <Label htmlFor="diagnosis">
+                  Diagnóstico <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="diagnosis"
+                  placeholder="Ex: Faringoamigdalite aguda"
+                  {...register("diagnosis")}
+                />
+                {errors.diagnosis && (
+                  <p className="text-sm text-red-500">{errors.diagnosis.message}</p>
+                )}
+              </div>
+
+              {/* Plano Terapêutico */}
+              <div className="space-y-2">
+                <Label htmlFor="plan">Plano Terapêutico</Label>
+                <Textarea
+                  id="plan"
+                  placeholder="Descreva o plano de tratamento..."
+                  rows={6}
+                  {...register("plan")}
+                />
+              </div>
 
             </CardContent>
-        </Card>
+          </Card>
 
-        {/* Dados Antropométricos - Destacado */}
-        <Card className="border-primary/50 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <TrendingUp className="h-5 w-5" />
-              Dados Antropométricos
-            </CardTitle>
-            <CardDescription>
-              <span className="font-medium">Importante:</span> Registre as medidas atuais para acompanhamento do crescimento
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Alerta de último registro */}
-            {measurementSource && measurementSource.type !== "current" && (
-              <Alert className="bg-white border-primary/20">
-                <AlertCircle className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-sm">
-                  <span className="font-medium">
-                    Dados pré-preenchidos {measurementSource.label}:
-                  </span>{" "}
-                  {defaultWeight && <span>Peso: {defaultWeight}kg</span>}
-                  {defaultWeight && defaultHeight && " • "}
-                  {defaultHeight && <span>Altura: {defaultHeight}cm</span>}
-                  {defaultHeadCirc && ` • P.C.: ${defaultHeadCirc}cm`}
-                  <span className="text-yellow-600 ml-2 font-medium">
-                    → Atualize com as medidas de hoje!
-                  </span>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Histórico de medições anteriores */}
-            {previousMeasurements.length > 0 && (
-              <div className="bg-white rounded-lg border p-3">
-                <p className="text-xs font-medium text-muted-foreground mb-2">
-                  📊 Últimas medições registradas:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {previousMeasurements.slice(0, 3).map((m) => (
-                    <span 
-                      key={m.id} 
-                      className="text-xs bg-gray-100 px-2 py-1 rounded"
-                    >
-                      {new Date(m.consultation_date).toLocaleDateString("pt-BR")}:{" "}
-                      {m.weight_kg}kg, {m.height_cm}cm
+          {/* Dados Antropométricos - Destacado */}
+          <Card className="border-primary/50 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary">
+                <TrendingUp className="h-5 w-5" />
+                Dados Antropométricos
+              </CardTitle>
+              <CardDescription>
+                <span className="font-medium">Importante:</span> Registre as medidas atuais para acompanhamento do crescimento
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Alerta de último registro */}
+              {measurementSource && measurementSource.type !== "current" && (
+                <Alert className="bg-white border-primary/20">
+                  <AlertCircle className="h-4 w-4 text-primary" />
+                  <AlertDescription className="text-sm">
+                    <span className="font-medium">
+                      Dados pré-preenchidos {measurementSource.label}:
+                    </span>{" "}
+                    {defaultWeight && <span>Peso: {defaultWeight}kg</span>}
+                    {defaultWeight && defaultHeight && " • "}
+                    {defaultHeight && <span>Altura: {defaultHeight}cm</span>}
+                    {defaultHeadCirc && ` • P.C.: ${defaultHeadCirc}cm`}
+                    <span className="text-yellow-600 ml-2 font-medium">
+                      → Atualize com as medidas de hoje!
                     </span>
-                  ))}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Histórico de medições anteriores */}
+              {previousMeasurements.length > 0 && (
+                <div className="bg-white rounded-lg border p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    📊 Últimas medições registradas:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {previousMeasurements.slice(0, 3).map((m) => (
+                      <span
+                        key={m.id}
+                        className="text-xs bg-gray-100 px-2 py-1 rounded"
+                      >
+                        {new Date(m.consultation_date).toLocaleDateString("pt-BR")}:{" "}
+                        {m.weight_kg}kg, {m.height_cm}cm
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Grid de Medidas - Destacado */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2 bg-white p-4 rounded-lg border">
+                  <Label htmlFor="weight_kg" className="flex items-center gap-2">
+                    <Scale className="h-4 w-4 text-muted-foreground" />
+                    Peso (kg) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="weight_kg"
+                    type="number"
+                    step="0.1"
+                    min="0.5"
+                    max="150"
+                    placeholder="12.5"
+                    className="text-lg font-medium h-12"
+                    {...register("weight_kg", {
+                      setValueAs: (v) => (v === "" ? null : parseFloat(v)),
+                    })}
+                  />
+                  {errors.weight_kg && (
+                    <p className="text-sm text-red-500">{errors.weight_kg.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2 bg-white p-4 rounded-lg border">
+                  <Label htmlFor="height_cm" className="flex items-center gap-2">
+                    <Ruler className="h-4 w-4 text-muted-foreground" />
+                    Altura (cm) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="height_cm"
+                    type="number"
+                    step="0.1"
+                    min="30"
+                    max="200"
+                    placeholder="98.5"
+                    className="text-lg font-medium h-12"
+                    {...register("height_cm", {
+                      setValueAs: (v) => (v === "" ? null : parseFloat(v)),
+                    })}
+                  />
+                  {errors.height_cm && (
+                    <p className="text-sm text-red-500">{errors.height_cm.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2 bg-white p-4 rounded-lg border">
+                  <Label htmlFor="head_circumference_cm" className="flex items-center gap-2">
+                    <Baby className="h-4 w-4 text-muted-foreground" />
+                    P. Cefálico (cm)
+                  </Label>
+                  <Input
+                    id="head_circumference_cm"
+                    type="number"
+                    step="0.1"
+                    min="25"
+                    max="65"
+                    placeholder="48.5"
+                    className="text-lg font-medium h-12"
+                    {...register("head_circumference_cm", {
+                      setValueAs: (v) => (v === "" ? null : parseFloat(v)),
+                    })}
+                  />
+                  {errors.head_circumference_cm && (
+                    <p className="text-sm text-red-500">
+                      {errors.head_circumference_cm.message}
+                    </p>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Grid de Medidas - Destacado */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2 bg-white p-4 rounded-lg border">
-                <Label htmlFor="weight_kg" className="flex items-center gap-2">
-                  <Scale className="h-4 w-4 text-muted-foreground" />
-                  Peso (kg) <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="weight_kg"
-                  type="number"
-                  step="0.1"
-                  min="0.5"
-                  max="150"
-                  placeholder="12.5"
-                  className="text-lg font-medium h-12"
-                  {...register("weight_kg", {
-                    setValueAs: (v) => (v === "" ? null : parseFloat(v)),
-                  })}
+              {/* Desenvolvimento */}
+              <div className="space-y-2 pt-2">
+                <Label htmlFor="development_notes">Notas de Desenvolvimento</Label>
+                <Textarea
+                  id="development_notes"
+                  placeholder="Marcos do desenvolvimento, observações..."
+                  rows={4}
+                  className="bg-white"
+                  {...register("development_notes")}
                 />
-                {errors.weight_kg && (
-                  <p className="text-sm text-red-500">{errors.weight_kg.message}</p>
-                )}
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="space-y-2 bg-white p-4 rounded-lg border">
-                <Label htmlFor="height_cm" className="flex items-center gap-2">
-                  <Ruler className="h-4 w-4 text-muted-foreground" />
-                  Altura (cm) <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="height_cm"
-                  type="number"
-                  step="0.1"
-                  min="30"
-                  max="200"
-                  placeholder="98.5"
-                  className="text-lg font-medium h-12"
-                  {...register("height_cm", {
-                    setValueAs: (v) => (v === "" ? null : parseFloat(v)),
-                  })}
-                />
-                {errors.height_cm && (
-                  <p className="text-sm text-red-500">{errors.height_cm.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2 bg-white p-4 rounded-lg border">
-                <Label htmlFor="head_circumference_cm" className="flex items-center gap-2">
-                  <Baby className="h-4 w-4 text-muted-foreground" />
-                  P. Cefálico (cm)
-                </Label>
-                <Input
-                  id="head_circumference_cm"
-                  type="number"
-                  step="0.1"
-                  min="25"
-                  max="65"
-                  placeholder="48.5"
-                  className="text-lg font-medium h-12"
-                  {...register("head_circumference_cm", {
-                    setValueAs: (v) => (v === "" ? null : parseFloat(v)),
-                  })}
-                />
-                {errors.head_circumference_cm && (
-                  <p className="text-sm text-red-500">
-                    {errors.head_circumference_cm.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Desenvolvimento */}
-            <div className="space-y-2 pt-2">
-              <Label htmlFor="development_notes">Notas de Desenvolvimento</Label>
+          {/* Histórico Gestacional/Perinatal - DESTAQUE */}
+          <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-100">
+                <Baby className="h-5 w-5" />
+                Histórico Gestacional e Perinatal
+              </CardTitle>
+              <CardDescription className="text-amber-700 dark:text-amber-300">
+                Informações sobre gestação, parto e período neonatal (crítico para recém-nascidos e lactentes)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <Textarea
-                id="development_notes"
-                placeholder="Marcos do desenvolvimento, observações..."
+                id="prenatal_perinatal_history"
+                placeholder="Ex: Nasceu prematuro (35 semanas), mãe teve diabetes gestacional, ficou 5 dias em UTI neonatal..."
                 rows={4}
-                className="bg-white"
-                {...register("development_notes")}
+                className="bg-white dark:bg-gray-950 border-amber-300 dark:border-amber-800"
+                {...register("prenatal_perinatal_history")}
               />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Histórico Gestacional/Perinatal - DESTAQUE */}
-        <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-100">
-              <Baby className="h-5 w-5" />
-              Histórico Gestacional e Perinatal
-            </CardTitle>
-            <CardDescription className="text-amber-700 dark:text-amber-300">
-              Informações sobre gestação, parto e período neonatal (crítico para recém-nascidos e lactentes)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              id="prenatal_perinatal_history"
-              placeholder="Ex: Nasceu prematuro (35 semanas), mãe teve diabetes gestacional, ficou 5 dias em UTI neonatal..."
-              rows={4}
-              className="bg-white dark:bg-gray-950 border-amber-300 dark:border-amber-800"
-              {...register("prenatal_perinatal_history")}
-            />
-          </CardContent>
-        </Card>
+          {/* Observações */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <StickyNote className="h-5 w-5" />
+                Observações Adicionais
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                id="notes"
+                placeholder="Notas adicionais, observações, lembretes..."
+                rows={4}
+                {...register("notes")}
+              />
+            </CardContent>
+          </Card>
 
-        {/* Observações */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <StickyNote className="h-5 w-5" />
-              Observações Adicionais
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              id="notes"
-              placeholder="Notas adicionais, observações, lembretes..."
-              rows={4}
-              {...register("notes")}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Botões de Ação */}
-        <div className="flex items-center justify-between gap-4 pt-4">
-          <Link href={`/consultations/${consultation.id}/preview`}>
-            <Button type="button" variant="outline">
-              Cancelar
+          {/* Botões de Ação */}
+          <div className="flex items-center justify-between gap-4 pt-4">
+            <Link href={`/consultations/${consultation.id}/preview`}>
+              <Button type="button" variant="outline">
+                Cancelar
+              </Button>
+            </Link>
+            <Button type="submit" disabled={isSaving} className="gap-2">
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Salvar Alterações
+                </>
+              )}
             </Button>
-          </Link>
-          <Button type="submit" disabled={isSaving} className="gap-2">
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Salvar Alterações
-              </>
-            )}
-          </Button>
-        </div>
-      </form>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

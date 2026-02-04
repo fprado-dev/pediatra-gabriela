@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Calendar, Phone, Heart, AlertTriangle, ArrowRight } from "lucide-react";
+import { User, Calendar, Phone, Heart, AlertTriangle, Eye, Cake } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -35,11 +34,11 @@ export function PatientCard({ patient }: PatientCardProps) {
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
       age--;
     }
-    
+
     if (age === 0) {
       const months = monthDiff + (today.getDate() >= birth.getDate() ? 0 : -1);
       if (months === 0) {
@@ -48,76 +47,78 @@ export function PatientCard({ patient }: PatientCardProps) {
       }
       return `${months} ${months === 1 ? 'mês' : 'meses'}`;
     }
-    
+
     return `${age} ano${age !== 1 ? 's' : ''}`;
   };
 
   const hasAllergies = patient.allergies && patient.allergies.trim().length > 0;
 
   return (
-    <Card className="hover:shadow-md transition-shadow flex flex-col">
-      <CardContent className="p-4 flex flex-col flex-1">
-        {/* Header: Badges */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            {patient.blood_type && (
-              <Badge variant="outline" className="text-xs">
-                <Heart className="h-3 w-3 mr-1" />
+    <div className="bg-white border border-gray-200 rounded-lg flex flex-col">
+      {/* Header: Badges + Tempo */}
+      <div className="p-4 flex items-center justify-between border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          {patient.blood_type && (
+            <Badge variant="outline" className="flex items-center gap-1.5">
+              <Heart className="h-3 w-3 text-red-500" />
+              <span className="text-xs font-medium text-gray-700">
                 {patient.blood_type}
-              </Badge>
-            )}
-            {hasAllergies && (
-              <Badge variant="destructive" className="text-xs">
-                <AlertTriangle className="h-3 w-3 mr-1" />
+              </span>
+            </Badge>
+          )}
+          {hasAllergies && (
+            <Badge variant="outline" className="flex items-center gap-1.5 border-red-200 bg-red-50">
+              <AlertTriangle className="h-3 w-3 text-red-600" />
+              <span className="text-xs font-medium text-red-700">
                 Alergias
-              </Badge>
-            )}
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(patient.created_at), {
-              addSuffix: true,
-              locale: ptBR,
-            })}
-          </span>
+              </span>
+            </Badge>
+          )}
         </div>
+        <span className="text-xs text-gray-500">
+          {formatDistanceToNow(new Date(patient.created_at), {
+            addSuffix: true,
+            locale: ptBR,
+          })}
+        </span>
+      </div>
 
-        {/* Nome do paciente */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
-            {getInitials(patient.full_name)}
-          </div>
-          <span className="font-semibold text-sm truncate">
+      {/* Body: Informações */}
+      <div className="p-4 flex-1 space-y-3">
+        {/* Nome do Paciente */}
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-gray-400 shrink-0" />
+          <span className="font-semibold text-gray-900 truncate">
             {patient.full_name}
           </span>
         </div>
 
-        {/* Info */}
-        <div className="flex-1 mb-3">
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {calculateAge(patient.date_of_birth)}
-            </span>
-            <span className="flex items-center gap-1">
-              <Phone className="h-3 w-3" />
-              {patient.phone}
-            </span>
-          </div>
+        {/* Idade */}
+        <div className="flex items-center gap-2">
+          <Cake className="h-4 w-4 text-gray-400 shrink-0" />
+          <span className="text-sm text-gray-600">
+            {calculateAge(patient.date_of_birth)}
+          </span>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t">
-          <span className="text-xs text-muted-foreground">
-            Ver perfil
+        {/* Telefone */}
+        <div className="flex items-center gap-2">
+          <Phone className="h-4 w-4 text-gray-400 shrink-0" />
+          <span className="text-sm text-gray-600">
+            {patient.phone}
           </span>
-          <Link href={`/patients/${patient.id}`}>
-            <Button size="sm" variant="default">
-              Abrir
-              <ArrowRight className="h-3 w-3 ml-1" />
-            </Button>
-          </Link>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Footer: Ação */}
+      <div className="p-4 flex justify-end border-t border-gray-100">
+        <Link href={`/patients/${patient.id}`} className="block">
+          <Button className="gap-2 cursor-pointer" size="xs">
+            <Eye className="h-3 w-3" />
+            Ver Paciente
+          </Button>
+        </Link>
+      </div>
+    </div>
   );
 }

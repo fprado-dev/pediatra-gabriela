@@ -98,10 +98,6 @@ export async function POST(request: NextRequest) {
     const sessionDir = join(tmpdir(), 'audio-chunks', sessionId);
     await mkdir(sessionDir, { recursive: true });
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d71df0d2-957e-4675-996e-9c84a33114de', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'upload-chunk/route.ts:99', message: 'Diretório de sessão criado e chunk salvo', data: { sessionId, chunkIndex, totalChunks, sessionDir, hostname: process.env.HOSTNAME || 'unknown', awsLambdaFunctionName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'none' }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'D' }) }).catch(() => { });
-    // #endregion
-
     // Salvar chunk
     const chunkFileName = `chunk-${chunkIndex.toString().padStart(4, '0')}.bin`;
     const chunkPath = join(sessionDir, chunkFileName);

@@ -246,27 +246,43 @@ export function PrescriptionForm({
   };
 
   // Carregar template
-  const loadTemplate = (templateId: string) => {
-    const template = templates.find((t) => t.id === templateId);
-    if (!template) return;
+  const loadTemplate = async (templateId: string) => {
+    try {
+      // Buscar template diretamente do Supabase para garantir dados atualizados
+      const { data: template, error } = await supabase
+        .from("prescription_templates")
+        .select("*")
+        .eq("id", templateId)
+        .single();
 
-    if (template.medications?.length > 0) {
-      setMedications(
-        template.medications.map((m: any) => ({
-          id: crypto.randomUUID(),
-          name: m.name || "",
-          dosage: m.dosage || "",
-          quantity: m.quantity || "",
-          instructions: m.instructions || "",
-        }))
-      );
+      if (error || !template) {
+        console.error("Erro ao carregar template:", error);
+        toast.error("Erro ao carregar template");
+        return;
+      }
+
+      // Aplicar medicações
+      if (template.medications && template.medications.length > 0) {
+        setMedications(
+          template.medications.map((m: any) => ({
+            id: crypto.randomUUID(),
+            name: m.name || "",
+            dosage: m.dosage || "",
+            quantity: m.quantity || "",
+            instructions: m.instructions || "",
+          }))
+        );
+      }
+
+      // Aplicar outros campos (usando nomes corretos do schema)
+      if (template.instructions) setOrientations(template.instructions);
+      if (template.warnings) setAlertSigns(template.warnings);
+
+      toast.success(`Template "${template.name}" carregado!`);
+    } catch (error) {
+      console.error("Erro ao carregar template:", error);
+      toast.error("Erro ao carregar template");
     }
-    if (template.orientations) setOrientations(template.orientations);
-    if (template.alert_signs) setAlertSigns(template.alert_signs);
-    if (template.prevention) setPrevention(template.prevention);
-    if (template.notes) setNotes(template.notes);
-
-    toast.success(`Template "${template.name}" carregado!`);
   };
 
   // Abrir seletor de templates
@@ -294,8 +310,8 @@ export function PrescriptionForm({
   };
 
   // Aplicar template
-  const applyTemplate = (templateText: string, templateId: string) => {
-    loadTemplate(templateId);
+  const applyTemplate = async (templateText: string, templateId: string) => {
+    await loadTemplate(templateId);
     setShowTemplateSelector(false);
     setPendingTemplate(null);
     setShowReplaceConfirm(false);
@@ -309,13 +325,20 @@ export function PrescriptionForm({
     }
 
     try {
+      // Obter o user ID atual
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return;
+      }
+
       const { error } = await supabase.from("prescription_templates").insert({
+        doctor_id: user.id,
         name: templateName,
         medications: medications.filter((m) => m.name.trim()),
-        orientations,
-        alert_signs: alertSigns,
-        prevention,
-        notes,
+        instructions: orientations,
+        warnings: alertSigns,
       });
 
       if (error) throw error;

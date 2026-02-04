@@ -21,7 +21,7 @@ const ICON_MAP = {
   'pill': Pill,
 };
 
-const MIN_WORDS_FOR_CONDENSING = 100; // ~1-2 parágrafos
+const MIN_WORDS_FOR_CONDENSING = 50; // ~1-2 parágrafos
 const AUTO_CONDENSE_THRESHOLD = 500; // Auto-condensar textos muito longos
 
 function countWords(text: string): number {
@@ -140,7 +140,7 @@ export function CondensableField({
       )}
 
       {/* Conteúdo */}
-      <div className="pl-6">
+      <div className="px-6">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-4 w-full" />

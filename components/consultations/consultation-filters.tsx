@@ -1,140 +1,83 @@
+
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Search, Loader2 } from "lucide-react";
+import { useState, useTransition, useEffect } from "react";
+ import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import { Search } from "lucide-react"
 
 interface ConsultationFiltersProps {
-  currentStatus: string;
-  currentPeriod: string;
   currentSearch: string;
   patientId?: string;
+  totalResults?: number;
 }
 
 export function ConsultationFilters({
-  currentStatus,
-  currentPeriod,
   currentSearch,
   patientId,
+  totalResults = 0,
 }: ConsultationFiltersProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [searchValue, setSearchValue] = useState(currentSearch);
 
-  const updateFilters = (updates: Record<string, string>) => {
-    const params = new URLSearchParams();
-    
-    // Manter filtros existentes
-    if (patientId) params.set("patient", patientId);
-    
-    // Status
-    const newStatus = updates.status ?? currentStatus;
-    if (newStatus && newStatus !== "all") params.set("status", newStatus);
-    
-    // Período
-    const newPeriod = updates.period ?? currentPeriod;
-    if (newPeriod && newPeriod !== "all") params.set("period", newPeriod);
-    
-    // Busca
-    const newSearch = updates.search ?? currentSearch;
-    if (newSearch) params.set("search", newSearch);
-    
-    // Resetar para página 1 ao filtrar
-    params.set("page", "1");
-    
-    startTransition(() => {
-      router.push(`/consultations?${params.toString()}`);
-    });
-  };
+  // Debounce e busca automática
+  useEffect(() => {
+    // Só busca se tiver 3+ caracteres ou se for string vazia (limpar busca)
+    if (searchValue.length >= 3 || searchValue.length === 0) {
+      const timeoutId = setTimeout(() => {
+        const params = new URLSearchParams();
+        
+        // Manter filtro de paciente se existir
+        if (patientId) params.set("patient", patientId);
+        
+        // Adicionar busca se houver
+        if (searchValue.length >= 3) {
+          params.set("search", searchValue);
+        }
+        
+        // Resetar para página 1 ao buscar
+        params.set("page", "1");
+        
+        startTransition(() => {
+          router.push(`/consultations?${params.toString()}`);
+        });
+      }, 300); // Debounce de 300ms
 
-  const handleSearch = () => {
-    updateFilters({ search: searchValue });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
+      return () => clearTimeout(timeoutId);
     }
-  };
+  }, [searchValue, patientId, router]);
 
-  const clearFilters = () => {
-    setSearchValue("");
-    const params = new URLSearchParams();
-    if (patientId) params.set("patient", patientId);
-    startTransition(() => {
-      router.push(`/consultations?${params.toString()}`);
-    });
-  };
 
-  const hasActiveFilters = currentStatus !== "all" || currentPeriod !== "all" || currentSearch;
+
+  // Formatar texto de resultados
+  const resultsText = totalResults === 0 
+    ? "Nenhum resultado" 
+    : totalResults === 1 
+      ? "1 consulta" 
+      : `${totalResults} consultas`;
 
   return (
-    <div className="flex flex-col sm:flex-row gap-4">
-      {/* Busca */}
-      <div className="relative flex-1 flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por queixa..."
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="pl-10"
-          />
-        </div>
-        <Button onClick={handleSearch} disabled={isPending}>
-          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buscar"}
-        </Button>
-      </div>
-
-      {/* Filtro de Status */}
-      <Select 
-        value={currentStatus} 
-        onValueChange={(value) => updateFilters({ status: value })}
-      >
-        <SelectTrigger className="w-full sm:w-[160px]">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos</SelectItem>
-          <SelectItem value="completed">Completo</SelectItem>
-          <SelectItem value="processing">Processando</SelectItem>
-          <SelectItem value="error">Erro</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {/* Filtro de Período */}
-      <Select 
-        value={currentPeriod} 
-        onValueChange={(value) => updateFilters({ period: value })}
-      >
-        <SelectTrigger className="w-full sm:w-[160px]">
-          <SelectValue placeholder="Período" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todo período</SelectItem>
-          <SelectItem value="week">Última semana</SelectItem>
-          <SelectItem value="month">Último mês</SelectItem>
-          <SelectItem value="3months">3 meses</SelectItem>
-          <SelectItem value="6months">6 meses</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {/* Limpar filtros */}
-      {hasActiveFilters && (
-        <Button variant="ghost" onClick={clearFilters} disabled={isPending}>
-          Limpar
-        </Button>
-      )}
+    <div className="flex items-center gap-4">
+      <InputGroup className="max-w-md bg-white">
+        <InputGroupInput 
+          placeholder="Buscar por paciente, diagnóstico ou queixa..."
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+        />
+        <InputGroupAddon>
+          <Search className="h-4 w-4" />
+        </InputGroupAddon>
+        {searchValue.length >= 3 && (
+          <InputGroupAddon align="inline-end" className="text-sm text-gray-600">
+            {isPending ? "Buscando..." : resultsText}
+          </InputGroupAddon>
+        )}
+      </InputGroup>
     </div>
   );
 }

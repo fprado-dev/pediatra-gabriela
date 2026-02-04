@@ -75,7 +75,7 @@ export function AudioPlayer({ consultationId }: AudioPlayerProps) {
   }
 
   return (
-    <div className="pt-8 border-t">
+    <div className="p-6 bg-gray-50/30">
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Volume2 className="h-4 w-4 text-muted-foreground" />

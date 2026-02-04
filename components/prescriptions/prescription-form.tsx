@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,8 +45,16 @@ import {
   Loader2,
   BookMarked,
   FileText,
+  Cake,
+  UserCheck,
+  Weight,
+  Microscope,
+  Ruler,
 } from "lucide-react";
 import { MedicationItem } from "./medication-item";
+import { ptBR } from "date-fns/locale";
+import { PrescriptionFormFAB } from "./prescription-form-fab";
+import { TemplateSelectorModal } from "../templates/template-selector-modal";
 
 interface Medication {
   id: string;
@@ -73,6 +82,7 @@ interface Patient {
   weight?: number;
   allergies?: string;
   currentMedications?: string;
+  height?: number;
 }
 
 interface ClinicalData {
@@ -128,6 +138,9 @@ export function PrescriptionForm({
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const [templateName, setTemplateName] = useState("");
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<{ text: string, id: string } | null>(null);
 
   // Estado do formulário
   const [medications, setMedications] = useState<Medication[]>(
@@ -256,6 +269,38 @@ export function PrescriptionForm({
     toast.success(`Template "${template.name}" carregado!`);
   };
 
+  // Abrir seletor de templates
+  const handleUseTemplate = () => {
+    setShowTemplateSelector(true);
+  };
+
+  // Callback do seletor de templates
+  const handleSelectTemplate = (templateText: string, templateId: string) => {
+    // Verificar se há conteúdo atual
+    const hasContent = medications.some(m => m.name.trim()) ||
+      orientations.trim() ||
+      alertSigns.trim() ||
+      prevention.trim() ||
+      notes.trim();
+
+    if (hasContent) {
+      // Pedir confirmação
+      setPendingTemplate({ text: templateText, id: templateId });
+      setShowReplaceConfirm(true);
+    } else {
+      // Aplicar diretamente
+      applyTemplate(templateText, templateId);
+    }
+  };
+
+  // Aplicar template
+  const applyTemplate = (templateText: string, templateId: string) => {
+    loadTemplate(templateId);
+    setShowTemplateSelector(false);
+    setPendingTemplate(null);
+    setShowReplaceConfirm(false);
+  };
+
   // Salvar como template
   const saveAsTemplate = async () => {
     if (!templateName.trim()) {
@@ -333,330 +378,353 @@ export function PrescriptionForm({
   });
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href={`/consultations/${consultationId}/preview`}>
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
+    <div className="min-h-screen bg-gray-50 py-8">
+      {/* FAB de ações */}
+      <div className="px-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {patient?.name}
+            </h1>
+            <div className="flex items-center gap-4 text-sm text-gray-600 mt-4">
+              {patient?.age && (
+                <div className="flex items-center gap-1.5">
+                  <Cake className="h-3.5 w-3.5 text-gray-400" />
+                  {patient?.age && (
+                    <>
+                      <span className="text-gray-300">•</span>
+                      <span className="text-gray-700 font-medium">{patient?.age}</span>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <Weight className="h-3.5 w-3.5 text-gray-400" />
+                <span>{patient?.weight}kg</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Ruler className="h-3.5 w-3.5 text-gray-400" />
+                <span>{patient?.height}cm</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Microscope className="h-3.5 w-3.5 text-gray-400" />
+                <span>{patient?.allergies}</span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Pill className="h-3.5 w-3.5 text-gray-400" />
+                <span>{patient?.currentMedications}</span>
+              </div>
+
+            </div>
+
+
+
+          </div>
+          <Link href="/consultations">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold">Criar Receita Médica</h1>
-            <p className="text-muted-foreground">
-              Paciente: <strong>{patient.name}</strong>
-              {patient.age && ` (${patient.age})`}
-              {patient.weight && ` • ${patient.weight}kg`}
-            </p>
-          </div>
         </div>
+        <Separator className="my-4" />
 
-        {/* Templates */}
-        {templates.length > 0 && (
-          <Select onValueChange={loadTemplate}>
-            <SelectTrigger className="w-[200px]">
-              <BookMarked className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Carregar template" />
-            </SelectTrigger>
-            <SelectContent>
-              {templates.map((template) => (
-                <SelectItem key={template.id} value={template.id}>
-                  {template.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+        {patient.allergies && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3 mb-4">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-destructive">Alergias do Paciente</p>
+              <p className="text-sm text-destructive/80">{patient.allergies}</p>
+            </div>
+          </div>
         )}
-      </div>
-
-      {/* Alergias */}
-      {patient.allergies && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-destructive">Alergias do Paciente</p>
-            <p className="text-sm text-destructive/80">{patient.allergies}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Diagnóstico */}
-      {clinicalData.diagnosis && (
-        <div className="bg-muted/50 rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Diagnóstico:</p>
-          <p className="font-medium">{clinicalData.diagnosis}</p>
-        </div>
-      )}
-
-      <Separator />
-
-      {/* Seção: Medicamentos */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Pill className="h-5 w-5" />
-            Medicamentos
-          </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => generateSection("medications")}
-            disabled={isGenerating === "medications"}
-          >
-            {isGenerating === "medications" ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
-            Gerar com IA
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {medications.map((med, index) => (
-            <MedicationItem
-              key={med.id}
-              medication={med}
-              index={index}
-              onUpdate={(field, value) => updateMedication(med.id, field, value)}
-              onRemove={() => removeMedication(med.id)}
-              canRemove={medications.length > 1}
-            />
-          ))}
-          <Button variant="outline" onClick={addMedication} className="w-full">
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Medicamento
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Seção: Orientações */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5" />
-            Orientações
-          </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => generateSection("orientations")}
-            disabled={isGenerating === "orientations"}
-          >
-            {isGenerating === "orientations" ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
-            Gerar com IA
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            placeholder="Orientações de cuidado, alimentação, repouso..."
-            value={orientations}
-            onChange={(e) => setOrientations(e.target.value)}
-            rows={5}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Seção: Sinais de Alerta */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Sinais de Alerta
-          </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => generateSection("alertSigns")}
-            disabled={isGenerating === "alertSigns"}
-          >
-            {isGenerating === "alertSigns" ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
-            Gerar com IA
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            placeholder="Quando procurar atendimento médico imediatamente..."
-            value={alertSigns}
-            onChange={(e) => setAlertSigns(e.target.value)}
-            rows={5}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Seção: Prevenção */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Como Prevenir
-          </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => generateSection("prevention")}
-            disabled={isGenerating === "prevention"}
-          >
-            {isGenerating === "prevention" ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
-            Gerar com IA
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            placeholder="Orientações preventivas para evitar novos episódios..."
-            value={prevention}
-            onChange={(e) => setPrevention(e.target.value)}
-            rows={4}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Seção: Anotações */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <StickyNote className="h-5 w-5" />
-            Anotações Adicionais
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="returnDays"
-                checked={returnDays !== null}
-                onCheckedChange={(checked) =>
-                  setReturnDays(checked ? 7 : null)
-                }
-              />
-              <Label htmlFor="returnDays" className="flex items-center gap-2">
-                Retornar em
-                <Input
-                  type="number"
-                  className="w-16 h-8"
-                  value={returnDays || ""}
-                  onChange={(e) =>
-                    setReturnDays(e.target.value ? parseInt(e.target.value) : null)
-                  }
-                  disabled={returnDays === null}
+        <div className="p-2 flex flex-col gap-4">
+          {/*  Seção Medicamentos */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Pill className="h-5 w-5" />
+                Medicamentos
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => generateSection("medications")}
+                disabled={isGenerating === "medications"}
+              >
+                {isGenerating === "medications" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Gerar com IA
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {medications.map((med, index) => (
+                <MedicationItem
+                  key={med.id}
+                  medication={med}
+                  index={index}
+                  onUpdate={(field, value) => updateMedication(med.id, field, value)}
+                  onRemove={() => removeMedication(med.id)}
+                  canRemove={medications.length > 1}
                 />
-                dias
-              </Label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="bringExams"
-                checked={bringExams}
-                onCheckedChange={(checked) => setBringExams(checked as boolean)}
-              />
-              <Label htmlFor="bringExams">Levar resultados de exames</Label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="observeFeeding"
-                checked={observeFeeding}
-                onCheckedChange={(checked) =>
-                  setObserveFeeding(checked as boolean)
-                }
-              />
-              <Label htmlFor="observeFeeding">
-                Observar aceitação alimentar
-              </Label>
-            </div>
-          </div>
-
-          <Textarea
-            placeholder="Outras anotações..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Rodapé Preview */}
-      <div className="bg-muted/30 rounded-lg p-4 text-center text-sm text-muted-foreground">
-        <p className="font-medium">{doctor.name}</p>
-        {doctor.crm && <p>CRM {doctor.crm}</p>}
-        <p className="mt-1">{today}</p>
-      </div>
-
-      <Separator />
-
-      {/* Ações */}
-      <div className="flex items-center justify-between">
-        <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <BookMarked className="h-4 w-4 mr-2" />
-              Salvar como Template
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Salvar como Template</DialogTitle>
-              <DialogDescription>
-                Salve esta receita como um template para reutilizar em futuras consultas.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <Label htmlFor="templateName">Nome do Template</Label>
-              <Input
-                id="templateName"
-                placeholder="Ex: Gastroenterite, Gripe, Otite..."
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                className="mt-2"
-              />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)}>
-                Cancelar
+              ))}
+              <Button variant="outline" onClick={addMedication} className="w-full">
+                <Plus className="h-4 w-4" />
+                Adicionar Medicamento
               </Button>
-              <Button onClick={saveAsTemplate}>
-                <Save className="h-4 w-4 mr-2" />
-                Salvar Template
+            </CardContent>
+          </Card>
+          {/*  Seção Orientações */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="h-5 w-5" />
+                Orientações
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => generateSection("orientations")}
+                disabled={isGenerating === "orientations"}
+              >
+                {isGenerating === "orientations" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Gerar com IA
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Orientações de cuidado, alimentação, repouso..."
+                value={orientations}
+                onChange={(e) => setOrientations(e.target.value)}
+                rows={15}
+                className="resize-none"
+                disabled={isGenerating === "orientations"}
+              />
+            </CardContent>
+          </Card>
 
-        <div className="flex gap-2">
-          <Link href={`/consultations/${consultationId}/preview`}>
-            <Button variant="outline">Cancelar</Button>
-          </Link>
-          <Button onClick={savePrescription} disabled={isSaving}>
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Salvar Receita
-          </Button>
-          {existingPrescription && (
-            <Button asChild variant="secondary">
-              <a href={`/api/prescriptions/${consultationId}/download`} download>
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </a>
-            </Button>
-          )}
+          {/*  Seção Sinais de Alerta */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Sinais de Alerta
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => generateSection("alertSigns")}
+                disabled={isGenerating === "alertSigns"}
+              >
+                {isGenerating === "alertSigns" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Gerar com IA
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Quando procurar atendimento médico imediatamente..."
+                value={alertSigns}
+                onChange={(e) => setAlertSigns(e.target.value)}
+                rows={10}
+                className="resize-none"
+                disabled={isGenerating === "alertSigns"}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Seção: Prevenção */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Como Prevenir
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => generateSection("prevention")}
+                disabled={isGenerating === "prevention"}
+              >
+                {isGenerating === "prevention" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Gerar com IA
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Orientações preventivas para evitar novos episódios..."
+                value={prevention}
+                onChange={(e) => setPrevention(e.target.value)}
+                rows={10}
+                className="resize-none"
+                disabled={isGenerating === "prevention"}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Seção: Anotações */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <StickyNote className="h-5 w-5" />
+                Anotações Adicionais
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="returnDays"
+                    checked={returnDays !== null}
+                    onCheckedChange={(checked) =>
+                      setReturnDays(checked ? 7 : null)
+                    }
+                  />
+                  <Label htmlFor="returnDays" className="flex items-center gap-2">
+                    Retornar em
+                    <Input
+                      type="number"
+                      className="w-16 h-8"
+                      value={returnDays || ""}
+                      onChange={(e) =>
+                        setReturnDays(e.target.value ? parseInt(e.target.value) : null)
+                      }
+                      disabled={returnDays === null}
+                    />
+                    dias
+                  </Label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="bringExams"
+                    checked={bringExams}
+                    onCheckedChange={(checked) => setBringExams(checked as boolean)}
+                  />
+                  <Label htmlFor="bringExams">Levar resultados de exames</Label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="observeFeeding"
+                    checked={observeFeeding}
+                    onCheckedChange={(checked) =>
+                      setObserveFeeding(checked as boolean)
+                    }
+                  />
+                  <Label htmlFor="observeFeeding">
+                    Observar aceitação alimentar
+                  </Label>
+                </div>
+              </div>
+
+              <Textarea
+                placeholder="Outras anotações..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+              />
+            </CardContent>
+          </Card>
+
+
+
         </div>
       </div>
+
+      {/* FAB de Ações */}
+      <PrescriptionFormFAB
+        consultationId={consultationId}
+        isSaving={isSaving}
+        onSave={savePrescription}
+        onUseTemplate={handleUseTemplate}
+        onSaveAsTemplate={() => setShowSaveTemplateDialog(true)}
+        existingPrescription={!!existingPrescription}
+      />
+
+      {/* Modal de Seleção de Templates */}
+      <TemplateSelectorModal
+        open={showTemplateSelector}
+        onOpenChange={setShowTemplateSelector}
+        onSelectTemplate={handleSelectTemplate}
+        patientWeight={patient.weight}
+      />
+
+      {/* Dialog de Confirmação para Substituir Conteúdo */}
+      <Dialog open={showReplaceConfirm} onOpenChange={setShowReplaceConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Substituir Conteúdo Atual?</DialogTitle>
+            <DialogDescription>
+              Você já tem conteúdo preenchido nesta receita. Deseja substituir todo o conteúdo pelo template selecionado?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowReplaceConfirm(false);
+              setPendingTemplate(null);
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={() => {
+              if (pendingTemplate) {
+                applyTemplate(pendingTemplate.text, pendingTemplate.id);
+              }
+            }}>
+              Sim, Substituir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Salvar como Template */}
+      <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salvar como Template</DialogTitle>
+            <DialogDescription>
+              Salve esta receita como um template para reutilizar em futuras consultas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="templateName">Nome do Template</Label>
+            <Input
+              id="templateName"
+              placeholder="Ex: Gastroenterite, Gripe, Otite..."
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveAsTemplate}>
+              <Save className="h-4 w-4" />
+              Salvar Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+

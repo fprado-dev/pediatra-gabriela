@@ -7,17 +7,20 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 15%; /* #272424 aproximado */
+    --foreground: 0 0% 15%;
+    /* #272424 aproximado */
     --card: 0 0% 100%;
     --card-foreground: 0 0% 15%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 15%;
-    --primary: 212 79% 81%; /* #A8C9F5 */
+    --primary: 212 79% 81%;
+    /* #A8C9F5 */
     --primary-foreground: 0 0% 15%;
     --secondary: 212 50% 95%;
     --secondary-foreground: 212 79% 30%;
     --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 20%; /* #343434 aproximado */
+    --muted-foreground: 0 0% 20%;
+    /* #343434 aproximado */
     --accent: 212 70% 90%;
     --accent-foreground: 212 79% 30%;
     --destructive: 0 84.2% 60.2%;
@@ -38,6 +41,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -46,5 +50,78 @@
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
+  }
+}
+
+/* Toast Customization */
+@layer components {
+
+  /* Base toast styles */
+  :root {
+    --toast-success-bg: 134 61% 95%;
+    /* Verde muito claro */
+    --toast-success-border: 134 61% 80%;
+    /* Verde suave */
+    --toast-success-text: 134 61% 25%;
+    /* Verde escuro */
+
+    --toast-error-bg: 0 70% 96%;
+    /* Vermelho muito claro */
+    --toast-error-border: 0 70% 85%;
+    /* Vermelho suave */
+    --toast-error-text: 0 70% 35%;
+    /* Vermelho escuro */
+
+    --toast-warning-bg: 38 92% 95%;
+    /* Laranja muito claro */
+    --toast-warning-border: 38 92% 80%;
+    /* Laranja suave */
+    --toast-warning-text: 38 92% 30%;
+    /* Laranja escuro */
+
+    --toast-info-bg: 212 79% 96%;
+    /* Azul muito claro */
+    --toast-info-border: 212 79% 85%;
+    /* Azul suave */
+    --toast-info-text: 212 79% 30%;
+    /* Azul escuro */
+  }
+
+  .toast-custom {
+    @apply rounded-lg shadow-lg border;
+    z-index: 9999 !important;
+  }
+
+  .toast-success {
+    background-color: hsl(var(--toast-success-bg)) !important;
+    border-color: hsl(var(--toast-success-border)) !important;
+    color: hsl(var(--toast-success-text)) !important;
+    border-width: 1px;
+  }
+
+  .toast-error {
+    background-color: hsl(var(--toast-error-bg)) !important;
+    border-color: hsl(var(--toast-error-border)) !important;
+    color: hsl(var(--toast-error-text)) !important;
+    border-width: 1px;
+  }
+
+  .toast-warning {
+    background-color: hsl(var(--toast-warning-bg)) !important;
+    border-color: hsl(var(--toast-warning-border)) !important;
+    color: hsl(var(--toast-warning-text)) !important;
+    border-width: 1px;
+  }
+
+  .toast-info {
+    background-color: hsl(var(--toast-info-bg)) !important;
+    border-color: hsl(var(--toast-info-border)) !important;
+    color: hsl(var(--toast-info-text)) !important;
+    border-width: 1px;
+  }
+
+  /* Garantir que o container do toast tenha z-index alto */
+  [data-sonner-toaster] {
+    z-index: 9999 !important;
   }
 }

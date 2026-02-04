@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaginationProps {
@@ -31,70 +30,77 @@ export function Pagination({ currentPage, totalPages, buildPageUrl }: Pagination
 
   const visiblePages = getVisiblePages();
 
+  // Classes base para botões
+  const baseButtonClass = "inline-flex items-center justify-center h-9 px-3 text-sm font-medium rounded-md border transition-colors";
+  const normalButtonClass = "bg-white text-gray-600 border-gray-300 hover:bg-gray-50";
+  const activeButtonClass = "bg-gray-200 text-gray-900 border-gray-300 font-semibold";
+  const disabledButtonClass = "opacity-50 cursor-not-allowed pointer-events-none";
+
   return (
-    <div className="flex items-center justify-center gap-2 pt-4">
-      <Button
-        variant="outline"
-        size="sm"
-        asChild
-        disabled={currentPage === 1}
+    <div className="flex items-center justify-end gap-2 pt-6">
+      {/* Botão Anterior */}
+      <Link
+        href={currentPage > 1 ? buildPageUrl(currentPage - 1) : "#"}
+        className={`${baseButtonClass} ${normalButtonClass} gap-1 ${currentPage === 1 ? disabledButtonClass : ""}`}
+        aria-disabled={currentPage === 1}
       >
-        <Link href={currentPage > 1 ? buildPageUrl(currentPage - 1) : "#"}>
-          <ChevronLeft className="h-4 w-4" />
-          Anterior
-        </Link>
-      </Button>
+        <ChevronLeft className="h-4 w-4" />
+        <span className="hidden sm:inline">Anterior</span>
+      </Link>
 
-      <div className="flex items-center gap-1">
-        {/* Primeira página se não visível */}
-        {visiblePages[0] > 1 && (
-          <>
-            <Button variant="outline" size="sm" className="w-8 h-8 p-0" asChild>
-              <Link href={buildPageUrl(1)}>1</Link>
-            </Button>
-            {visiblePages[0] > 2 && (
-              <span className="px-2 text-muted-foreground">...</span>
-            )}
-          </>
-        )}
-
-        {/* Páginas visíveis */}
-        {visiblePages.map((page) => (
-          <Button
-            key={page}
-            variant={currentPage === page ? "default" : "outline"}
-            size="sm"
-            className="w-8 h-8 p-0"
-            asChild
+      {/* Primeira página se não visível */}
+      {visiblePages[0] > 1 && (
+        <>
+          <Link
+            href={buildPageUrl(1)}
+            className={`${baseButtonClass} ${normalButtonClass} w-9 p-0`}
           >
-            <Link href={buildPageUrl(page)}>{page}</Link>
-          </Button>
-        ))}
+            1
+          </Link>
+          {visiblePages[0] > 2 && (
+            <span className="px-1 text-gray-400 text-sm">...</span>
+          )}
+        </>
+      )}
 
-        {/* Última página se não visível */}
-        {visiblePages[visiblePages.length - 1] < totalPages && (
-          <>
-            {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
-              <span className="px-2 text-muted-foreground">...</span>
-            )}
-            <Button variant="outline" size="sm" className="w-8 h-8 p-0" asChild>
-              <Link href={buildPageUrl(totalPages)}>{totalPages}</Link>
-            </Button>
-          </>
-        )}
-      </div>
-
-      <Button
-        variant="outline"
-        size="sm"
-        asChild
-        disabled={currentPage === totalPages}
-      >
-        <Link href={currentPage < totalPages ? buildPageUrl(currentPage + 1) : "#"}>
-          Próximo
-          <ChevronRight className="h-4 w-4" />
+      {/* Páginas visíveis */}
+      {visiblePages.map((page) => (
+        <Link
+          key={page}
+          href={buildPageUrl(page)}
+          className={`${baseButtonClass} w-9 p-0 ${
+            currentPage === page ? activeButtonClass : normalButtonClass
+          }`}
+          aria-current={currentPage === page ? "page" : undefined}
+        >
+          {page}
         </Link>
-      </Button>
+      ))}
+
+      {/* Última página se não visível */}
+      {visiblePages[visiblePages.length - 1] < totalPages && (
+        <>
+          {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
+            <span className="px-1 text-gray-400 text-sm">...</span>
+          )}
+          <Link
+            href={buildPageUrl(totalPages)}
+            className={`${baseButtonClass} ${normalButtonClass} w-9 p-0`}
+          >
+            {totalPages}
+          </Link>
+        </>
+      )}
+
+      {/* Botão Próximo */}
+      <Link
+        href={currentPage < totalPages ? buildPageUrl(currentPage + 1) : "#"}
+        className={`${baseButtonClass} ${normalButtonClass} gap-1 ${currentPage === totalPages ? disabledButtonClass : ""}`}
+        aria-disabled={currentPage === totalPages}
+      >
+        <span className="hidden sm:inline">Próxima</span>
+        <ChevronRight className="h-4 w-4" />
+      </Link>
     </div>
   );
 }

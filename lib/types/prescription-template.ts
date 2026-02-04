@@ -18,9 +18,14 @@ export interface PrescriptionTemplate {
   name: string;
   category: string;
   medications: Medication[];
-  instructions?: string;           // Orientações gerais
-  warnings?: string;               // Alertas importantes
+  instructions?: string;           // Orientações gerais (legado)
+  warnings?: string;               // Alertas importantes (legado)
+  orientations?: string;           // Orientações de cuidado, alimentação, repouso
+  alert_signs?: string;            // Sinais de alerta
+  prevention?: string;             // Como prevenir
+  notes?: string;                  // Anotações adicionais
   is_favorite: boolean;
+  is_open_template: boolean;       // Se true, template da comunidade; se false, apenas do criador
   usage_count: number;
   created_at: string;
   updated_at: string;
@@ -57,7 +62,7 @@ export type TemplateCategory = typeof TEMPLATE_CATEGORIES[number];
 // Helper para formatar medicação
 export function formatMedication(med: Medication, patientWeight?: number): string {
   let result = med.name;
-  
+
   // Calcular dosagem se tiver peso do paciente
   if (patientWeight && med.dosage.includes("mg/kg")) {
     const dosagePerKg = parseFloat(med.dosage.match(/[\d.]+/)?.[0] || "0");
@@ -66,23 +71,23 @@ export function formatMedication(med: Medication, patientWeight?: number): strin
   } else {
     result += ` ${med.dosage}`;
   }
-  
+
   if (med.frequency) {
     result += `, ${med.frequency}`;
   }
-  
+
   if (med.route) {
     result += ` (${med.route})`;
   }
-  
+
   if (med.condition) {
     result += `, ${med.condition}`;
   }
-  
+
   if (med.duration) {
     result += `, ${med.duration}`;
   }
-  
+
   return result;
 }
 
@@ -92,7 +97,7 @@ export function formatTemplate(
   patientWeight?: number
 ): string {
   let result = "";
-  
+
   // Medicações
   if (template.medications.length > 0) {
     result += "PRESCRIÇÃO:\n";
@@ -101,18 +106,32 @@ export function formatTemplate(
     });
     result += "\n";
   }
-  
-  // Instruções
-  if (template.instructions) {
+
+  // Orientações (usar novo campo ou legado)
+  const orientations = template.orientations || template.instructions;
+  if (orientations) {
     result += "ORIENTAÇÕES:\n";
-    result += template.instructions + "\n\n";
+    result += orientations + "\n\n";
   }
-  
-  // Alertas
-  if (template.warnings) {
-    result += "⚠️  ATENÇÃO:\n";
-    result += template.warnings + "\n";
+
+  // Sinais de Alerta (usar novo campo ou legado)
+  const alertSigns = template.alert_signs || template.warnings;
+  if (alertSigns) {
+    result += "⚠️ SINAIS DE ALERTA:\n";
+    result += alertSigns + "\n\n";
   }
-  
+
+  // Prevenção
+  if (template.prevention) {
+    result += "COMO PREVENIR:\n";
+    result += template.prevention + "\n\n";
+  }
+
+  // Notas
+  if (template.notes) {
+    result += "OBSERVAÇÕES:\n";
+    result += template.notes + "\n";
+  }
+
   return result.trim();
 }

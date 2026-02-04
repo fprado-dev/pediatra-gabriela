@@ -1,20 +1,23 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  FileText, 
-  User, 
-  Clock, 
-  CheckCircle2, 
-  Loader2, 
-  AlertCircle,
-  ArrowRight 
+import {
+  User,
+  Cake,
+  Stethoscope,
+  MessageSquare,
+  Clock,
+  ArrowRight,
+  FileText,
+  Loader2,
+  Search,
+  Eye,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, differenceInYears, differenceInMonths, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Badge } from "../ui/badge";
 
 interface Patient {
   id: string;
@@ -29,20 +32,88 @@ interface Consultation {
   created_at: string;
   audio_duration_seconds: number;
   chief_complaint?: string;
+  diagnosis?: string;
   patient?: Patient;
 }
 
 interface ConsultationListProps {
   consultations: Consultation[];
+  isSearching?: boolean;
+  hasAnyConsultations?: boolean;
 }
 
-export function ConsultationList({ consultations }: ConsultationListProps) {
-  if (consultations.length === 0) {
+// Função para calcular idade detalhada
+function calculateDetailedAge(birthDate: string): string {
+  const birth = new Date(birthDate);
+  const today = new Date();
+
+  let years = today.getFullYear() - birth.getFullYear();
+  let months = today.getMonth() - birth.getMonth();
+  let days = today.getDate() - birth.getDate();
+
+  if (days < 0) {
+    months--;
+    const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += lastMonth.getDate();
+  }
+
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  // Formatação baseada na idade
+  if (years === 0 && months === 0) {
+    return `${days} ${days === 1 ? 'dia' : 'dias'}`;
+  } else if (years === 0) {
+    if (days === 0) {
+      return `${months} ${months === 1 ? 'mês' : 'meses'}`;
+    }
+    return `${months} ${months === 1 ? 'mês' : 'meses'} e ${days} ${days === 1 ? 'dia' : 'dias'}`;
+  } else {
+    if (months === 0) {
+      return `${years} ${years === 1 ? 'ano' : 'anos'}`;
+    }
+    return `${years} ${years === 1 ? 'ano' : 'anos'} e ${months} ${months === 1 ? 'mês' : 'meses'}`;
+  }
+}
+
+export function ConsultationList({
+  consultations,
+  isSearching = false,
+  hasAnyConsultations = true
+}: ConsultationListProps) {
+  // Empty State - Nenhuma consulta criada ainda
+  if (!hasAnyConsultations && consultations.length === 0 && !isSearching) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p className="text-sm">
-          Nenhuma consulta ainda. Comece gravando sua primeira consulta!
+      <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
+        <Stethoscope className="h-16 w-16 text-gray-300 mb-6" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          Nenhuma consulta registrada
+        </h3>
+        <p className="text-gray-500 mb-8 max-w-md">
+          Comece criando sua primeira consulta com gravação de áudio e documentação automática por IA
+        </p>
+        <Link href="/consultations/new-recording">
+          <Button size="lg" className="gap-2">
+            <FileText className="h-5 w-5" />
+            Nova Consulta
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // Busca Sem Resultados
+  if (consultations.length === 0 && isSearching) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white border border-gray-200 rounded-lg">
+        <Search className="h-12 w-12 text-gray-400 mb-4" />
+        <h3 className="text-base font-medium text-gray-700 mb-1">
+          Nenhuma consulta encontrada
+        </h3>
+        <p className="text-sm text-gray-500">
+          Tente buscar por outro termo
         </p>
       </div>
     );
@@ -54,43 +125,57 @@ export function ConsultationList({ consultations }: ConsultationListProps) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case "completed":
-        return (
-          <Badge className="bg-green-100 text-green-800 border-green-200">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Completo
-          </Badge>
-        );
+        return {
+          dot: "bg-green-600",
+          text: "text-gray-700",
+          label: "Completo",
+        };
       case "processing":
-        return (
-          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-            Processando
-          </Badge>
-        );
+        return {
+          dot: "bg-blue-600",
+          text: "text-gray-700",
+          label: "Processando",
+        };
       case "error":
-        return (
-          <Badge className="bg-red-100 text-red-800 border-red-200">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Erro
-          </Badge>
-        );
+        return {
+          dot: "bg-red-600",
+          text: "text-gray-700",
+          label: "Erro",
+        };
       default:
-        return null;
+        return {
+          dot: "bg-gray-600",
+          text: "text-gray-700",
+          label: "Desconhecido",
+        };
     }
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {consultations.map((consultation) => (
-        <Card key={consultation.id} className="hover:shadow-md transition-shadow flex flex-col">
-          <CardContent className="p-4 flex flex-col flex-1">
-            {/* Header: Status */}
-            <div className="flex items-center justify-between mb-3">
-              {getStatusBadge(consultation.status)}
-              <span className="text-xs text-muted-foreground">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+      {consultations.map((consultation) => {
+        const statusConfig = getStatusConfig(consultation.status);
+        const patientAge = consultation.patient?.date_of_birth
+          ? calculateDetailedAge(consultation.patient.date_of_birth)
+          : null;
+
+        return (
+          <div
+            key={consultation.id}
+            className="bg-white border border-gray-200 rounded-lg flex flex-col"
+          >
+            {/* Header: Status + Tempo */}
+            <div className="p-4 flex items-center justify-between border-b border-gray-100">
+              <Badge variant="outline" className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
+                <span className={`text-xs font-medium ${statusConfig.text}`}>
+                  {statusConfig.label}
+                </span>
+              </Badge>
+              <span className="text-xs text-gray-500">
                 {formatDistanceToNow(new Date(consultation.created_at), {
                   addSuffix: true,
                   locale: ptBR,
@@ -98,64 +183,92 @@ export function ConsultationList({ consultations }: ConsultationListProps) {
               </span>
             </div>
 
-            {/* Paciente */}
-            <div className="flex items-center gap-2 mb-2">
-              <User className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="font-semibold text-sm truncate">
-                {consultation.patient?.full_name || "Paciente não encontrado"}
-              </span>
-            </div>
-
-            {/* Queixa principal */}
-            <div className="flex-1 mb-3">
-              {consultation.chief_complaint ? (
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {consultation.chief_complaint}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">
-                  {consultation.status === "processing" 
-                    ? "Processando com IA..."
-                    : "Queixa não disponível"}
-                </p>
-              )}
-            </div>
-
-            {/* Footer: Metadados + Ação */}
-            <div className="flex items-center justify-between pt-3 border-t">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                <span>{formatDuration(consultation.audio_duration_seconds)}</span>
+            {/* Body: Informações */}
+            <div className="p-4 flex-1 space-y-3">
+              {/* Nome do Paciente */}
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-gray-400 shrink-0" />
+                <span className="font-semibold text-gray-900 truncate">
+                  {consultation.patient?.full_name || "Paciente não encontrado"}
+                </span>
               </div>
 
+              {/* Idade */}
+              {patientAge && (
+                <div className="flex items-center gap-2">
+                  <Cake className="h-4 w-4 text-gray-400 shrink-0" />
+                  <span className="text-sm text-gray-600">
+                    {patientAge}
+                  </span>
+                </div>
+              )}
+
+              {/* Diagnóstico */}
+              {consultation.diagnosis ? (
+                <div className="flex items-start gap-2">
+                  <Stethoscope className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
+                  <span className="text-sm text-gray-700 line-clamp-2">
+                    {consultation.diagnosis}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <Stethoscope className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
+                  <span className="text-sm text-gray-500 italic">
+                    {consultation.status === "processing"
+                      ? "Processando diagnóstico..."
+                      : "Diagnóstico não disponível"}
+                  </span>
+                </div>
+              )}
+
+              {/* Queixa */}
+              {consultation.chief_complaint && (
+                <div className="flex items-start gap-2">
+                  <MessageSquare className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
+                  <span className="text-sm text-gray-600 line-clamp-2">
+                    {consultation.chief_complaint}
+                  </span>
+                </div>
+              )}
+
+              {/* Duração */}
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-600">
+                  {formatDuration(consultation.audio_duration_seconds)} de duração.
+                </span>
+              </div>
+            </div>
+
+            {/* Footer: Ação */}
+            <div className="p-4 flex justify-end border-t border-gray-100">
               {consultation.status === "completed" && (
-                <Link href={`/consultations/${consultation.id}/preview`}>
-                  <Button size="sm" variant="default">
-                    Ver
-                    <ArrowRight className="h-3 w-3 ml-1" />
+                <Link href={`/consultations/${consultation.id}/preview`} className="block">
+                  <Button className="gap-2 cursor-pointer" size="xs">
+                    <Eye className="h-3 w-3" />
+                    Ver Consulta
                   </Button>
                 </Link>
               )}
               {consultation.status === "processing" && (
-                <Link href={`/consultations/${consultation.id}/preview`}>
-                  <Button size="sm" variant="outline">
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Aguardar
+                <Link href={`/consultations/${consultation.id}/preview`} className="block">
+                  <Button variant="outline" className="gap-2" size="icon-sm" disabled>
+                    <Loader2 className="h-3 w-3 animate-spin" />
                   </Button>
                 </Link>
               )}
               {consultation.status === "error" && (
-                <Link href={`/consultations/${consultation.id}/preview`}>
-                  <Button size="sm" variant="destructive">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Ver Erro
+                <Link href={`/consultations/${consultation.id}/preview`} className="block">
+                  <Button variant="destructive" className="gap-2" size="icon-sm">
+                    <AlertCircle className="h-3 w-3" />
                   </Button>
                 </Link>
               )}
             </div>
-          </CardContent>
-        </Card>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

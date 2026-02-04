@@ -1,30 +1,27 @@
-import { PageHeaderSkeleton } from "@/components/skeletons/page-header-skeleton";
-import { CardGridSkeleton } from "@/components/skeletons/list-skeleton";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ConsultationListSkeleton } from "@/components/consultations/consultation-skeleton";
+import { Separator } from "@/components/ui/separator";
 
 export default function ConsultationsLoading() {
   return (
-    <div className="space-y-6">
-      <PageHeaderSkeleton />
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="px-6 max-w-7xl mx-auto space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-9 w-72 bg-gray-200 rounded animate-pulse" />
+            <div className="h-5 w-96 bg-gray-200 rounded animate-pulse" />
+          </div>
+          <div className="h-9 w-36 bg-gray-200 rounded animate-pulse" />
+        </div>
 
-      {/* Filters skeleton */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Skeleton className="h-10 flex-1" />
-        <Skeleton className="h-10 w-[180px]" />
-        <Skeleton className="h-10 w-[180px]" />
+        <Separator className="my-4" />
+
+        {/* Search Skeleton */}
+        <div className="h-11 max-w-md bg-gray-200 rounded animate-pulse" />
+
+        {/* Cards Skeleton */}
+        <ConsultationListSkeleton count={2} />
       </div>
-
-      {/* List card */}
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-4 w-56" />
-        </CardHeader>
-        <CardContent>
-          <CardGridSkeleton items={6} />
-        </CardContent>
-      </Card>
     </div>
   );
 }

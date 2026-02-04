@@ -1,17 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Mic, FileText, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import Link from "next/link";
 import { ConsultationList } from "@/components/consultations/consultation-list";
 import { ConsultationFilters } from "@/components/consultations/consultation-filters";
 import { Pagination } from "@/components/consultations/pagination";
+import { Separator } from "@/components/ui/separator";
 
 export const dynamic = 'force-dynamic';
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 8;
 
 export default async function ConsultationsPage({
   searchParams,
@@ -57,7 +56,7 @@ export default async function ConsultationsPage({
     filteredPatient = patientData;
   }
 
-  // Construir query base
+  // Construir query base (incluindo diagnosis para busca expandida)
   let query = supabase
     .from("consultations")
     .select(`
@@ -67,6 +66,7 @@ export default async function ConsultationsPage({
       created_at,
       audio_duration_seconds,
       chief_complaint,
+      diagnosis,
       patient:patients (
         id,
         full_name,
@@ -110,31 +110,68 @@ export default async function ConsultationsPage({
     query = query.gte("created_at", startDate.toISOString());
   }
 
-  // Aplicar busca por nome do paciente ou queixa
+  // Se houver busca, buscar TODOS os registros sem filtro para fazer busca client-side
+  // Caso contrário, aplicar paginação normal
+  let rawConsultations;
+  let totalCount = 0;
+
   if (searchTerm) {
-    query = query.or(`chief_complaint.ilike.%${searchTerm}%`);
+    // Buscar TODOS os registros SEM filtro no servidor
+    const { data, error } = await query.order("created_at", { ascending: false });
+    
+    if (error) {
+      console.error("Erro ao buscar consultas:", error);
+    }
+
+    // Transformar dados
+    let allConsultations = (data || []).map((c: any) => ({
+      ...c,
+      patient: Array.isArray(c.patient) ? c.patient[0] : c.patient,
+    }));
+
+    // Filtrar client-side por nome do paciente, diagnóstico e queixa
+    const searchLower = searchTerm.toLowerCase();
+    allConsultations = allConsultations.filter((c: any) => {
+      const patientName = c.patient?.full_name?.toLowerCase() || '';
+      const chiefComplaint = c.chief_complaint?.toLowerCase() || '';
+      const diagnosis = c.diagnosis?.toLowerCase() || '';
+      
+      return patientName.includes(searchLower) ||
+             chiefComplaint.includes(searchLower) ||
+             diagnosis.includes(searchLower);
+    });
+
+    totalCount = allConsultations.length;
+
+    // Aplicar paginação manual
+    const offset = (currentPage - 1) * ITEMS_PER_PAGE;
+    rawConsultations = allConsultations.slice(offset, offset + ITEMS_PER_PAGE);
+  } else {
+    // Sem busca: usar paginação normal no servidor
+    const { count } = await query;
+    totalCount = count || 0;
+
+    const offset = (currentPage - 1) * ITEMS_PER_PAGE;
+    const { data, error } = await query
+      .order("created_at", { ascending: false })
+      .range(offset, offset + ITEMS_PER_PAGE - 1);
+
+    if (error) {
+      console.error("Erro ao buscar consultas:", error);
+    }
+
+    rawConsultations = data || [];
   }
 
-  // Contar total antes de paginar
-  const { count: totalCount } = await query;
+  // Transformar para o formato correto (se ainda não foi transformado)
+  const consultations = Array.isArray(rawConsultations[0]?.patient)
+    ? rawConsultations.map((c: any) => ({
+        ...c,
+        patient: Array.isArray(c.patient) ? c.patient[0] : c.patient,
+      }))
+    : rawConsultations;
 
-  // Aplicar paginação
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE;
-  const { data: rawConsultations, error } = await query
-    .order("created_at", { ascending: false })
-    .range(offset, offset + ITEMS_PER_PAGE - 1);
-
-  if (error) {
-    console.error("Erro ao buscar consultas:", error);
-  }
-
-  // Transformar para o formato correto (patient de array para objeto)
-  const consultations = rawConsultations?.map((c: any) => ({
-    ...c,
-    patient: Array.isArray(c.patient) ? c.patient[0] : c.patient,
-  })) || [];
-
-  const totalPages = Math.ceil((totalCount || 0) / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   // Construir URL base para paginação (mantendo filtros)
   const buildPageUrl = (page: number) => {
@@ -148,95 +185,52 @@ export default async function ConsultationsPage({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <FileText className="h-8 w-8" />
-            Consultas
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie suas consultas gravadas e processadas por IA
-          </p>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="px-6 max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Histórico de Consultas
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Acesse o histórico completo de atendimentos em um só lugar
+            </p>
+          </div>
+          <Link href="/consultations/new-recording">
+            <Button size="sm" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nova Consulta
+            </Button>
+          </Link>
         </div>
-        <Link href="/consultations/new-recording">
-          <Button size="lg" className="gap-2">
-            <Mic className="h-5 w-5" />
-            Nova Consulta
-          </Button>
-        </Link>
+
+        <Separator className="my-4" />
+       
+
+        {/* Busca */}
+        <ConsultationFilters 
+          currentSearch={searchTerm || ""}
+          patientId={patientId}
+          totalResults={consultations.length}
+        />
+
+        {/* Lista de consultas ou Empty State */}
+        <ConsultationList 
+          consultations={consultations || []} 
+          isSearching={!!searchTerm}
+          hasAnyConsultations={!!totalCount && totalCount > 0}
+        />
+        
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            buildPageUrl={buildPageUrl}
+          />
+        )}
       </div>
-
-      {/* Filtro de paciente ativo */}
-      {filteredPatient && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Filtrando por:</span>
-          <Badge variant="secondary" className="gap-2">
-            {filteredPatient.full_name}
-            <Link href="/consultations">
-              <X className="h-3 w-3 hover:text-destructive cursor-pointer" />
-            </Link>
-          </Badge>
-        </div>
-      )}
-
-      {/* Filtros */}
-      <ConsultationFilters 
-        currentStatus={statusFilter || "all"}
-        currentPeriod={periodFilter || "all"}
-        currentSearch={searchTerm || ""}
-        patientId={patientId}
-      />
-
-      {/* CTA para nova consulta (apenas se não houver consultas) */}
-      {(!consultations || consultations.length === 0) && !statusFilter && !periodFilter && !searchTerm && (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mic className="h-5 w-5" />
-              Pronto para começar?
-            </CardTitle>
-            <CardDescription>
-              Grave uma consulta e deixe a IA gerar automaticamente toda a documentação clínica
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/consultations/new-recording">
-              <Button size="lg" className="gap-2">
-                <Mic className="h-5 w-5" />
-                Nova Consulta com Gravação
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Lista de consultas */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {filteredPatient ? `Consultas de ${filteredPatient.full_name}` : "Consultas"}
-          </CardTitle>
-          <CardDescription>
-            {totalCount && totalCount > 0
-              ? `${totalCount} consulta${totalCount > 1 ? 's' : ''} encontrada${totalCount > 1 ? 's' : ''}`
-              : "Nenhuma consulta encontrada"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ConsultationList consultations={consultations || []} />
-          
-          {/* Paginação */}
-          {totalPages > 1 && (
-            <Pagination 
-              currentPage={currentPage}
-              totalPages={totalPages}
-              buildPageUrl={buildPageUrl}
-            />
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

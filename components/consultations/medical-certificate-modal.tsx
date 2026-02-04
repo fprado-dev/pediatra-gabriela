@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +43,7 @@ interface MedicalCertificateModalProps {
   doctorName: string;
   doctorCRM: string;
   doctorSpecialty?: string;
+  variant?: "default" | "icon";
 }
 
 export function MedicalCertificateModal({
@@ -53,6 +55,7 @@ export function MedicalCertificateModal({
   doctorName,
   doctorCRM,
   doctorSpecialty,
+  variant = "default",
 }: MedicalCertificateModalProps) {
   const [open, setOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<CertificateType | null>(null);
@@ -204,13 +207,40 @@ export function MedicalCertificateModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <FileText className="h-4 w-4 mr-2" />
-          Gerar Atestado
-        </Button>
-      </DialogTrigger>
+    <>
+      {variant === "icon" ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  size="icon"
+                  className="h-12 w-12 rounded-full shadow-lg bg-white hover:bg-gray-50 text-gray-900 border border-gray-200"
+                >
+                  <FileText className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              {renderDialogContent()}
+            </Dialog>
+          </TooltipTrigger>
+          <TooltipContent side="left">Gerar Atestado</TooltipContent>
+        </Tooltip>
+      ) : (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <FileText className="h-4 w-4 mr-2" />
+              Gerar Atestado
+            </Button>
+          </DialogTrigger>
+          {renderDialogContent()}
+        </Dialog>
+      )}
+    </>
+  );
+
+  function renderDialogContent() {
+    return (
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         {!selectedType ? (
           <>
@@ -559,6 +589,6 @@ export function MedicalCertificateModal({
           </>
         )}
       </DialogContent>
-    </Dialog>
-  );
+    );
+  }
 }

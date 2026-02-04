@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import { PrescriptionForm } from "@/components/prescriptions/prescription-form";
+import { calculateDetailedAge } from "../preview/page";
 
 export const dynamic = 'force-dynamic';
 
@@ -66,25 +67,7 @@ export default async function PrescriptionPage({
     ? consultation.patient[0]
     : consultation.patient;
 
-  // Calcular idade do paciente
-  let patientAge: string | null = null;
-  if (patient?.date_of_birth) {
-    const birth = new Date(patient.date_of_birth);
-    const today = new Date();
-    let years = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      years--;
-    }
-    
-    if (years === 0) {
-      const months = monthDiff + (today.getDate() >= birth.getDate() ? 0 : -1) + 12;
-      patientAge = `${months % 12} ${months % 12 === 1 ? 'mês' : 'meses'}`;
-    } else {
-      patientAge = `${years} ${years === 1 ? 'ano' : 'anos'}`;
-    }
-  }
+  const patientAge = calculateDetailedAge(patient.date_of_birth);
 
   return (
     <PrescriptionForm
@@ -95,6 +78,7 @@ export default async function PrescriptionPage({
         age: patientAge,
         weight: patient?.weight_kg,
         allergies: patient?.allergies,
+        height: patient?.height_cm,
         currentMedications: patient?.current_medications,
       }}
       clinicalData={{

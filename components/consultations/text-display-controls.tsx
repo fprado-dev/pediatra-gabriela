@@ -53,34 +53,7 @@ export function TextDisplayControls({
 }: TextDisplayControlsProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        {MODES.map((modeOption) => {
-          const Icon = modeOption.icon;
-          const isActive = mode === modeOption.id;
-          
-          return (
-            <Button
-              key={modeOption.id}
-              variant={isActive ? "default" : "outline"}
-              size="sm"
-              onClick={() => onModeChange(modeOption.id)}
-              disabled={isLoading}
-              className={cn(
-                "gap-2 transition-all",
-                isActive && "shadow-sm"
-              )}
-              title={modeOption.description}
-            >
-              {isLoading && mode === modeOption.id ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Icon className="h-3.5 w-3.5" />
-              )}
-              {modeOption.label}
-            </Button>
-          );
-        })}
-      </div>
+     
       
       {/* Indicadores */}
       {wordCount && (

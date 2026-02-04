@@ -62,6 +62,10 @@ export async function POST(request: NextRequest) {
       const sessionDir = join(tmpdir(), 'audio-chunks', sessionId);
       console.log(`📂 Procurando chunks em: ${sessionDir}`);
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d71df0d2-957e-4675-996e-9c84a33114de', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'upload-audio/route.ts:67', message: 'Tentando ler diretório de chunks', data: { sessionId, sessionDir, tmpdir: tmpdir(), hostname: process.env.HOSTNAME || 'unknown', awsLambdaFunctionName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'none' }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'D' }) }).catch(() => { });
+      // #endregion
+
       try {
         // Ler todos os chunks
         const chunkFiles = await readdir(sessionDir);
@@ -106,6 +110,10 @@ export async function POST(request: NextRequest) {
         console.log(`🗑️  Chunks temporários removidos`);
       } catch (chunkError: any) {
         console.error("❌ Erro ao processar chunks:", chunkError);
+
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d71df0d2-957e-4675-996e-9c84a33114de', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'upload-audio/route.ts:111', message: 'Falha ao processar chunks', data: { sessionId, sessionDir, errorCode: chunkError.code, errorMessage: chunkError.message, errorStack: chunkError.stack?.split('\n')[0], hostname: process.env.HOSTNAME || 'unknown', awsLambdaFunctionName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'none' }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'D' }) }).catch(() => { });
+        // #endregion
 
         // Tentar limpar chunks em caso de erro
         try {

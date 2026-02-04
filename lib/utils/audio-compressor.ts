@@ -3,8 +3,6 @@
  * Usa Web Audio API + lamejs para converter para MP3 com bitrate otimizado
  */
 
-import { encode } from "lamejs";
-
 interface CompressionOptions {
   bitrate?: number; // kbps (padrão: 96)
   sampleRate?: number; // Hz (padrão: 44100)
@@ -78,8 +76,11 @@ export async function compressAudio(
 
     onProgress?.(60);
 
+    // Importar lamejs dinamicamente (evita problemas com Turbopack)
+    const lamejs = await import("lamejs");
+
     // Configurar encoder MP3
-    const mp3encoder = new encode(
+    const mp3encoder = new lamejs.Mp3Encoder(
       audioBuffer.numberOfChannels === 2 ? 2 : 1, // channels
       sampleRate,
       bitrate

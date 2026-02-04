@@ -11,11 +11,14 @@ import { PatientSelector } from "./patient-selector";
 import { PatientMiniCard } from "./patient-mini-card";
 import { ProcessingStatus } from "./processing-status";
 import { StepIndicator } from "./step-indicator";
+import { DuplicateAudioDialog } from "./duplicate-audio-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, AlertCircle, CheckCircle2, Sparkles, Clock, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+import { calculateAudioHash } from "@/lib/utils/calculate-audio-hash";
+import { divideIntoChunks, shouldUseChunking, generateSessionId } from "@/lib/utils/audio-chunker";
 
 interface Patient {
   id: string;
@@ -68,10 +71,27 @@ export function NewConsultationRecording({
   const [error, setError] = useState<string | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Audio state
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioDuration, setAudioDuration] = useState<number>(0);
+  const [audioHash, setAudioHash] = useState<string | null>(null);
+
+  // Duplicate detection state
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    existingConsultation: {
+      id: string;
+      patientId: string;
+      patientName: string;
+      createdAt: string;
+      status: string;
+      hasTranscription: boolean;
+    };
+    isSamePatient: boolean;
+  } | null>(null);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [isReusing, setIsReusing] = useState(false);
 
   // Avança automaticamente se paciente já está selecionado (vindo da agenda)
   useEffect(() => {
@@ -143,13 +163,209 @@ export function NewConsultationRecording({
     setIsUploading(true);
     setError(null);
     setProcessingError(null);
+    setUploadProgress(0);
 
     try {
+      const audioSizeMB = audioBlob.size / (1024 * 1024);
+      const useChunking = shouldUseChunking(audioBlob.size);
+      
+      if (useChunking) {
+        console.log(`📦 Arquivo grande (${audioSizeMB.toFixed(1)}MB), usando upload chunked`);
+        toast.info("Enviando arquivo grande em partes...", {
+          description: `${audioSizeMB.toFixed(1)}MB será dividido em chunks de 4MB`,
+        });
+      }
+      
+      let hash: string | null = null;
+      // 1. Calcular hash do áudio (sempre, mesmo para arquivos grandes)
+      console.log("🔢 Calculando hash do áudio...");
+      setUploadProgress(5);
+      
+      try {
+        hash = await calculateAudioHash(audioBlob);
+        setAudioHash(hash);
+        console.log(`✅ Hash calculado: ${hash.substring(0, 16)}...`);
+        setUploadProgress(10);
+      } catch (hashError) {
+        console.warn("⚠️ Não foi possível calcular hash, continuando sem verificação:", hashError);
+      }
+
+      // 2. Verificar se é duplicata (sempre, mesmo para arquivos grandes)
+      if (hash) {
+        console.log("🔍 Verificando duplicatas...");
+        setUploadProgress(15);
+        
+        try {
+          const checkResponse = await fetch(
+            `/api/consultations/check-duplicate?hash=${hash}&patientId=${selectedPatientId}`
+          );
+          
+          if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
+            
+            // Se encontrou duplicata, mostrar diálogo e parar aqui
+            if (checkData.duplicate) {
+              console.log("♻️ Duplicata detectada, mostrando opções ao usuário");
+              setDuplicateInfo(checkData);
+              setShowDuplicateDialog(true);
+              setIsUploading(false);
+              setUploadProgress(0);
+              return; // Para aqui e aguarda decisão do usuário
+            } else {
+              console.log("✅ Nenhuma duplicata encontrada, prosseguindo com upload");
+            }
+          } else {
+            console.warn("⚠️ Erro ao verificar duplicatas, continuando com upload normal");
+          }
+        } catch (checkError) {
+          console.warn("⚠️ Falha na verificação de duplicatas, continuando:", checkError);
+        }
+      }
+      
+      setUploadProgress(20);
+
+      // 3. Fazer upload (chunked ou normal dependendo do tamanho)
+      if (useChunking) {
+        await uploadChunked(hash);
+      } else {
+        await uploadAudioNormally(hash);
+      }
+    } catch (err: any) {
+      console.error("❌ Erro no processo de upload:", err);
+      setError(err.message || "Erro ao processar áudio");
+      toast.error("Erro ao enviar áudio");
+      setIsUploading(false);
+    }
+  };
+
+  // Função para upload chunked (arquivos grandes)
+  const uploadChunked = async (hash: string | null) => {
+    try {
+      if (!audioBlob) throw new Error("Áudio não disponível");
+      
+      // Determinar nome e tipo do arquivo baseado no blob
+      const fileType = audioBlob.type || "audio/webm";
+      const extension = fileType.includes("mp4") ? "mp4" : fileType.includes("webm") ? "webm" : "mp3";
+      const fileName = `audio.${extension}`;
+      
+      console.log(`📝 Arquivo detectado: ${fileName} (${fileType})`);
+      
+      const chunks = divideIntoChunks(audioBlob, undefined, fileName);
+      const sessionId = chunks[0].metadata.sessionId; // Usar sessionId dos chunks
+      
+      console.log(`🧩 Iniciando upload chunked: ${chunks.length} chunks (session: ${sessionId.substring(0, 20)}...)`);
+      
+      // Enviar cada chunk sequencialmente
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const formData = new FormData();
+        
+        formData.append("chunk", chunk.blob);
+        formData.append("sessionId", chunk.metadata.sessionId);
+        formData.append("chunkIndex", chunk.metadata.chunkIndex.toString());
+        formData.append("totalChunks", chunk.metadata.totalChunks.toString());
+        
+        console.log(`📤 Enviando chunk ${i + 1}/${chunks.length}...`);
+        
+        const response = await fetch("/api/consultations/upload-chunk", {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Erro ao enviar chunk ${i + 1}`);
+        }
+        
+        // Atualizar progresso (20% já foi usado para hash/duplicata, 20-90% para chunks)
+        const chunkProgress = 20 + Math.round(((i + 1) / chunks.length) * 70);
+        setUploadProgress(chunkProgress);
+        
+        console.log(`✅ Chunk ${i + 1}/${chunks.length} enviado (${chunkProgress}%)`);
+      }
+      
+      console.log(`✅ Todos os chunks enviados, finalizando upload...`);
+      setUploadProgress(90);
+      
+      // Finalizar upload (servidor juntará os chunks)
       const formData = new FormData();
-      const fileName = inputMode === "record" ? "consultation.webm" : "consultation.mp3";
-      formData.append("audio", audioBlob, fileName);
-      formData.append("patientId", selectedPatientId);
+      formData.append("sessionId", sessionId); // Usar o mesmo sessionId dos chunks
+      formData.append("patientId", selectedPatientId!);
       formData.append("duration", audioDuration.toString());
+      formData.append("fileName", fileName);
+      formData.append("fileType", fileType);
+      if (hash) {
+        formData.append("hash", hash);
+      }
+      
+      const response = await fetch("/api/consultations/upload-audio", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao finalizar upload");
+      }
+      
+      const data = await response.json();
+      setUploadProgress(100);
+      setConsultationId(data.consultationId);
+      setFlowState("processing");
+      toast.success("Áudio enviado com sucesso!");
+      
+      // Iniciar processamento
+      fetch("/api/consultations/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consultationId: data.consultationId }),
+      }).catch((err) => {
+        console.error("Erro ao iniciar processamento:", err);
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // Função auxiliar para fazer upload normal
+  const uploadAudioNormally = async (hash: string | null) => {
+    try {
+      if (!audioBlob) {
+        throw new Error("Áudio não disponível");
+      }
+
+      const formData = new FormData();
+      
+      // Detectar extensão baseada no tipo do blob ou modo de input
+      let fileName = "consultation.mp3"; // padrão
+      if (inputMode === "record") {
+        fileName = "consultation.webm";
+      } else if (audioBlob.type) {
+        // Detectar extensão pelo MIME type
+        if (audioBlob.type.includes("mp4")) {
+          fileName = "consultation.mp4";
+        } else if (audioBlob.type.includes("webm")) {
+          fileName = "consultation.webm";
+        } else if (audioBlob.type.includes("wav")) {
+          fileName = "consultation.wav";
+        } else if (audioBlob.type.includes("m4a")) {
+          fileName = "consultation.m4a";
+        } else if (audioBlob.type.includes("aac")) {
+          fileName = "consultation.aac";
+        } else if (audioBlob.type.includes("ogg")) {
+          fileName = "consultation.ogg";
+        }
+      }
+
+      console.log(`📤 Preparando upload: ${fileName} (${(audioBlob.size / 1024 / 1024).toFixed(2)}MB)`);
+      
+      formData.append("audio", audioBlob, fileName);
+      formData.append("patientId", selectedPatientId!);
+      formData.append("duration", audioDuration.toString());
+      if (hash) {
+        formData.append("hash", hash);
+      }
 
       const response = await fetch("/api/consultations/upload-audio", {
         method: "POST",
@@ -174,10 +390,6 @@ export function NewConsultationRecording({
       }).catch((err) => {
         console.error("Erro ao iniciar processamento:", err);
       });
-    } catch (err: any) {
-      console.error("Erro no upload:", err);
-      setError(err.message || "Erro ao processar áudio");
-      toast.error("Erro ao enviar áudio");
     } finally {
       setIsUploading(false);
     }
@@ -188,6 +400,68 @@ export function NewConsultationRecording({
     setAudioDuration(0);
     setFlowState("input");
     setProcessingError(null);
+  };
+
+  // Handlers para o diálogo de duplicata
+  const handleViewExisting = () => {
+    if (duplicateInfo?.existingConsultation.id) {
+      router.push(`/consultations/${duplicateInfo.existingConsultation.id}/preview`);
+    }
+  };
+
+  const handleReuse = async () => {
+    if (!duplicateInfo || !selectedPatientId) return;
+
+    setIsReusing(true);
+    try {
+      const response = await fetch("/api/consultations/reuse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceConsultationId: duplicateInfo.existingConsultation.id,
+          patientId: selectedPatientId,
+          // timerId: se tiver timer, adicionar aqui
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao reutilizar consulta");
+      }
+
+      const data = await response.json();
+      
+      toast.success("Consulta criada instantaneamente! ⚡", {
+        description: "Dados reutilizados com sucesso. Você economizou tempo e custos.",
+      });
+
+      // Redirecionar para a nova consulta
+      router.push(`/consultations/${data.consultationId}/preview`);
+    } catch (err: any) {
+      console.error("Erro ao reutilizar consulta:", err);
+      toast.error("Erro ao reutilizar consulta", {
+        description: err.message,
+      });
+    } finally {
+      setIsReusing(false);
+    }
+  };
+
+  const handleProcessAnyway = async () => {
+    setShowDuplicateDialog(false);
+    setIsUploading(true);
+    
+    toast.info("Processando áudio novamente...", {
+      description: "Isso consumirá tempo e recursos de API.",
+    });
+
+    // Fazer upload normal ignorando a duplicata
+    await uploadAudioNormally(audioHash);
+  };
+
+  const handleCancelDuplicate = () => {
+    setShowDuplicateDialog(false);
+    setDuplicateInfo(null);
   };
 
   const handleProcessingComplete = (id: string) => {
@@ -349,6 +623,7 @@ export function NewConsultationRecording({
               onConfirm={handleConfirmAndUpload}
               onReRecord={handleReRecord}
               isUploading={isUploading}
+              uploadProgress={uploadProgress}
             />
           )}
 
@@ -421,6 +696,22 @@ export function NewConsultationRecording({
           )}
         </div>
       </main>
+
+      {/* Diálogo de Duplicata */}
+      {duplicateInfo && selectedPatient && (
+        <DuplicateAudioDialog
+          open={showDuplicateDialog}
+          existingConsultation={duplicateInfo.existingConsultation}
+          currentPatientId={selectedPatientId!}
+          currentPatientName={selectedPatient.full_name}
+          isSamePatient={duplicateInfo.isSamePatient}
+          onViewExisting={handleViewExisting}
+          onReuse={handleReuse}
+          onProcessAnyway={handleProcessAnyway}
+          onCancel={handleCancelDuplicate}
+          isReusing={isReusing}
+        />
+      )}
     </div>
   );
 }

@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RotateCcw, Clock, FileAudio } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Play, Pause, RotateCcw, Clock, FileAudio, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AudioPreviewProps {
@@ -12,6 +13,7 @@ interface AudioPreviewProps {
   onConfirm: () => void;
   onReRecord: () => void;
   isUploading?: boolean;
+  uploadProgress?: number;
 }
 
 export function AudioPreview({
@@ -20,6 +22,7 @@ export function AudioPreview({
   onConfirm,
   onReRecord,
   isUploading = false,
+  uploadProgress = 0,
 }: AudioPreviewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -154,6 +157,25 @@ export function AudioPreview({
           </div>
         </div>
 
+        {/* Upload Progress */}
+        {isUploading && uploadProgress > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Enviando áudio...
+              </span>
+              <span className="font-medium">{uploadProgress}%</span>
+            </div>
+            <Progress value={uploadProgress} className="h-2" />
+            <p className="text-xs text-muted-foreground text-center">
+              {uploadProgress < 20 && "Verificando duplicatas..."}
+              {uploadProgress >= 20 && uploadProgress < 90 && "Enviando dados..."}
+              {uploadProgress >= 90 && "Finalizando..."}
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-3">
           <Button
@@ -170,7 +192,14 @@ export function AudioPreview({
             onClick={onConfirm}
             disabled={isUploading}
           >
-            {isUploading ? "Enviando..." : "Confirmar e Enviar"}
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Enviando...
+              </>
+            ) : (
+              "Confirmar e Enviar"
+            )}
           </Button>
         </div>
       </CardContent>

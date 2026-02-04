@@ -153,7 +153,7 @@ export default async function PatientProfilePage({
           </div>
         </div>
         <div className="flex gap-2">
-          <Link href={`/consultations/new-recording?patientId=${id}`}>
+          <Link href={`/consultations/new-recording?patient_id=${id}`}>
             <Button className="gap-2" size="lg">
               <Mic className="h-4 w-4" />
               Nova Consulta
@@ -389,7 +389,7 @@ export default async function PatientProfilePage({
               <p className="text-sm text-muted-foreground mb-6">
                 {patient.full_name} ainda não possui consultas gravadas.
               </p>
-              <Link href={`/consultations/new-recording?patientId=${id}`}>
+              <Link href={`/consultations/new-recording?patient_id=${id}`}>
                 <Button>
                   <Mic className="h-4 w-4 mr-2" />
                   Gravar Primeira Consulta

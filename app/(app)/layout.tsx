@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
+import { TimerRecordingProvider } from "@/lib/contexts/timer-recording-context";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,10 @@ export default async function ProtectedLayout({
     crm: profile?.crm ?? null,
   };
 
-  return <AppShell user={userData}>{children}</AppShell>;
+  return (
+    <TimerRecordingProvider>
+      <AppShell user={userData}>{children}</AppShell>
+    </TimerRecordingProvider>
+  );
 }
 

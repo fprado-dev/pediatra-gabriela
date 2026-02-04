@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { Mic, Square, Pause, Play, Trash2, Upload, AlertCircle } from "lucide-react";
+import { Mic, Square, Pause, Play, Trash2, Upload, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { compressAudio } from "@/lib/utils/audio-compressor";
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number) => void;
@@ -22,6 +23,8 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -192,10 +195,86 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
     toast.info("Gravação cancelada");
   };
 
-  const handleUpload = () => {
-    if (audioBlob) {
+  const handleUpload = async () => {
+    if (!audioBlob) return;
+
+    const MAX_SIZE = 200 * 1024 * 1024; // 200MB
+    const originalSize = audioBlob.size;
+
+    // Se já cabe, enviar direto
+    if (originalSize <= MAX_SIZE) {
+      console.log(`✅ Áudio dentro do limite: ${(originalSize / 1024 / 1024).toFixed(2)}MB`);
       onRecordingComplete(audioBlob, duration);
+      return;
     }
+
+    // Precisa comprimir
+    console.log(`⚠️  Áudio excede 200MB: ${(originalSize / 1024 / 1024).toFixed(2)}MB`);
+    toast.info("Áudio muito grande, comprimindo...");
+    setIsCompressing(true);
+    setCompressionProgress(0);
+
+    try {
+      const compressed = await compressUntilFits(audioBlob, MAX_SIZE);
+      setIsCompressing(false);
+      toast.success("Áudio comprimido com sucesso!");
+      onRecordingComplete(compressed, duration);
+    } catch (error: any) {
+      setIsCompressing(false);
+      toast.error("Erro ao comprimir áudio");
+      console.error("❌ Erro na compressão:", error);
+    }
+  };
+
+  /**
+   * Comprime áudio progressivamente até caber no tamanho máximo
+   * Tenta bitrates: 96 -> 64 -> 48 -> 32 kbps
+   */
+  const compressUntilFits = async (blob: Blob, maxSize: number): Promise<Blob> => {
+    const bitrates = [96, 64, 48, 32]; // kbps
+    const file = new File([blob], "audio.webm", { type: blob.type });
+
+    for (let i = 0; i < bitrates.length; i++) {
+      const bitrate = bitrates[i];
+      console.log(`🗜️  Tentando comprimir com ${bitrate}kbps...`);
+      
+      toast.info(`Comprimindo com ${bitrate}kbps...`);
+
+      try {
+        const result = await compressAudio(file, {
+          bitrate,
+          onProgress: (progress) => {
+            setCompressionProgress(progress);
+          },
+        });
+
+        const compressedSize = result.compressedSize;
+        console.log(`   Resultado: ${(compressedSize / 1024 / 1024).toFixed(2)}MB`);
+
+        if (compressedSize <= maxSize) {
+          console.log(`✅ Áudio comprimido com sucesso! Economia de ${result.compressionRatio.toFixed(1)}%`);
+          toast.success(`Comprimido: ${(compressedSize / 1024 / 1024).toFixed(2)}MB (economia de ${result.compressionRatio.toFixed(0)}%)`);
+          return result.compressedBlob;
+        }
+
+        // Se ainda não cabe e não é o último bitrate, tentar próximo
+        if (i < bitrates.length - 1) {
+          console.log(`   Ainda muito grande, tentando bitrate menor...`);
+        }
+      } catch (error) {
+        console.error(`❌ Erro ao comprimir com ${bitrate}kbps:`, error);
+        // Se falhar, tentar próximo bitrate
+        if (i === bitrates.length - 1) {
+          throw error; // Se foi o último, propagar erro
+        }
+      }
+    }
+
+    // Se chegou aqui, mesmo com 32kbps não coube (improvável)
+    // Retornar a última tentativa
+    console.warn("⚠️  Não foi possível comprimir abaixo de 200MB, enviando mesmo assim...");
+    const lastAttempt = await compressAudio(file, { bitrate: 32 });
+    return lastAttempt.compressedBlob;
   };
 
   const formatTime = (seconds: number) => {
@@ -256,7 +335,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
         )}
 
         {/* Player de áudio após gravação */}
-        {recordingState === "stopped" && audioUrl && (
+        {recordingState === "stopped" && audioUrl && !isCompressing && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>Pré-visualização</span>
@@ -265,6 +344,20 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
               </span>
             </div>
             <audio src={audioUrl} controls className="w-full" />
+          </div>
+        )}
+
+        {/* Progresso de compressão */}
+        {isCompressing && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Comprimindo áudio...</span>
+              <span className="font-semibold">{compressionProgress}%</span>
+            </div>
+            <Progress value={compressionProgress} className="h-2" />
+            <p className="text-xs text-muted-foreground text-center">
+              Otimizando áudio para envio. Isso pode levar alguns momentos.
+            </p>
           </div>
         )}
 
@@ -305,11 +398,31 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
 
           {recordingState === "stopped" && (
             <>
-              <Button size="lg" onClick={handleUpload} className="gap-2">
-                <Upload className="h-5 w-5" />
-                Processar Consulta
+              <Button 
+                size="lg" 
+                onClick={handleUpload} 
+                className="gap-2"
+                disabled={isCompressing}
+              >
+                {isCompressing ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Comprimindo...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-5 w-5" />
+                    Processar Consulta
+                  </>
+                )}
               </Button>
-              <Button size="lg" variant="outline" onClick={cancelRecording} className="gap-2">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                onClick={cancelRecording} 
+                className="gap-2"
+                disabled={isCompressing}
+              >
                 <Trash2 className="h-5 w-5" />
                 Descartar
               </Button>

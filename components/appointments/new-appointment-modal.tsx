@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarIcon, Clock, User, Plus, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -336,7 +336,7 @@ export function NewAppointmentModal({
                     onSelect={setDate}
                     buttonVariant="outline"
                     disabled={(date) =>
-                      date < new Date() || date.getDay() === 0 || date.getDay() === 6
+                      startOfDay(date) < startOfDay(new Date()) || date.getDay() === 0 || date.getDay() === 6
                     }
                     autoFocus
                     locale={ptBR}

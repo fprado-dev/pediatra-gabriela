@@ -42,6 +42,7 @@ const consultationSchema = z.object({
   height_cm: z.number().min(30).max(200).nullable().optional(),
   head_circumference_cm: z.number().min(25).max(65).nullable().optional(),
   development_notes: z.string().optional(),
+  prenatal_perinatal_history: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -104,6 +105,7 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
       height_cm: defaultHeight,
       head_circumference_cm: defaultHeadCirc,
       development_notes: consultation.development_notes || "",
+      prenatal_perinatal_history: consultation.prenatal_perinatal_history || "",
       notes: consultation.notes || "",
     },
   });
@@ -124,6 +126,7 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
         height_cm: data.height_cm || null,
         head_circumference_cm: data.head_circumference_cm || null,
         development_notes: data.development_notes || null,
+        prenatal_perinatal_history: data.prenatal_perinatal_history || null,
         notes: data.notes || null,
         updated_at: new Date().toISOString(),
       };
@@ -140,6 +143,7 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
           height_cm: consultation.height_cm,
           head_circumference_cm: consultation.head_circumference_cm,
           development_notes: consultation.development_notes,
+          prenatal_perinatal_history: consultation.prenatal_perinatal_history,
           notes: consultation.notes,
           saved_at: new Date().toISOString(),
         };
@@ -412,6 +416,28 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                 {...register("development_notes")}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Histórico Gestacional/Perinatal - DESTAQUE */}
+        <Card className="border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-100">
+              <Baby className="h-5 w-5" />
+              Histórico Gestacional e Perinatal
+            </CardTitle>
+            <CardDescription className="text-amber-700 dark:text-amber-300">
+              Informações sobre gestação, parto e período neonatal (crítico para recém-nascidos e lactentes)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              id="prenatal_perinatal_history"
+              placeholder="Ex: Nasceu prematuro (35 semanas), mãe teve diabetes gestacional, ficou 5 dias em UTI neonatal..."
+              rows={4}
+              className="bg-white dark:bg-gray-950 border-amber-300 dark:border-amber-800"
+              {...register("prenatal_perinatal_history")}
+            />
           </CardContent>
         </Card>
 

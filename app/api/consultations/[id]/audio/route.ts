@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getSignedUrl, extractKeyFromUrl } from "@/lib/cloudflare/r2-client";
 
 export const dynamic = 'force-dynamic';
 
@@ -48,24 +49,24 @@ export async function GET(
       );
     }
 
-    // Extrair o path do áudio da URL
-    const pathMatch = consultation.audio_url.match(/consultation-audios\/(.+)$/);
-    if (!pathMatch) {
+    // Extrair o key do áudio da URL
+    let audioKey: string;
+    try {
+      audioKey = extractKeyFromUrl(consultation.audio_url);
+    } catch (error: any) {
+      console.error("Erro ao extrair key:", error);
       return NextResponse.json(
         { error: "URL do áudio inválida" },
         { status: 500 }
       );
     }
 
-    const audioPath = pathMatch[1];
-
-    // Criar URL assinada válida por 1 hora
-    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-      .from("consultation-audios")
-      .createSignedUrl(audioPath, 3600); // 1 hora = 3600 segundos
-
-    if (signedUrlError || !signedUrlData) {
-      console.error("Erro ao criar URL assinada:", signedUrlError);
+    // Criar URL assinada válida por 1 hora usando Cloudflare R2
+    let signedUrl: string;
+    try {
+      signedUrl = await getSignedUrl(audioKey, 3600); // 1 hora = 3600 segundos
+    } catch (error: any) {
+      console.error("Erro ao criar URL assinada:", error);
       return NextResponse.json(
         { error: "Erro ao gerar URL do áudio" },
         { status: 500 }
@@ -73,7 +74,7 @@ export async function GET(
     }
 
     return NextResponse.json({
-      signedUrl: signedUrlData.signedUrl,
+      signedUrl: signedUrl,
       expiresIn: 3600,
     });
   } catch (error: any) {

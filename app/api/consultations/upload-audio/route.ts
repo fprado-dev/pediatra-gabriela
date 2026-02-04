@@ -1,8 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
+import { uploadAudio } from "@/lib/cloudflare/r2-client";
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import { readdir, readFile, rm } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
 
 export const maxDuration = 60; // 60 segundos para upload
 export const dynamic = 'force-dynamic';
+// Permitir arquivos grandes (200MB)
+export const runtime = 'nodejs';
+export const preferredRegion = 'auto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,33 +28,135 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obter FormData
-    const formData = await request.formData();
-    const audioFile = formData.get("audio") as File;
+    // Obter FormData com tratamento de erro melhorado
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (formError: any) {
+      console.error("❌ Erro ao parsear FormData:", formError);
+      return NextResponse.json(
+        {
+          error: "Erro ao processar arquivo enviado. Verifique se o arquivo não está corrompido.",
+          details: formError.message
+        },
+        { status: 400 }
+      );
+    }
+
+    const sessionId = formData.get("sessionId") as string | null;
     const patientId = formData.get("patientId") as string;
     const duration = parseInt(formData.get("duration") as string);
+    const timerId = formData.get("timer_id") as string | null;
+    const clientHash = formData.get("hash") as string | null;
 
-    if (!audioFile || !patientId) {
+    let audioFile: File | null = null;
+    let buffer: Buffer;
+    let fileName: string;
+    let fileType: string;
+
+    // Verificar se é upload chunked ou normal
+    if (sessionId) {
+      // MODO CHUNKED: Juntar chunks
+      console.log(`🧩 Modo chunked detectado - Session: ${sessionId}`);
+
+      const sessionDir = join(tmpdir(), 'audio-chunks', sessionId);
+      console.log(`📂 Procurando chunks em: ${sessionDir}`);
+
+      try {
+        // Ler todos os chunks
+        const chunkFiles = await readdir(sessionDir);
+
+        if (chunkFiles.length === 0) {
+          throw new Error("Nenhum chunk encontrado para esta sessão");
+        }
+
+        // Ordenar chunks por índice (alfabeticamente funciona porque temos padding)
+        chunkFiles.sort();
+        console.log(`📦 Chunks encontrados: ${chunkFiles.join(', ')}`);
+
+        console.log(`📦 Juntando ${chunkFiles.length} chunks...`);
+
+        // Ler e juntar todos os chunks
+        const chunkBuffers = await Promise.all(
+          chunkFiles.map(async (f) => {
+            const chunkPath = join(sessionDir, f);
+            const chunkBuffer = await readFile(chunkPath);
+            console.log(`  ✓ ${f}: ${(chunkBuffer.length / 1024).toFixed(1)}KB`);
+            return chunkBuffer;
+          })
+        );
+
+        buffer = Buffer.concat(chunkBuffers);
+
+        console.log(`✅ Chunks juntados: ${(buffer.length / 1024 / 1024).toFixed(2)}MB`);
+
+        // Validar que o buffer não está vazio
+        if (buffer.length === 0) {
+          throw new Error("Buffer final está vazio após juntar chunks");
+        }
+
+        // Detectar tipo de arquivo pelo FormData
+        fileName = formData.get("fileName") as string || "audio.mp3";
+        fileType = formData.get("fileType") as string || "audio/mpeg";
+
+        console.log(`📄 Arquivo: ${fileName} (${fileType})`);
+
+        // Limpar chunks após juntar
+        await rm(sessionDir, { recursive: true, force: true });
+        console.log(`🗑️  Chunks temporários removidos`);
+      } catch (chunkError: any) {
+        console.error("❌ Erro ao processar chunks:", chunkError);
+
+        // Tentar limpar chunks em caso de erro
+        try {
+          await rm(sessionDir, { recursive: true, force: true });
+        } catch { }
+
+        return NextResponse.json(
+          { error: "Erro ao processar chunks enviados" },
+          { status: 500 }
+        );
+      }
+    } else {
+      // MODO NORMAL: Arquivo direto (< 10MB)
+      audioFile = formData.get("audio") as File;
+
+      if (!audioFile) {
+        return NextResponse.json(
+          { error: "Áudio não fornecido" },
+          { status: 400 }
+        );
+      }
+
+      console.log(`📦 Arquivo recebido: ${audioFile.name}, ${(audioFile.size / 1024 / 1024).toFixed(2)}MB`);
+
+      const arrayBuffer = await audioFile.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      fileName = audioFile.name;
+      fileType = audioFile.type;
+    }
+
+    if (!patientId) {
       return NextResponse.json(
-        { error: "Áudio ou paciente não fornecido" },
+        { error: "Paciente não fornecido" },
         { status: 400 }
       );
     }
 
-    // Validar tamanho (50MB máx)
-    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-    if (audioFile.size > MAX_SIZE) {
+    // Validar tamanho (200MB máx - suporta até ~2h de áudio)
+    const MAX_SIZE = 200 * 1024 * 1024; // 200MB
+    if (buffer.length > MAX_SIZE) {
       return NextResponse.json(
-        { error: "Arquivo muito grande. Máximo: 50MB" },
+        { error: "Arquivo muito grande. Máximo: 200MB" },
         { status: 400 }
       );
     }
 
-    // Validar duração (30min máx = 1800s)
-    const MAX_DURATION = 1800;
+    // Validar duração (2h30min máx = 9000s - suporta consultas longas)
+    const MAX_DURATION = 9000;
     if (duration > MAX_DURATION) {
       return NextResponse.json(
-        { error: "Áudio muito longo. Máximo: 30 minutos" },
+        { error: "Áudio muito longo. Máximo: 2h30min" },
         { status: 400 }
       );
     }
@@ -66,7 +176,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`📤 Upload de áudio iniciado - Tamanho: ${(audioFile.size / 1024 / 1024).toFixed(2)}MB, Duração: ${duration}s`);
+    console.log(`📤 Upload de áudio iniciado - Tamanho: ${(buffer.length / 1024 / 1024).toFixed(2)}MB, Duração: ${duration}s`);
+
+    // Calcular hash do áudio (usar hash do cliente se fornecido, senão calcular no servidor)
+    let audioHash: string | null = null;
+    try {
+      if (clientHash) {
+        console.log(`🔢 Hash fornecido pelo cliente: ${clientHash.substring(0, 16)}...`);
+        audioHash = clientHash;
+      } else {
+        console.log(`🔢 Calculando hash no servidor...`);
+        const hash = crypto.createHash('sha256');
+        hash.update(buffer);
+        audioHash = hash.digest('hex');
+        console.log(`✅ Hash calculado: ${audioHash.substring(0, 16)}...`);
+      }
+    } catch (hashError) {
+      console.warn(`⚠️ Erro ao processar hash, continuando sem hash:`, hashError);
+      // Continuar sem hash - não é crítico
+    }
 
     // Criar registro na tabela consultations
     const { data: consultation, error: consultationError } = await supabase
@@ -75,9 +203,10 @@ export async function POST(request: NextRequest) {
         doctor_id: user.id,
         patient_id: patientId,
         status: "processing",
+        audio_hash: audioHash, // Salvar hash para detecção de duplicatas
         audio_duration_seconds: duration,
-        audio_size_bytes: audioFile.size,
-        audio_format: audioFile.type.includes("webm") ? "webm" : "mp3",
+        audio_size_bytes: buffer.length,
+        audio_format: fileType.includes("webm") ? "webm" : fileType.includes("mp4") ? "mp4" : "mp3",
         processing_started_at: new Date().toISOString(),
         processing_steps: [
           {
@@ -98,21 +227,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upload para Supabase Storage
-    const fileName = `${user.id}/${consultation.id}.${audioFile.type.includes("webm") ? "webm" : "mp3"}`;
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Upload para Cloudflare R2
+    const extension = fileType.includes("webm") ? "webm" : fileType.includes("mp4") ? "mp4" : "mp3";
+    const r2FileName = `${user.id}/${consultation.id}.${extension}`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("consultation-audios")
-      .upload(fileName, buffer, {
-        contentType: audioFile.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
+    let audioUrl: string;
+    try {
+      audioUrl = await uploadAudio(r2FileName, buffer, fileType);
+    } catch (uploadError: any) {
       console.error("❌ Erro no upload:", uploadError);
-      
+
       // Atualizar status para erro
       await supabase
         .from("consultations")
@@ -128,16 +252,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obter URL pública do áudio
-    const { data: urlData } = supabase.storage
-      .from("consultation-audios")
-      .getPublicUrl(fileName);
-
     // Atualizar consulta com URL do áudio
     await supabase
       .from("consultations")
       .update({
-        audio_url: urlData.publicUrl,
+        audio_url: audioUrl,
         processing_steps: [
           {
             step: "upload",
@@ -148,12 +267,44 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", consultation.id);
 
+    // Link com timer se fornecido
+    if (timerId) {
+      console.log(`🔗 Linkando timer ${timerId} com consultation ${consultation.id}`);
+
+      // Validar que o timer pertence ao médico e ao paciente correto
+      const { data: timer, error: timerError } = await supabase
+        .from("consultation_timers")
+        .select("doctor_id, patient_id, status")
+        .eq("id", timerId)
+        .single();
+
+      if (timerError || !timer) {
+        console.warn(`⚠️ Timer ${timerId} não encontrado, continuando sem link`);
+      } else if (timer.doctor_id !== user.id) {
+        console.warn(`⚠️ Timer ${timerId} não pertence ao médico, continuando sem link`);
+      } else if (timer.patient_id !== patientId) {
+        console.warn(`⚠️ Timer ${timerId} não pertence ao paciente correto, continuando sem link`);
+      } else {
+        // Fazer link
+        const { error: linkError } = await supabase
+          .from("consultation_timers")
+          .update({ consultation_id: consultation.id })
+          .eq("id", timerId);
+
+        if (linkError) {
+          console.error(`❌ Erro ao linkar timer: ${linkError.message}`);
+        } else {
+          console.log(`✅ Timer ${timerId} linkado com sucesso à consultation ${consultation.id}`);
+        }
+      }
+    }
+
     console.log(`✅ Upload concluído - Consulta ID: ${consultation.id}`);
     console.log(`📤 Retornando resposta ao cliente (cliente iniciará processamento)...`);
 
     return NextResponse.json({
       consultationId: consultation.id,
-      audioUrl: urlData.publicUrl,
+      audioUrl: audioUrl,
       message: "Upload concluído, processamento iniciado em background",
     });
   } catch (error: any) {

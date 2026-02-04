@@ -3,13 +3,15 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, Pill, FileCheck } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, Pill, FileCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AudioPlayer } from "@/components/consultations/audio-player";
 import { MedicalCertificateModal } from "@/components/consultations/medical-certificate-modal";
 import { MedicalCertificatesList } from "@/components/consultations/medical-certificates-list";
+import { CondensableField } from "@/components/consultations/condensable-field";
+import { ProcessingRetry } from "@/components/consultations/processing-retry";
 
 export const dynamic = 'force-dynamic';
 
@@ -154,6 +156,84 @@ export default async function ConsultationPreviewPage({
 
       <Separator />
 
+      {/* Sistema de Retry - Mostrar se houver erro ou processamento incompleto */}
+      {(consultation.status === "error" || consultation.status === "processing") && (
+        <ProcessingRetry
+          consultationId={id}
+          status={consultation.status}
+          processingSteps={consultation.processing_steps}
+          processingError={consultation.processing_error}
+          rawTranscription={consultation.raw_transcription}
+          cleanedTranscription={consultation.cleaned_transcription}
+        />
+      )}
+
+      {/* Transcrição com Identificação de Falantes - Novo! */}
+      {consultation.raw_transcription?.includes("[Speaker") && (
+        <div className="space-y-4 bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-950/20 dark:to-slate-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-blue-500 text-white rounded-full p-2">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-blue-900 dark:text-blue-100">
+                Transcrição com Identificação de Falantes
+              </h2>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Conversação completa com identificação automática de participantes
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+            {consultation.raw_transcription
+              .split("\n\n")
+              .filter((line: string) => line.trim().length > 0)
+              .map((line: string, idx: number) => {
+                const match = line.match(/^\[([^\]]+)\]:\s*(.+)$/s);
+                if (!match) return null;
+                
+                const [, speaker, text] = match;
+                const speakerNum = speaker.match(/Speaker (\d+)/)?.[1];
+                const isDoctor = speakerNum === "1"; // Speaker 1 = médica
+                
+                return (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-lg border-l-4 transition-all hover:shadow-sm ${
+                      isDoctor
+                        ? "bg-blue-50 dark:bg-blue-950/30 border-blue-500"
+                        : "bg-green-50 dark:bg-green-950/30 border-green-500"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge 
+                        variant={isDoctor ? "default" : "secondary"} 
+                        className={`text-xs ${isDoctor ? "bg-blue-600" : "bg-green-600 text-white"}`}
+                      >
+                        {speaker}
+                      </Badge>
+                      {isDoctor && (
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                          (Médica)
+                        </span>
+                      )}
+                      {!isDoctor && speakerNum === "2" && (
+                        <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                          (Mãe/Responsável)
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm leading-relaxed text-foreground/90">
+                      {text}
+                    </p>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
       {/* Conteúdo Principal - Minimalista */}
       <div className="space-y-8">
         {/* Queixa Principal */}
@@ -173,32 +253,44 @@ export default async function ConsultationPreviewPage({
 
         {/* História/Anamnese */}
         {consultation.history && (
-          <div className="space-y-3">
+          <CondensableField
+            title="Anamnese"
+            iconName="file-text"
+            originalText={consultation.history}
+            consultationId={id}
+            fieldName="history"
+          />
+        )}
+
+        {/* Histórico Gestacional/Perinatal - DESTAQUE ESPECIAL */}
+        {consultation.prenatal_perinatal_history && (
+          <div className="space-y-3 bg-amber-50 dark:bg-amber-950/20 border-l-4 border-amber-500 p-4 rounded-r-lg">
             <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Anamnese
+              <div className="bg-amber-500 text-white rounded-full p-1.5">
+                <Activity className="h-4 w-4" />
+              </div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100">
+                Histórico Gestacional e Perinatal
               </h2>
+              <Badge variant="destructive" className="ml-2 text-xs">
+                CRÍTICO
+              </Badge>
             </div>
-            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6">
-              {consultation.history}
+            <p className="text-base leading-relaxed whitespace-pre-wrap pl-9 text-amber-950 dark:text-amber-50">
+              {consultation.prenatal_perinatal_history}
             </p>
           </div>
         )}
 
         {/* Exame Físico */}
         {consultation.physical_exam && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Exame Físico
-              </h2>
-            </div>
-            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6">
-              {consultation.physical_exam}
-            </p>
-          </div>
+          <CondensableField
+            title="Exame Físico"
+            iconName="activity"
+            originalText={consultation.physical_exam}
+            consultationId={id}
+            fieldName="physical_exam"
+          />
         )}
 
         {/* Diagnóstico */}
@@ -217,14 +309,13 @@ export default async function ConsultationPreviewPage({
 
         {/* Plano Terapêutico */}
         {consultation.plan && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Plano Terapêutico
-            </h2>
-            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6">
-              {consultation.plan}
-            </p>
-          </div>
+          <CondensableField
+            title="Plano Terapêutico"
+            iconName="pill"
+            originalText={consultation.plan}
+            consultationId={id}
+            fieldName="plan"
+          />
         )}
 
         {/* Dados Pediátricos - Grid Compacto */}
@@ -273,14 +364,13 @@ export default async function ConsultationPreviewPage({
 
         {/* Notas Adicionais */}
         {consultation.notes && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Observações
-            </h2>
-            <p className="text-base leading-relaxed whitespace-pre-wrap pl-6 text-muted-foreground">
-              {consultation.notes}
-            </p>
-          </div>
+          <CondensableField
+            title="Observações"
+            iconName="file-text"
+            originalText={consultation.notes}
+            consultationId={id}
+            fieldName="notes"
+          />
         )}
       </div>
 

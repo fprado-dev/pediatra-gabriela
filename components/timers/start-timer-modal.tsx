@@ -16,6 +16,7 @@ import { Calendar, User, Clock, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { createClient } from "@/lib/supabase/client";
 import type { AppointmentWithPatient } from "@/lib/types/appointment";
 
 interface Patient {
@@ -69,7 +70,7 @@ export function StartTimerModal({
       const today = format(new Date(), "yyyy-MM-dd");
       const response = await fetch(`/api/appointments?date=${today}&status=confirmed`);
       const data = await response.json();
-      setTodayAppointments(data.appointments || []);
+      setTodayAppointments(data || []);
     } catch (error) {
       console.error("Error fetching appointments:", error);
     }
@@ -77,9 +78,24 @@ export function StartTimerModal({
 
   const fetchPatients = async () => {
     try {
-      const response = await fetch(`/api/patients?search=${searchTerm}`);
-      const data = await response.json();
-      setPatients(data.patients || []);
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+
+      let query = supabase
+        .from("patients")
+        .select("*")
+        .eq("doctor_id", user.id)
+        .eq("is_active", true)
+        .order("full_name");
+
+      if (searchTerm.trim()) {
+        query = query.ilike("full_name", `%${searchTerm}%`);
+      }
+
+      const { data } = await query.limit(10);
+      setPatients(data || []);
     } catch (error) {
       console.error("Error fetching patients:", error);
     }

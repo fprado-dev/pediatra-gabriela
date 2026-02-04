@@ -40,7 +40,9 @@ interface ConsultationData {
   height_cm?: number;
   head_circumference_cm?: number;
   development_notes?: string;
+  prenatal_perinatal_history?: string;
   notes?: string;
+  raw_transcription?: string;
   patient: PatientData[];
 }
 
@@ -59,11 +61,11 @@ function calculateAge(dateOfBirth: string): number | null {
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
   } catch {
     return null;
@@ -75,24 +77,24 @@ function calculateAge(dateOfBirth: string): number | null {
  */
 function formatPatientDescription(patient: PatientData, patientAge: number | null): string {
   let description = `Olá, meu nome é ${patient?.full_name || 'N/A'}`;
-  
+
   // Idade
   if (patientAge !== null) {
     description += ` e tenho ${patientAge} anos de idade`;
   }
   description += `.`;
-  
+
   // Data de Nascimento
   if (patient?.date_of_birth) {
     description += ` Nasci em ${format(new Date(patient.date_of_birth), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
   }
-  
+
   // Tipo Sanguíneo
   if (patient?.blood_type) {
     description += ` e meu tipo sanguíneo é ${patient.blood_type}`;
   }
   description += `.`;
-  
+
   // Responsável
   if (patient?.responsible_name) {
     description += ` Meu responsável é ${patient.responsible_name}`;
@@ -101,18 +103,18 @@ function formatPatientDescription(patient: PatientData, patientAge: number | nul
     }
     description += `.`;
   }
-  
+
   // Contato
   if (patient?.phone) {
     description += ` Para contato, o telefone é ${patient.phone}`;
     description += `.`;
   }
-  
+
   // Endereço
   if (patient?.address) {
     description += ` Resido em: ${patient.address}.`;
   }
-  
+
   return description;
 }
 
@@ -126,7 +128,7 @@ async function addPDFHeader(
 ) {
   // Logo
   const logoHeight = await builder.drawLogo();
-  
+
   // Ajustar posição Y para alinhar com a logo
   const titleStartY = builder.yPosition;
   builder.yPosition = titleStartY - (logoHeight > 0 ? 10 : 0);
@@ -216,15 +218,15 @@ function addClinicalSections(builder: PDFBuilder, consultation: ConsultationData
 function addMeasurementsSection(builder: PDFBuilder, consultation: ConsultationData) {
   if (consultation.weight_kg || consultation.height_cm || consultation.head_circumference_cm) {
     let measures = "";
-    
+
     if (consultation.weight_kg) {
       measures += `Peso: ${consultation.weight_kg} kg | Altura: ${consultation.height_cm} cm | `;
     }
-    
+
     if (consultation.head_circumference_cm) {
       measures += `Perímetro Cefálico: ${consultation.head_circumference_cm} cm`;
     }
-    
+
     builder.addSection("Medidas Antropométricas", measures);
   }
 }
@@ -234,7 +236,7 @@ function addMeasurementsSection(builder: PDFBuilder, consultation: ConsultationD
  */
 function addPrescriptionSection(builder: PDFBuilder, consultation: ConsultationData) {
   if (consultation.prescription) {
-    builder.addSection("Prescrição Médica", consultation.prescription || null, { 
+    builder.addSection("Prescrição Médica", consultation.prescription || null, {
       preformatted: true,
       size: 9,
     });
@@ -246,24 +248,65 @@ function addPrescriptionSection(builder: PDFBuilder, consultation: ConsultationD
  */
 function addObservationsSection(builder: PDFBuilder, consultation: ConsultationData) {
   let observations = "";
-  
+
   if (consultation.physical_exam) {
     observations += `Exame Físico:\n${consultation.physical_exam}\n\n`;
   }
-  
+
+  if (consultation.prenatal_perinatal_history) {
+    observations += `⚠️ HISTÓRICO GESTACIONAL E PERINATAL (CRÍTICO):\n${consultation.prenatal_perinatal_history}\n\n`;
+  }
+
   if (consultation.development_notes) {
     observations += `Desenvolvimento:\n${consultation.development_notes}\n\n`;
   }
-  
+
   if (consultation.notes) {
     observations += `${consultation.notes}`;
   }
-  
+
   if (observations.trim()) {
     builder.addSection("Observações Adicionais", observations.trim());
   }
-  
+
   builder.moveDown(10);
+}
+
+/**
+ * Adiciona seção de transcrição com identificação de falantes (se disponível)
+ */
+function addSpeakerTranscriptionSection(builder: PDFBuilder, consultation: ConsultationData) {
+  // Verificar se tem diarização
+  if (consultation.raw_transcription?.includes("[Speaker")) {
+    builder.addTitle("Transcrição com Identificação de Falantes", 14);
+    builder.moveDown(0.3);
+    builder.addText("Conversação completa com identificação automática de participantes:", 9);
+    builder.moveDown(0.3);
+
+    const lines = consultation.raw_transcription.split("\n\n");
+    lines.forEach((line: string) => {
+      const match = line.match(/^\[([^\]]+)\]:\s*(.+)$/s);
+      if (match) {
+        const [, speaker, text] = match;
+        const speakerNum = speaker.match(/Speaker (\d+)/)?.[1];
+
+        // Identificar o papel do speaker
+        let roleLabel = "";
+        if (speakerNum === "1") {
+          roleLabel = " (Médica)";
+        } else if (speakerNum === "2") {
+          roleLabel = " (Mãe/Responsável)";
+        }
+
+        builder.addText(`${speaker}${roleLabel}:`, 9, COLORS.primary);
+        builder.moveDown(0.1);
+        builder.addText(text, 9);
+        builder.moveDown(0.25);
+      }
+    });
+
+    builder.moveDown(0.5);
+  }
 }
 
 /**
@@ -283,15 +326,15 @@ export async function generateConsultationPDF(
   profile: ProfileData | null
 ): Promise<Buffer> {
   console.log("📄 Iniciando geração de PDF profissional...");
-  
+
   // Extrair dados do paciente (sempre vem como array do Supabase)
-  const patient = Array.isArray(consultation.patient) 
-    ? consultation.patient[0] 
+  const patient = Array.isArray(consultation.patient)
+    ? consultation.patient[0]
     : consultation.patient;
 
   // Calcular idade do paciente
-  const patientAge = patient?.date_of_birth 
-    ? calculateAge(patient.date_of_birth) 
+  const patientAge = patient?.date_of_birth
+    ? calculateAge(patient.date_of_birth)
     : null;
 
   // Criar documento PDF
@@ -305,34 +348,37 @@ export async function generateConsultationPDF(
   await builder.loadFonts();
 
   // === MONTAR PDF ===
-  
+
   // Cabeçalho
   await addPDFHeader(builder, profile, consultation.created_at);
-  
+
   // Dados do Paciente
   addPatientSection(builder, patient, patientAge);
-  
+
   // Alergias (se houver)
   addAllergiesWarning(builder, patient);
-  
+
   // Medicações Atuais (se houver)
   addCurrentMedicationsSection(builder, patient);
-  
+
   // Seções Clínicas
   addClinicalSections(builder, consultation);
-  
+
   // Medidas Antropométricas
   addMeasurementsSection(builder, consultation);
-  
+
   // Prescrição Médica
   addPrescriptionSection(builder, consultation);
-  
+
   // Observações Adicionais
   addObservationsSection(builder, consultation);
-  
+
+  // Transcrição com Falantes (se disponível)
+  addSpeakerTranscriptionSection(builder, consultation);
+
   // Histórico Médico
   addMedicalHistorySection(builder, patient);
-  
+
   // Rodapé
   await builder.addFooter();
 

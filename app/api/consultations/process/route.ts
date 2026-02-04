@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { transcribeAudio } from "@/lib/openai/transcribe";
 import { cleanTranscription } from "@/lib/openai/clean-text";
 import { extractConsultationFields } from "@/lib/openai/extract-fields";
+import { downloadAudio, extractKeyFromUrl } from "@/lib/cloudflare/r2-client";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -10,12 +11,25 @@ import { tmpdir } from "os";
 export const maxDuration = 300; // 5 minutos para processamento
 export const dynamic = 'force-dynamic';
 
+/**
+ * Determina extensão baseada no Content-Type
+ */
+function getExtensionFromContentType(contentType: string): string {
+  if (contentType.includes("webm")) return "webm";
+  if (contentType.includes("mp4") || contentType.includes("m4a")) return "mp4";
+  if (contentType.includes("wav")) return "wav";
+  if (contentType.includes("ogg")) return "ogg";
+  if (contentType.includes("aac")) return "aac";
+  return "mp3"; // padrão
+}
+
 export async function POST(request: NextRequest) {
-  const tempFilePath = join(tmpdir(), `audio-${Date.now()}.mp3`);
-  
+  let tempFilePath = join(tmpdir(), `audio-${Date.now()}.tmp`); // Temporário, será renomeado
+  let consultationId: string | undefined; // Variável para usar no catch
+
   try {
     console.log("\n=== INICIANDO PROCESSAMENTO DE CONSULTA ===");
-    
+
     const supabase = await createClient();
 
     // Verificar autenticação
@@ -34,8 +48,8 @@ export async function POST(request: NextRequest) {
     console.log(`👤 Usuário autenticado: ${user.id}`);
 
     const body = await request.json();
-    const { consultationId } = body;
-    
+    consultationId = body.consultationId; // Salvar em variável externa
+
     console.log(`📋 Consultation ID: ${consultationId}`);
 
     if (!consultationId) {
@@ -69,43 +83,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 1: Baixar áudio do Supabase Storage
-    console.log("📥 Step 1/4: Baixando áudio...");
+    // Step 1: Baixar áudio do Cloudflare R2
+    console.log("📥 Step 1/4: Baixando áudio do R2...");
     await updateProcessingStep(supabase, consultationId, "download", "in_progress");
 
-    // Extrair o caminho do arquivo do audio_url
     const audioUrl = consultation.audio_url;
     console.log(`📍 Audio URL: ${audioUrl}`);
-    
-    // O path está no formato: {user_id}/{consultation_id}.webm
-    const pathMatch = audioUrl.match(/consultation-audios\/(.+)$/);
-    if (!pathMatch) {
-      throw new Error(`Não foi possível extrair o path do áudio da URL: ${audioUrl}`);
-    }
-    
-    const audioPath = pathMatch[1];
-    console.log(`📁 Path do áudio: ${audioPath}`);
 
-    const { data: audioData, error: downloadError } = await supabase.storage
-      .from("consultation-audios")
-      .download(audioPath);
+    // Extrair key do arquivo do R2
+    const audioKey = extractKeyFromUrl(audioUrl);
+    console.log(`📁 Key do áudio: ${audioKey}`);
 
-    if (downloadError) {
-      console.error("❌ Erro no download:", downloadError);
-      throw new Error(`Erro ao baixar áudio: ${downloadError.message}`);
-    }
+    // Baixar do Cloudflare R2
+    const { buffer: audioBuffer, contentType } = await downloadAudio(audioKey);
+    console.log(`📦 Áudio baixado: ${audioBuffer.length} bytes (${contentType})`);
 
-    if (!audioData) {
-      throw new Error("Dados do áudio não retornados");
-    }
+    // Determinar extensão correta baseada no Content-Type
+    const extension = getExtensionFromContentType(contentType);
+    tempFilePath = join(tmpdir(), `audio-${Date.now()}.${extension}`);
+    console.log(`📝 Extensão detectada: .${extension}`);
 
-    console.log(`📦 Áudio baixado: ${audioData.size} bytes`);
-
-    // Salvar áudio temporariamente
-    const arrayBuffer = await audioData.arrayBuffer();
-    await writeFile(tempFilePath, Buffer.from(arrayBuffer));
+    // Salvar áudio temporariamente com extensão correta
+    await writeFile(tempFilePath, audioBuffer);
     console.log(`💾 Áudio salvo temporariamente em: ${tempFilePath}`);
-    
+    console.log(`📊 Tamanho do arquivo: ${(audioBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+
+    // Verificar se o arquivo não está vazio
+    if (audioBuffer.length === 0) {
+      throw new Error("Arquivo de áudio está vazio");
+    }
+
     await updateProcessingStep(supabase, consultationId, "download", "completed");
 
     // Step 2: Transcrever com Whisper
@@ -116,6 +123,20 @@ export async function POST(request: NextRequest) {
       audioPath: tempFilePath,
       language: "pt",
     });
+
+    console.log(`📝 Transcrição: ${rawTranscription.length} caracteres`);
+    console.log(`   Preview: ${rawTranscription.substring(0, 200)}...`);
+
+    // 🎙️ Detectar se tem diarização automática de speakers
+    const hasDiarization = rawTranscription.includes("[Speaker");
+    if (hasDiarization) {
+      const speakerMatches = rawTranscription.match(/\[Speaker \d+\]/g) || [];
+      const uniqueSpeakers = [...new Set(speakerMatches)];
+      console.log(`👥 Diarização detectada: ${uniqueSpeakers.length} falantes identificados`);
+      console.log(`   Falantes: ${uniqueSpeakers.join(", ")}`);
+    } else {
+      console.log(`⚠️ Sem diarização automática (consulta antiga ou modelo sem segments)`);
+    }
 
     await supabase
       .from("consultations")
@@ -157,6 +178,7 @@ export async function POST(request: NextRequest) {
         height_cm: extractedFields.height_cm,
         head_circumference_cm: extractedFields.head_circumference_cm,
         development_notes: extractedFields.development_notes,
+        prenatal_perinatal_history: extractedFields.prenatal_perinatal_history, // NOVO: histórico gestacional
         original_ai_version: extractedFields, // Guardar versão original
         status: "completed",
         processing_completed_at: new Date().toISOString(),
@@ -176,12 +198,10 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("❌ Erro no processamento:", error);
 
-    // Tentar salvar erro no banco
-    try {
-      const supabase = await createClient();
-      const { consultationId } = await request.json();
-      
-      if (consultationId) {
+    // Tentar salvar erro no banco usando consultationId da variável externa
+    if (consultationId) {
+      try {
+        const supabase = await createClient();
         await supabase
           .from("consultations")
           .update({
@@ -190,9 +210,13 @@ export async function POST(request: NextRequest) {
             processing_completed_at: new Date().toISOString(),
           })
           .eq("id", consultationId);
+
+        console.log("✅ Erro salvo no banco - retry disponível na página de preview");
+      } catch (dbError) {
+        console.error("❌ Erro ao salvar erro no banco:", dbError);
       }
-    } catch (dbError) {
-      console.error("❌ Erro ao salvar erro no banco:", dbError);
+    } else {
+      console.warn("⚠️ consultationId não disponível para salvar erro");
     }
 
     return NextResponse.json(

@@ -4,6 +4,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
+import { downloadAudio, extractKeyFromUrl } from "@/lib/cloudflare/r2-client";
 import { transcribeAudio } from "./transcribe";
 import { cleanTranscription } from "./clean-text";
 import { extractConsultationFields } from "./extract-fields";
@@ -12,12 +13,12 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 export async function processConsultation(consultationId: string) {
-  const tempFilePath = join(tmpdir(), `audio-${Date.now()}.mp3`);
-  
+  let tempFilePath = join(tmpdir(), `audio-${Date.now()}.tmp`); // Temporário, será renomeado
+
   try {
     console.log("\n=== INICIANDO PROCESSAMENTO DE CONSULTA ===");
     console.log(`📋 Consultation ID: ${consultationId}`);
-    
+
     const supabase = await createClient();
 
     // Buscar consulta
@@ -63,40 +64,35 @@ export async function processConsultation(consultationId: string) {
 
     console.log("👤 Paciente:", patient?.full_name, `(${patientAge} anos)`);
 
-    // Step 1: Baixar áudio do Supabase Storage
-    console.log("\n📥 Step 1/4: Baixando áudio...");
+    // Step 1: Baixar áudio do Cloudflare R2
+    console.log("\n📥 Step 1/4: Baixando áudio do R2...");
     await updateProcessingStep(supabase, consultationId, "download", "in_progress");
 
-    // Extrair o caminho do arquivo do audio_url
+    // Extrair o key do arquivo do audio_url
     const audioUrl = consultation.audio_url;
-    const pathMatch = audioUrl.match(/consultation-audios\/(.+)$/);
-    if (!pathMatch) {
-      throw new Error(`Não foi possível extrair o path do áudio da URL: ${audioUrl}`);
+    const audioKey = extractKeyFromUrl(audioUrl);
+    console.log(`📁 Key do áudio: ${audioKey}`);
+
+    const { buffer: audioBuffer, contentType } = await downloadAudio(audioKey);
+    console.log(`📦 Áudio baixado: ${audioBuffer.length} bytes (${contentType})`);
+
+    // Determinar extensão correta baseada no Content-Type
+    function getExtension(ct: string): string {
+      if (ct.includes("webm")) return "webm";
+      if (ct.includes("mp4") || ct.includes("m4a")) return "mp4";
+      if (ct.includes("wav")) return "wav";
+      if (ct.includes("ogg")) return "ogg";
+      if (ct.includes("aac")) return "aac";
+      return "mp3";
     }
-    
-    const audioPath = pathMatch[1];
-    console.log(`📁 Path do áudio: ${audioPath}`);
+    const extension = getExtension(contentType);
+    tempFilePath = join(tmpdir(), `audio-${Date.now()}.${extension}`);
+    console.log(`📝 Extensão detectada: .${extension}`);
 
-    const { data: audioData, error: downloadError } = await supabase.storage
-      .from("consultation-audios")
-      .download(audioPath);
-
-    if (downloadError) {
-      console.error("❌ Erro no download:", downloadError);
-      throw new Error(`Erro ao baixar áudio: ${downloadError.message}`);
-    }
-
-    if (!audioData) {
-      throw new Error("Dados do áudio não retornados");
-    }
-
-    console.log(`📦 Áudio baixado: ${audioData.size} bytes`);
-
-    // Salvar áudio temporariamente
-    const arrayBuffer = await audioData.arrayBuffer();
-    await writeFile(tempFilePath, Buffer.from(arrayBuffer));
+    // Salvar áudio temporariamente com extensão correta
+    await writeFile(tempFilePath, audioBuffer);
     console.log(`💾 Áudio salvo temporariamente em: ${tempFilePath}`);
-    
+
     await updateProcessingStep(supabase, consultationId, "download", "completed");
 
     // Step 2: Transcrever com Whisper
@@ -108,7 +104,19 @@ export async function processConsultation(consultationId: string) {
       language: "pt",
     });
 
-    console.log(`📝 Transcrição bruta: ${rawTranscription.substring(0, 200)}...`);
+    console.log(`📝 Transcrição: ${rawTranscription.length} caracteres`);
+    console.log(`   Preview: ${rawTranscription.substring(0, 200)}...`);
+
+    // 🎙️ Detectar se tem diarização automática de speakers
+    const hasDiarization = rawTranscription.includes("[Speaker");
+    if (hasDiarization) {
+      const speakerMatches = rawTranscription.match(/\[Speaker \d+\]/g) || [];
+      const uniqueSpeakers = [...new Set(speakerMatches)];
+      console.log(`👥 Diarização detectada: ${uniqueSpeakers.length} falantes identificados`);
+      console.log(`   Falantes: ${uniqueSpeakers.join(", ")}`);
+    } else {
+      console.log(`⚠️ Sem diarização automática (consulta antiga ou modelo sem segments)`);
+    }
 
     await supabase
       .from("consultations")
@@ -117,16 +125,22 @@ export async function processConsultation(consultationId: string) {
 
     await updateProcessingStep(supabase, consultationId, "transcription", "completed");
 
-    // Step 3: Limpar texto
-    console.log("\n🧹 Step 3/4: Limpando texto...");
+    // Step 3: Limpar texto (DESABILITADO - estava removendo muito conteúdo)
+    console.log("\n🧹 Step 3/4: Pulando limpeza de texto...");
     await updateProcessingStep(supabase, consultationId, "cleaning", "in_progress");
 
-    const cleanedText = await cleanTranscription(rawTranscription, {
-      patientName: patient?.full_name,
-      patientAge,
-    });
+    // 🔥 USANDO TRANSCRIÇÃO DIRETA (sem limpeza por GPT)
+    // O GPT de extração (gpt-4o) já faz a limpeza implicitamente
+    const cleanedText = rawTranscription;
+    console.log(`⚠️ Usando transcrição direta do Whisper (${cleanedText.length} chars)`);
 
-    console.log(`✨ Texto limpo: ${cleanedText.substring(0, 200)}...`);
+    // 🔥 LIMPEZA POR GPT DESABILITADA (removia muito conteúdo)
+    // const cleanedText = await cleanTranscription(rawTranscription, {
+    //   patientName: patient?.full_name,
+    //   patientAge,
+    // });
+
+    console.log(`✨ Texto para extração: ${cleanedText.substring(0, 200)}...`);
 
     await supabase
       .from("consultations")
@@ -167,6 +181,7 @@ export async function processConsultation(consultationId: string) {
         height_cm: extractedFields.height_cm,
         head_circumference_cm: extractedFields.head_circumference_cm,
         development_notes: extractedFields.development_notes,
+        prenatal_perinatal_history: extractedFields.prenatal_perinatal_history, // NOVO: histórico gestacional
         original_ai_version: extractedFields, // Guardar versão original
         status: "completed",
         processing_completed_at: new Date().toISOString(),
@@ -188,7 +203,7 @@ export async function processConsultation(consultationId: string) {
     // Tentar salvar erro no banco
     try {
       const supabase = await createClient();
-      
+
       await supabase
         .from("consultations")
         .update({

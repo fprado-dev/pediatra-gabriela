@@ -1,10 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { uploadAudio } from "@/lib/cloudflare/r2-client";
+import { uploadAudio, listChunks, downloadChunk, deleteChunks } from "@/lib/cloudflare/r2-client";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { readdir, readFile, rm } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
 
 export const maxDuration = 60; // 60 segundos para upload
 export const dynamic = 'force-dynamic';
@@ -56,32 +53,25 @@ export async function POST(request: NextRequest) {
 
     // Verificar se é upload chunked ou normal
     if (sessionId) {
-      // MODO CHUNKED: Juntar chunks
+      // MODO CHUNKED: Juntar chunks do R2
       console.log(`🧩 Modo chunked detectado - Session: ${sessionId}`);
 
-      const sessionDir = join(tmpdir(), 'audio-chunks', sessionId);
-      console.log(`📂 Procurando chunks em: ${sessionDir}`);
-
       try {
-        // Ler todos os chunks
-        const chunkFiles = await readdir(sessionDir);
+        // Listar todos os chunks no R2
+        const chunkKeys = await listChunks(sessionId);
 
-        if (chunkFiles.length === 0) {
-          throw new Error("Nenhum chunk encontrado para esta sessão");
+        if (chunkKeys.length === 0) {
+          throw new Error("Nenhum chunk encontrado para esta sessão no R2");
         }
 
-        // Ordenar chunks por índice (alfabeticamente funciona porque temos padding)
-        chunkFiles.sort();
-        console.log(`📦 Chunks encontrados: ${chunkFiles.join(', ')}`);
+        console.log(`📦 ${chunkKeys.length} chunks encontrados no R2`);
+        console.log(`📦 Baixando e juntando chunks...`);
 
-        console.log(`📦 Juntando ${chunkFiles.length} chunks...`);
-
-        // Ler e juntar todos os chunks
+        // Baixar e juntar todos os chunks em paralelo
         const chunkBuffers = await Promise.all(
-          chunkFiles.map(async (f) => {
-            const chunkPath = join(sessionDir, f);
-            const chunkBuffer = await readFile(chunkPath);
-            console.log(`  ✓ ${f}: ${(chunkBuffer.length / 1024).toFixed(1)}KB`);
+          chunkKeys.map(async (key, idx) => {
+            const chunkBuffer = await downloadChunk(key);
+            console.log(`  ✓ Chunk ${idx}: ${(chunkBuffer.length / 1024).toFixed(1)}KB`);
             return chunkBuffer;
           })
         );
@@ -101,15 +91,15 @@ export async function POST(request: NextRequest) {
 
         console.log(`📄 Arquivo: ${fileName} (${fileType})`);
 
-        // Limpar chunks após juntar
-        await rm(sessionDir, { recursive: true, force: true });
-        console.log(`🗑️  Chunks temporários removidos`);
+        // Limpar chunks do R2 após juntar
+        await deleteChunks(sessionId);
+        console.log(`🗑️  Chunks temporários removidos do R2`);
       } catch (chunkError: any) {
         console.error("❌ Erro ao processar chunks:", chunkError);
 
-        // Tentar limpar chunks em caso de erro
+        // Tentar limpar chunks do R2 em caso de erro
         try {
-          await rm(sessionDir, { recursive: true, force: true });
+          await deleteChunks(sessionId);
         } catch { }
 
         return NextResponse.json(

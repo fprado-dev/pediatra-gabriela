@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { TimerWithPatient } from "@/lib/types/timer";
 import { compressAudio } from "@/lib/utils/audio-compressor";
 import { useRouter } from "next/navigation";
+import { divideIntoChunks, shouldUseChunking } from "@/lib/utils/audio-chunker";
 
 type RecordingState = 'idle' | 'recording' | 'paused' | 'stopped';
 type WidgetState = 'minimized' | 'compact' | 'expanded' | 'recording';
@@ -392,31 +393,102 @@ export function TimerRecordingProvider({ children }: { children: React.ReactNode
         finalBlob = compressed;
       }
 
-      // Upload
-      const formData = new FormData();
-      formData.append("audio", finalBlob);
-      formData.append("patientId", activeTimer.patient_id);
-      formData.append("duration", audioDuration.toString());
-      formData.append("timer_id", activeTimer.id);
+      // Detectar se precisa usar chunked upload (arquivo >= 4.5MB)
+      const useChunking = shouldUseChunking(finalBlob.size);
+      const fileName = "audio.webm";
+      const fileType = finalBlob.type;
 
-      const response = await fetch("/api/consultations/upload-audio", {
-        method: "POST",
-        body: formData,
-      });
+      if (useChunking) {
+        const sizeMB = (finalBlob.size / 1024 / 1024).toFixed(1);
+        toast.info("Enviando arquivo grande em partes...", {
+          description: `${sizeMB}MB será dividido em chunks de 4MB`,
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        toast.success("Consulta processada!");
-        
-        // Clean up
-        setAudioBlob(null);
-        setRecordingState('idle');
-        setAudioDuration(0);
-        
-        // Redirect to preview
-        router.push(`/consultations/${data.consultationId}/preview`);
+        // Dividir em chunks
+        const chunks = divideIntoChunks(finalBlob, undefined, fileName);
+        const sessionId = chunks[0].metadata.sessionId;
+
+        console.log(`🧩 Timer: Iniciando upload chunked: ${chunks.length} chunks`);
+
+        // Enviar cada chunk sequencialmente
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          const formData = new FormData();
+
+          formData.append("chunk", chunk.blob);
+          formData.append("sessionId", chunk.metadata.sessionId);
+          formData.append("chunkIndex", chunk.metadata.chunkIndex.toString());
+          formData.append("totalChunks", chunk.metadata.totalChunks.toString());
+
+          console.log(`📤 Timer: Enviando chunk ${i + 1}/${chunks.length}...`);
+
+          const response = await fetch("/api/consultations/upload-chunk", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Falha ao enviar chunk ${i + 1}`);
+          }
+
+          console.log(`✅ Timer: Chunk ${i + 1}/${chunks.length} enviado`);
+        }
+
+        // Finalizar upload (servidor juntará os chunks do R2)
+        const finalFormData = new FormData();
+        finalFormData.append("sessionId", sessionId);
+        finalFormData.append("patientId", activeTimer.patient_id);
+        finalFormData.append("duration", audioDuration.toString());
+        finalFormData.append("timer_id", activeTimer.id);
+        finalFormData.append("fileName", fileName);
+        finalFormData.append("fileType", fileType);
+
+        const response = await fetch("/api/consultations/upload-audio", {
+          method: "POST",
+          body: finalFormData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          toast.success("Consulta processada!");
+
+          // Clean up
+          setAudioBlob(null);
+          setRecordingState('idle');
+          setAudioDuration(0);
+
+          // Redirect to preview
+          router.push(`/consultations/${data.consultationId}/preview`);
+        } else {
+          throw new Error("Upload failed");
+        }
       } else {
-        throw new Error("Upload failed");
+        // Upload direto (< 4.5MB)
+        const formData = new FormData();
+        formData.append("audio", finalBlob);
+        formData.append("patientId", activeTimer.patient_id);
+        formData.append("duration", audioDuration.toString());
+        formData.append("timer_id", activeTimer.id);
+
+        const response = await fetch("/api/consultations/upload-audio", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          toast.success("Consulta processada!");
+
+          // Clean up
+          setAudioBlob(null);
+          setRecordingState('idle');
+          setAudioDuration(0);
+
+          // Redirect to preview
+          router.push(`/consultations/${data.consultationId}/preview`);
+        } else {
+          throw new Error("Upload failed");
+        }
       }
     } catch (error) {
       console.error("Upload error:", error);

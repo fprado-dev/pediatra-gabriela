@@ -74,17 +74,16 @@ export function generateSessionId(): string {
 /**
  * Verifica se um arquivo deve usar upload chunked
  * 
- * IMPORTANTE: Na Vercel Serverless, cada Lambda tem seu próprio /tmp efêmero.
- * Chunks salvos em uma Lambda não estão disponíveis em outra.
- * Threshold aumentado para 10MB para evitar chunking desnecessário.
+ * IMPORTANTE: Vercel tem limite de 4.5MB por request body.
+ * Arquivos >= 4.5MB devem usar chunked upload com R2 como storage temporário.
  * 
  * @param fileSizeBytes - Tamanho do arquivo em bytes
- * @param thresholdMB - Limite em MB (padrão: 10MB - limite Vercel Body Parsing)
+ * @param thresholdMB - Limite em MB (padrão: 4.5MB - limite Vercel Body Size)
  * @returns true se deve usar chunking
  */
 export function shouldUseChunking(
   fileSizeBytes: number,
-  thresholdMB: number = 10
+  thresholdMB: number = 4.5
 ): boolean {
   const fileSizeMB = fileSizeBytes / (1024 * 1024);
   return fileSizeMB >= thresholdMB;

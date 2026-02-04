@@ -171,3 +171,143 @@ export function extractKeyFromUrl(url: string): string {
 
   return match[1];
 }
+
+// ========================================
+// FUNÇÕES PARA CHUNKED UPLOAD
+// Workaround para limite de 4.5MB da Vercel
+// ========================================
+
+/**
+ * Upload de chunk temporário para R2
+ * Usado para armazenar chunks durante upload em partes
+ * 
+ * @param sessionId - ID único da sessão de upload
+ * @param chunkIndex - Índice do chunk
+ * @param buffer - Buffer do chunk
+ * @returns Key do chunk no R2
+ */
+export async function uploadChunk(
+  sessionId: string,
+  chunkIndex: number,
+  buffer: Buffer
+): Promise<string> {
+  const chunkKey = `chunks/${sessionId}/${chunkIndex.toString().padStart(4, '0')}.bin`;
+
+  try {
+    const command = new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: chunkKey,
+      Body: buffer,
+      ContentType: "application/octet-stream",
+      Metadata: {
+        sessionId,
+        chunkIndex: chunkIndex.toString(),
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    await r2Client.send(command);
+    console.log(`✅ Chunk ${chunkIndex} uploaded to R2: ${chunkKey}`);
+    return chunkKey;
+  } catch (error: any) {
+    console.error(`❌ Erro ao fazer upload do chunk ${chunkIndex} para R2:`, error);
+    throw new Error(`Falha ao fazer upload do chunk: ${error.message}`);
+  }
+}
+
+/**
+ * Download de chunk temporário do R2
+ * 
+ * @param chunkKey - Key do chunk no R2
+ * @returns Buffer do chunk
+ */
+export async function downloadChunk(chunkKey: string): Promise<Buffer> {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: chunkKey,
+    });
+
+    const response = await r2Client.send(command);
+
+    if (!response.Body) {
+      throw new Error("Chunk vazio retornado do R2");
+    }
+
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(chunk);
+    }
+
+    const buffer = Buffer.concat(chunks);
+    return buffer;
+  } catch (error: any) {
+    console.error(`❌ Erro ao baixar chunk do R2: ${chunkKey}`, error);
+    throw new Error(`Falha ao baixar chunk: ${error.message}`);
+  }
+}
+
+/**
+ * Lista todos os chunks de uma sessão
+ * 
+ * @param sessionId - ID da sessão
+ * @returns Array de keys dos chunks, ordenados por índice
+ */
+export async function listChunks(sessionId: string): Promise<string[]> {
+  try {
+    const { ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+
+    const command = new ListObjectsV2Command({
+      Bucket: R2_BUCKET,
+      Prefix: `chunks/${sessionId}/`,
+    });
+
+    const response = await r2Client.send(command);
+
+    if (!response.Contents || response.Contents.length === 0) {
+      return [];
+    }
+
+    // Ordenar por nome (que inclui índice com padding)
+    const chunkKeys = response.Contents
+      .map(obj => obj.Key!)
+      .filter(key => key.endsWith('.bin'))
+      .sort();
+
+    return chunkKeys;
+  } catch (error: any) {
+    console.error(`❌ Erro ao listar chunks da sessão ${sessionId}:`, error);
+    throw new Error(`Falha ao listar chunks: ${error.message}`);
+  }
+}
+
+/**
+ * Remove todos os chunks de uma sessão (cleanup)
+ * 
+ * @param sessionId - ID da sessão
+ */
+export async function deleteChunks(sessionId: string): Promise<void> {
+  try {
+    const chunkKeys = await listChunks(sessionId);
+
+    if (chunkKeys.length === 0) {
+      console.log(`ℹ️ Nenhum chunk encontrado para sessão ${sessionId}`);
+      return;
+    }
+
+    // Deletar todos os chunks em paralelo
+    await Promise.all(
+      chunkKeys.map(key =>
+        r2Client.send(new DeleteObjectCommand({
+          Bucket: R2_BUCKET,
+          Key: key,
+        }))
+      )
+    );
+
+    console.log(`🗑️ ${chunkKeys.length} chunks removidos da sessão ${sessionId}`);
+  } catch (error: any) {
+    console.warn(`⚠️ Erro ao deletar chunks da sessão ${sessionId}:`, error);
+    // Não lançar erro - cleanup é best-effort
+  }
+}

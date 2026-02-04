@@ -1,9 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
-import { cleanupOldChunks } from "@/lib/utils/cleanup-chunks";
+import { uploadChunk } from "@/lib/cloudflare/r2-client";
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -86,26 +83,13 @@ export async function POST(request: NextRequest) {
       `(${(chunkBlob.size / 1024 / 1024).toFixed(2)}MB) - Session: ${sessionId.substring(0, 20)}...`
     );
 
-    // Limpar chunks órfãos periodicamente (apenas no primeiro chunk para evitar overhead)
-    if (chunkIndex === 0) {
-      cleanupOldChunks().catch(err => {
-        console.warn("⚠️ Erro na limpeza automática de chunks:", err);
-        // Não é crítico, continuar
-      });
-    }
-
-    // Criar diretório para a sessão se não existir
-    const sessionDir = join(tmpdir(), 'audio-chunks', sessionId);
-    await mkdir(sessionDir, { recursive: true });
-
-    // Salvar chunk
-    const chunkFileName = `chunk-${chunkIndex.toString().padStart(4, '0')}.bin`;
-    const chunkPath = join(sessionDir, chunkFileName);
+    // Converter blob para buffer
     const chunkBuffer = Buffer.from(await chunkBlob.arrayBuffer());
 
-    await writeFile(chunkPath, chunkBuffer);
+    // Salvar chunk no Cloudflare R2 (não em /tmp - resolve problema de Serverless)
+    await uploadChunk(sessionId, chunkIndex, chunkBuffer);
 
-    console.log(`✅ Chunk ${chunkIndex + 1}/${totalChunks} salvo: ${chunkFileName}`);
+    console.log(`✅ Chunk ${chunkIndex + 1}/${totalChunks} salvo no R2`);
 
     // Calcular progresso
     const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);

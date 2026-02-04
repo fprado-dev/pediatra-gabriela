@@ -278,34 +278,37 @@ function addObservationsSection(builder: PDFBuilder, consultation: ConsultationD
 function addSpeakerTranscriptionSection(builder: PDFBuilder, consultation: ConsultationData) {
   // Verificar se tem diarização
   if (consultation.raw_transcription?.includes("[Speaker")) {
-    builder.addTitle("Transcrição com Identificação de Falantes", 14);
-    builder.moveDown(0.3);
-    builder.addText("Conversação completa com identificação automática de participantes:", 9);
-    builder.moveDown(0.3);
-
+    // Formatar conteúdo da transcrição
     const lines = consultation.raw_transcription.split("\n\n");
-    lines.forEach((line: string) => {
-      const match = line.match(/^\[([^\]]+)\]:\s*(.+)$/s);
-      if (match) {
-        const [, speaker, text] = match;
-        const speakerNum = speaker.match(/Speaker (\d+)/)?.[1];
+    const formattedContent = lines
+      .map((line: string) => {
+        const match = line.match(/^\[([^\]]+)\]:\s*(.+)$/);
+        if (match) {
+          const [, speaker, text] = match;
+          const speakerNum = speaker.match(/Speaker (\d+)/)?.[1];
 
-        // Identificar o papel do speaker
-        let roleLabel = "";
-        if (speakerNum === "1") {
-          roleLabel = " (Médica)";
-        } else if (speakerNum === "2") {
-          roleLabel = " (Mãe/Responsável)";
+          // Identificar o papel do speaker
+          let roleLabel = "";
+          if (speakerNum === "1") {
+            roleLabel = " (Médica)";
+          } else if (speakerNum === "2") {
+            roleLabel = " (Mãe/Responsável)";
+          }
+
+          return `${speaker}${roleLabel}:\n${text}`;
         }
+        return null;
+      })
+      .filter(Boolean)
+      .join("\n\n");
 
-        builder.addText(`${speaker}${roleLabel}:`, 9, COLORS.primary);
-        builder.moveDown(0.1);
-        builder.addText(text, 9);
-        builder.moveDown(0.25);
-      }
-    });
-
-    builder.moveDown(0.5);
+    if (formattedContent) {
+      builder.addSection(
+        "Transcrição com Identificação de Falantes",
+        formattedContent,
+        { preformatted: true, size: 9 }
+      );
+    }
   }
 }
 

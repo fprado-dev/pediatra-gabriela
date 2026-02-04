@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
       existingConsultation: {
         id: consultation.id,
         patientId: consultation.patient_id,
-        patientName: consultation.patient?.full_name || "Paciente",
+        patientName: consultation.patient?.[0]?.full_name || "Paciente",
         createdAt: consultation.created_at,
         audioUrl: consultation.audio_url,
         status: consultation.status,

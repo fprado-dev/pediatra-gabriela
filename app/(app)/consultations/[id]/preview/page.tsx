@@ -190,7 +190,7 @@ export default async function ConsultationPreviewPage({
               .split("\n\n")
               .filter((line: string) => line.trim().length > 0)
               .map((line: string, idx: number) => {
-                const match = line.match(/^\[([^\]]+)\]:\s*(.+)$/s);
+                const match = line.match(/^\[([^\]]+)\]:\s*(.+)$/);
                 if (!match) return null;
                 
                 const [, speaker, text] = match;

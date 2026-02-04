@@ -1,26 +1,26 @@
 {
   "functions": {
-    "api/consultations/upload-audio/route.ts": {
+    "app/api/consultations/upload-audio/route.ts": {
       "maxDuration": 60,
       "memory": 1024
     },
-    "api/consultations/upload-chunk/route.ts": {
+    "app/api/consultations/upload-chunk/route.ts": {
       "maxDuration": 30,
       "memory": 512
     },
-    "api/consultations/process/route.ts": {
+    "app/api/consultations/process/route.ts": {
       "maxDuration": 300,
       "memory": 1024
     },
-    "api/consultations/check-duplicate/route.ts": {
+    "app/api/consultations/check-duplicate/route.ts": {
       "maxDuration": 10,
       "memory": 256
     },
-    "api/consultations/reuse/route.ts": {
+    "app/api/consultations/reuse/route.ts": {
       "maxDuration": 30,
       "memory": 512
     },
-    "api/consultations/cleanup-chunks/route.ts": {
+    "app/api/consultations/cleanup-chunks/route.ts": {
       "maxDuration": 60,
       "memory": 256
     }

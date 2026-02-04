@@ -90,7 +90,7 @@ export function TextDisplayControls({
               <span>
                 {wordCount.current} de {wordCount.original} palavras
               </span>
-              {compressionRatio !== null && compressionRatio > 0 && (
+              {compressionRatio != null && compressionRatio > 0 && (
                 <Badge variant="secondary" className="text-xs font-normal">
                   {compressionRatio}% menor
                 </Badge>

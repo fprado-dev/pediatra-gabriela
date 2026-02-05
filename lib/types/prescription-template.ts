@@ -17,6 +17,7 @@ export interface PrescriptionTemplate {
   doctor_id: string;
   name: string;
   category: string;
+  description?: string;            // Descrição do template
   medications: Medication[];
   instructions?: string;           // Orientações gerais (legado)
   warnings?: string;               // Alertas importantes (legado)

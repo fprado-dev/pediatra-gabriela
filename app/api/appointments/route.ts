@@ -118,7 +118,8 @@ export async function POST(request: NextRequest) {
       data.patient_id,
       (existingAppointments || []) as AppointmentWithPatient[],
       scheduleData as DoctorSchedule | undefined,
-      (blocks || []) as ScheduleBlock[]
+      (blocks || []) as ScheduleBlock[],
+      data.duration_minutes || 30
     );
 
     if (!validation.valid) {

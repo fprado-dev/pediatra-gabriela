@@ -5,11 +5,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Star, StarOff, TrendingUp, X, Users } from "lucide-react";
+import { Search, Star, StarOff, TrendingUp, X, Users, Pencil, Save } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { PrescriptionTemplate } from "@/lib/types/prescription-template";
@@ -45,6 +49,17 @@ export function TemplateSelectorModal({
   const [previewTemplate, setPreviewTemplate] = useState<PrescriptionTemplate | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Dialog de edição
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<PrescriptionTemplate | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    category: "",
+    description: "",
+    is_open_template: false,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
   const supabase = createClient();
 
   // Carregar templates ao abrir modal
@@ -63,8 +78,8 @@ export function TemplateSelectorModal({
       const query = searchQuery.toLowerCase();
       return templates.filter(
         (t) =>
-          t.name.toLowerCase().includes(query) ||
-          t.category.toLowerCase().includes(query) ||
+          t.name?.toLowerCase().includes(query) ||
+          t.category?.toLowerCase().includes(query) ||
           t.instructions?.toLowerCase().includes(query)
       );
     };
@@ -184,6 +199,77 @@ export function TemplateSelectorModal({
     } catch (error: any) {
       console.error("Erro ao favoritar:", error);
       toast.error("Erro ao atualizar favorito");
+    }
+  };
+
+  // Abrir dialog de edição
+  const handleEditTemplate = () => {
+    if (!previewTemplate) return;
+
+    setEditingTemplate(previewTemplate);
+    setEditForm({
+      name: previewTemplate.name,
+      category: previewTemplate.category || "",
+      description: previewTemplate.description || "",
+      is_open_template: previewTemplate.is_open_template,
+    });
+    setShowEditDialog(true);
+  };
+
+  // Salvar edição do template
+  const handleSaveEdit = async () => {
+    if (!editingTemplate) return;
+
+    if (!editForm.name.trim()) {
+      toast.error("Digite um nome para o template");
+      return;
+    }
+
+    if (!editForm.category.trim()) {
+      toast.error("Selecione uma categoria");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("prescription_templates")
+        .update({
+          name: editForm.name,
+          category: editForm.category,
+          description: editForm.description || null,
+          is_open_template: editForm.is_open_template,
+        })
+        .eq("id", editingTemplate.id);
+
+      if (error) throw error;
+
+      // Atualizar localmente
+      const updatedTemplate = {
+        ...editingTemplate,
+        ...editForm,
+      };
+
+      const updateTemplates = (templates: PrescriptionTemplate[]) =>
+        templates.map((t) =>
+          t.id === editingTemplate.id ? updatedTemplate : t
+        );
+
+      setMyTemplates(updateTemplates(myTemplates));
+      setCommunityTemplates(updateTemplates(communityTemplates));
+
+      if (previewTemplate?.id === editingTemplate.id) {
+        setPreviewTemplate(updatedTemplate);
+      }
+
+      toast.success("Template atualizado com sucesso!");
+      setShowEditDialog(false);
+      setEditingTemplate(null);
+    } catch (error: any) {
+      console.error("Erro ao atualizar template:", error);
+      toast.error("Erro ao atualizar template");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -471,12 +557,135 @@ export function TemplateSelectorModal({
                 </>
               )}
             </Button>
+
+            {/* Botão Editar - apenas para templates do próprio médico */}
+            {previewTemplate?.doctor_id === currentUser && (
+              <Button
+                variant="outline"
+                onClick={handleEditTemplate}
+                className="flex items-center gap-2"
+              >
+                <Pencil className="h-4 w-4" />
+                Editar
+              </Button>
+            )}
+
             <Button onClick={handleConfirmTemplate} className="flex-1">
               Usar Template
             </Button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      {/* Dialog de Edição de Template */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Template</DialogTitle>
+            <DialogDescription>
+              Atualize as informações do template. As medicações e orientações não podem ser editadas aqui.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Nome */}
+            <div className="space-y-2">
+              <Label htmlFor="editName">Nome do Template *</Label>
+              <Input
+                id="editName"
+                placeholder="Ex: Gastroenterite, Gripe, Otite..."
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+
+            {/* Categoria */}
+            <div className="space-y-2">
+              <Label htmlFor="editCategory">Categoria *</Label>
+              <Select
+                value={editForm.category}
+                onValueChange={(value) => setEditForm({ ...editForm, category: value })}
+              >
+                <SelectTrigger id="editCategory">
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Sintomas Comuns">Sintomas Comuns</SelectItem>
+                  <SelectItem value="Antibióticos">Antibióticos</SelectItem>
+                  <SelectItem value="Doenças Crônicas">Doenças Crônicas</SelectItem>
+                  <SelectItem value="Preventivos">Preventivos</SelectItem>
+                  <SelectItem value="Orientações Gerais">Orientações Gerais</SelectItem>
+                  <SelectItem value="Respiratório">Respiratório</SelectItem>
+                  <SelectItem value="Gastrointestinal">Gastrointestinal</SelectItem>
+                  <SelectItem value="Dermatológico">Dermatológico</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Descrição */}
+            <div className="space-y-2">
+              <Label htmlFor="editDescription">Descrição</Label>
+              <Textarea
+                id="editDescription"
+                placeholder="Descreva quando usar este template..."
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            {/* Checkbox Comunidade */}
+            <div className="flex items-center space-x-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <Checkbox
+                id="editIsOpen"
+                checked={editForm.is_open_template}
+                onCheckedChange={(checked) =>
+                  setEditForm({ ...editForm, is_open_template: checked as boolean })
+                }
+              />
+              <div className="flex-1">
+                <Label
+                  htmlFor="editIsOpen"
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Compartilhar com a comunidade
+                </Label>
+                <p className="text-xs text-gray-600 mt-1">
+                  Outros médicos poderão ver e usar este template
+                </p>
+              </div>
+            </div>
+
+            {/* Info sobre medicações */}
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                ℹ️ Para editar medicações e orientações, você precisa criar um novo template a partir de uma receita.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditDialog(false)}
+              disabled={isSaving}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSaving}>
+              {isSaving ? (
+                <>Salvando...</>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Alterações
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

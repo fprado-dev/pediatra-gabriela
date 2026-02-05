@@ -1,18 +1,22 @@
-import { 
-  DEFAULT_SCHEDULE, 
-  TimeSlot, 
+import {
+  DEFAULT_SCHEDULE,
+  TimeSlot,
   DoctorSchedule,
   ScheduleBlock,
-  AppointmentWithPatient 
+  AppointmentWithPatient
 } from '@/lib/types/appointment';
 import { format, parse, addMinutes, isAfter, isBefore, isEqual, startOfDay } from 'date-fns';
 
 /**
  * Verifica se uma data é fim de semana
+ * IMPORTANTE: Recebe string no formato yyyy-MM-dd para evitar problemas de timezone
  */
-export function isWeekend(date: Date): boolean {
-  const day = date.getDay();
-  return day === 0 || day === 6;
+export function isWeekend(dateString: string): boolean {
+  // Usar formato local sem problemas de timezone
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const dayOfWeek = date.getDay();
+  return dayOfWeek === 0 || dayOfWeek === 6;
 }
 
 /**
@@ -26,12 +30,27 @@ export function isLunchTime(time: string): boolean {
 /**
  * Verifica se um horário está dentro do expediente
  */
-export function isWithinWorkingHours(time: string, schedule?: DoctorSchedule): boolean {
-  const hour = parseInt(time.split(':')[0]);
+export function isWithinWorkingHours(time: string, schedule?: DoctorSchedule, durationMinutes: number = 0): boolean {
+  const [hour, minute] = time.split(':').map(Number);
   const startHour = schedule ? parseInt(schedule.start_time.split(':')[0]) : DEFAULT_SCHEDULE.startHour;
   const endHour = schedule ? parseInt(schedule.end_time.split(':')[0]) : DEFAULT_SCHEDULE.endHour;
-  
-  return hour >= startHour && hour < endHour;
+
+  // Verificar se o horário inicial está dentro do expediente
+  if (hour < startHour || hour >= endHour) {
+    return false;
+  }
+
+  // Se há duração, verificar se o horário final também está dentro do expediente
+  if (durationMinutes > 0) {
+    const totalMinutes = hour * 60 + minute + durationMinutes;
+    const endTimeHour = Math.floor(totalMinutes / 60);
+
+    if (endTimeHour > endHour) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -65,7 +84,7 @@ function isSlotAvailable(
   for (const block of blocks) {
     const blockStart = new Date(block.start_datetime);
     const blockEnd = new Date(block.end_datetime);
-    
+
     if (isBefore(slotTime, blockEnd) && isAfter(slotEnd, blockStart)) {
       return { available: false, reason: 'blocked' };
     }
@@ -85,9 +104,10 @@ export function generateTimeSlots(
   requestedDuration: number = DEFAULT_SCHEDULE.slotDuration
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
-  
+
   // Verifica se é fim de semana
-  if (isWeekend(date)) {
+  const dateString = format(date, 'yyyy-MM-dd');
+  if (isWeekend(dateString)) {
     return [];
   }
 
@@ -102,7 +122,7 @@ export function generateTimeSlots(
 
   while (isBefore(currentTime, endTime)) {
     const timeString = format(currentTime, 'HH:mm');
-    
+
     // Verifica horário de almoço
     if (isLunchTime(timeString)) {
       currentTime = addMinutes(currentTime, slotDuration);
@@ -146,7 +166,8 @@ export function findAvailableSlots(
   const maxDaysToCheck = 30;
 
   while (availableSlots.length < count && daysChecked < maxDaysToCheck) {
-    if (!isWeekend(currentDate)) {
+    const currentDateString = format(currentDate, 'yyyy-MM-dd');
+    if (!isWeekend(currentDateString)) {
       const daySlots = generateTimeSlots(
         currentDate,
         schedule,
@@ -155,7 +176,7 @@ export function findAvailableSlots(
       );
 
       const available = daySlots.filter(slot => slot.available);
-      
+
       for (const slot of available) {
         if (availableSlots.length < count) {
           availableSlots.push({
@@ -182,20 +203,23 @@ export function validateAppointmentTime(
   patientId: string,
   existingAppointments: AppointmentWithPatient[],
   schedule?: DoctorSchedule,
-  blocks: ScheduleBlock[] = []
+  blocks: ScheduleBlock[] = [],
+  durationMinutes: number = 30
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  const appointmentDate = new Date(date);
 
-  // Verifica se é no passado
+  // Verifica se é no passado (usando formato local para evitar problemas de timezone)
   const now = new Date();
-  const appointmentDateTime = new Date(`${date}T${time}`);
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const appointmentDateTime = new Date(year, month - 1, day, hour, minute);
+
   if (isBefore(appointmentDateTime, now)) {
     errors.push('Não é possível agendar no passado');
   }
 
-  // Verifica se é fim de semana
-  if (isWeekend(appointmentDate)) {
+  // Verifica se é fim de semana (passando string para evitar timezone)
+  if (isWeekend(date)) {
     errors.push('Não é possível agendar em finais de semana');
   }
 
@@ -204,42 +228,54 @@ export function validateAppointmentTime(
     errors.push('Horário de almoço indisponível');
   }
 
-  // Verifica expediente
-  if (!isWithinWorkingHours(time, schedule)) {
-    errors.push('Fora do horário de atendimento');
+  // Verifica expediente (incluindo duração)
+  if (!isWithinWorkingHours(time, schedule, durationMinutes)) {
+    errors.push('Fora do horário de atendimento (8h-18h)');
   }
 
-  // Verifica duplicidade de paciente no mesmo dia
-  const patientHasAppointment = existingAppointments.some(
-    apt => 
-      apt.patient_id === patientId && 
-      apt.appointment_date === date && 
-      apt.status !== 'cancelled'
-  );
-  if (patientHasAppointment) {
-    errors.push('Paciente já tem agendamento para este dia');
+  // Verifica duplicidade de paciente no mesmo dia (apenas se patientId fornecido)
+  if (patientId) {
+    const patientHasAppointment = existingAppointments.some(
+      apt =>
+        apt.patient_id === patientId &&
+        apt.appointment_date === date &&
+        apt.status !== 'cancelled'
+    );
+    if (patientHasAppointment) {
+      errors.push('Paciente já tem agendamento para este dia');
+    }
   }
 
-  // Verifica se horário está ocupado
-  const slotOccupied = existingAppointments.some(
-    apt => 
-      apt.appointment_date === date && 
-      apt.appointment_time === time && 
-      apt.status !== 'cancelled'
-  );
-  if (slotOccupied) {
-    errors.push('Horário já ocupado');
+  // Verifica conflito de horário (overlap)
+  const hasConflict = existingAppointments.some(apt => {
+    if (apt.status === 'cancelled' || apt.appointment_date !== date) {
+      return false;
+    }
+
+    const [aptHour, aptMinute] = apt.appointment_time.split(':').map(Number);
+    const aptStart = aptHour * 60 + aptMinute;
+    const aptEnd = aptStart + apt.duration_minutes;
+
+    const [newHour, newMinute] = time.split(':').map(Number);
+    const newStart = newHour * 60 + newMinute;
+    const newEnd = newStart + durationMinutes;
+
+    // Verifica overlap
+    return newStart < aptEnd && newEnd > aptStart;
+  });
+
+  if (hasConflict) {
+    errors.push('Horário conflita com outro agendamento');
   }
 
   // Verifica bloqueios
   const isBlocked = blocks.some(block => {
     const blockStart = new Date(block.start_datetime);
     const blockEnd = new Date(block.end_datetime);
-    const slotDateTime = new Date(`${date}T${time}`);
-    
+
     return (
-      (isAfter(slotDateTime, blockStart) || isEqual(slotDateTime, blockStart)) &&
-      isBefore(slotDateTime, blockEnd)
+      (isAfter(appointmentDateTime, blockStart) || isEqual(appointmentDateTime, blockStart)) &&
+      isBefore(appointmentDateTime, blockEnd)
     );
   });
   if (isBlocked) {

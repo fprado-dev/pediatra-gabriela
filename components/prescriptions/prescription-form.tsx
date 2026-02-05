@@ -138,6 +138,9 @@ export function PrescriptionForm({
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
   const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const [templateName, setTemplateName] = useState("");
+  const [templateCategory, setTemplateCategory] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [templateIsOpen, setTemplateIsOpen] = useState(false);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<{ text: string, id: string } | null>(null);
@@ -264,13 +267,23 @@ export function PrescriptionForm({
       // Aplicar medicações
       if (template.medications && template.medications.length > 0) {
         setMedications(
-          template.medications.map((m: any) => ({
-            id: crypto.randomUUID(),
-            name: m.name || "",
-            dosage: m.dosage || "",
-            quantity: m.quantity || "",
-            instructions: m.instructions || "",
-          }))
+          template.medications.map((m: any) => {
+            // Combinar campos do template em instructions
+            const instructionParts = [];
+            if (m.frequency) instructionParts.push(m.frequency);
+            if (m.route) instructionParts.push(`via ${m.route}`);
+            if (m.duration) instructionParts.push(m.duration);
+            if (m.condition) instructionParts.push(m.condition);
+            if (m.notes) instructionParts.push(m.notes);
+
+            return {
+              id: crypto.randomUUID(),
+              name: m.name || "",
+              dosage: m.dosage || "",
+              quantity: "", // Deixar vazio para o médico preencher
+              instructions: instructionParts.join(", "),
+            };
+          })
         );
       }
 
@@ -324,6 +337,11 @@ export function PrescriptionForm({
       return;
     }
 
+    if (!templateCategory.trim()) {
+      toast.error("Selecione uma categoria");
+      return;
+    }
+
     try {
       // Obter o user ID atual
       const { data: { user } } = await supabase.auth.getUser();
@@ -336,16 +354,25 @@ export function PrescriptionForm({
       const { error } = await supabase.from("prescription_templates").insert({
         doctor_id: user.id,
         name: templateName,
+        category: templateCategory,
+        description: templateDescription || null,
         medications: medications.filter((m) => m.name.trim()),
-        instructions: orientations,
-        warnings: alertSigns,
+        instructions: orientations || null,
+        warnings: alertSigns || null,
+        alert_signs: alertSigns || null,
+        prevention: prevention || null,
+        is_open_template: templateIsOpen,
       });
 
       if (error) throw error;
 
       toast.success("Template salvo com sucesso!");
       setShowSaveTemplateDialog(false);
+      // Limpar campos
       setTemplateName("");
+      setTemplateCategory("");
+      setTemplateDescription("");
+      setTemplateIsOpen(false);
     } catch (error) {
       console.error("Erro ao salvar template:", error);
       toast.error("Erro ao salvar template");
@@ -718,29 +745,97 @@ export function PrescriptionForm({
 
       {/* Dialog de Salvar como Template */}
       <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Salvar como Template</DialogTitle>
             <DialogDescription>
               Salve esta receita como um template para reutilizar em futuras consultas.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="templateName">Nome do Template</Label>
-            <Input
-              id="templateName"
-              placeholder="Ex: Gastroenterite, Gripe, Otite..."
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              className="mt-2"
-            />
+
+          <div className="space-y-4 py-4">
+            {/* Nome */}
+            <div className="space-y-2">
+              <Label htmlFor="templateName">Nome do Template *</Label>
+              <Input
+                id="templateName"
+                placeholder="Ex: Gastroenterite, Gripe, Otite..."
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+              />
+            </div>
+
+            {/* Categoria */}
+            <div className="space-y-2">
+              <Label htmlFor="templateCategory">Categoria *</Label>
+              <Select value={templateCategory} onValueChange={setTemplateCategory}>
+                <SelectTrigger id="templateCategory">
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Sintomas Comuns">Sintomas Comuns</SelectItem>
+                  <SelectItem value="Antibióticos">Antibióticos</SelectItem>
+                  <SelectItem value="Doenças Crônicas">Doenças Crônicas</SelectItem>
+                  <SelectItem value="Preventivos">Preventivos</SelectItem>
+                  <SelectItem value="Orientações Gerais">Orientações Gerais</SelectItem>
+                  <SelectItem value="Respiratório">Respiratório</SelectItem>
+                  <SelectItem value="Gastrointestinal">Gastrointestinal</SelectItem>
+                  <SelectItem value="Dermatológico">Dermatológico</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Descrição */}
+            <div className="space-y-2">
+              <Label htmlFor="templateDescription">Descrição</Label>
+              <Textarea
+                id="templateDescription"
+                placeholder="Descreva quando usar este template..."
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {/* Checkbox Comunidade */}
+            <div className="flex items-center space-x-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <Checkbox
+                id="templateIsOpen"
+                checked={templateIsOpen}
+                onCheckedChange={(checked) => setTemplateIsOpen(checked as boolean)}
+              />
+              <div className="flex-1">
+                <Label
+                  htmlFor="templateIsOpen"
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Compartilhar com a comunidade
+                </Label>
+                <p className="text-xs text-gray-600 mt-1">
+                  Outros médicos poderão ver e usar este template (recomendado)
+                </p>
+              </div>
+            </div>
+
+            {/* Resumo do que será salvo */}
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+              <p className="text-sm font-medium text-gray-700">O que será salvo:</p>
+              <ul className="text-xs text-gray-600 space-y-1 ml-4">
+                <li>✓ {medications.filter(m => m.name.trim()).length} medicação(ões)</li>
+                {orientations && <li>✓ Orientações gerais</li>}
+                {alertSigns && <li>✓ Sinais de alerta</li>}
+                {prevention && <li>✓ Como prevenir</li>}
+              </ul>
+            </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSaveTemplateDialog(false)}>
               Cancelar
             </Button>
             <Button onClick={saveAsTemplate}>
-              <Save className="h-4 w-4" />
+              <Save className="h-4 w-4 mr-2" />
               Salvar Template
             </Button>
           </DialogFooter>

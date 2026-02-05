@@ -1,18 +1,28 @@
-import { PageHeaderSkeleton } from "@/components/skeletons/page-header-skeleton";
-import { StatsCardsSkeleton } from "@/components/skeletons/stats-cards-skeleton";
-import { ChartSkeleton, DonutChartSkeleton } from "@/components/skeletons/chart-skeleton";
-import { ListSkeleton } from "@/components/skeletons/list-skeleton";
+import {
+  HeroSkeleton,
+  TodayAgendaSkeleton,
+  InsightsCardSkeleton,
+  EfficiencyMetricsSkeleton,
+  UpcomingActivitiesSkeleton,
+} from "@/components/dashboard/dashboard-loading";
 
 export default function DashboardLoading() {
   return (
     <div className="space-y-6">
-      <PageHeaderSkeleton />
-      <StatsCardsSkeleton />
-      <div className="grid gap-4 md:grid-cols-2">
-        <ChartSkeleton />
-        <DonutChartSkeleton />
+      {/* Hero Section */}
+      <HeroSkeleton />
+
+      {/* Grid Principal */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <TodayAgendaSkeleton />
+        <InsightsCardSkeleton />
       </div>
-      <ListSkeleton items={5} />
+
+      {/* Atividades Futuras */}
+      <UpcomingActivitiesSkeleton />
+
+      {/* Métricas de Eficiência */}
+      <EfficiencyMetricsSkeleton />
     </div>
   );
 }

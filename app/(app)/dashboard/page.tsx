@@ -1,15 +1,10 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { StatsCards } from "@/components/dashboard/stats-cards";
-import { ConsultationsChart } from "@/components/dashboard/consultations-chart";
-import { AgeDistributionChart } from "@/components/dashboard/age-distribution-chart";
-import { RecentActivity } from "@/components/dashboard/recent-activity";
-import { OverdueVaccines } from "@/components/dashboard/overdue-vaccines";
-import { TodayAppointments } from "@/components/dashboard/today-appointments";
-import { startOfMonth, format, subMonths } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { HeroSection } from "@/components/dashboard/hero-section";
+import { TodayAgenda } from "@/components/dashboard/today-agenda";
+import { InsightsCard } from "@/components/dashboard/insights-card";
+import { EfficiencyMetrics } from "@/components/dashboard/efficiency-metrics";
+import { UpcomingActivities } from "@/components/dashboard/upcoming-activities";
+import { startOfMonth, format, subDays, startOfWeek, addDays, endOfWeek } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
@@ -22,81 +17,122 @@ export default async function DashboardPage() {
 
   if (!user) return null;
 
-  // Buscar perfil do usuário
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .single();
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  const monthStart = startOfMonth(today).toISOString();
+  const previousMonthStart = startOfMonth(subDays(monthStart, 1)).toISOString();
+  const previousMonthEnd = subDays(monthStart, 1).toISOString();
 
-  // Buscar contagem de pacientes
-  const { count: patientsCount } = await supabase
+  // === HERO SECTION DATA ===
+
+  // Agendamentos hoje
+  const { data: todayAppointments } = await supabase
+    .from("appointments")
+    .select(`
+      id,
+      appointment_time,
+      status,
+      patient_id,
+      patient:patients(id, full_name, date_of_birth)
+    `)
+    .eq("doctor_id", user.id)
+    .eq("appointment_date", todayStr)
+    .neq("status", "cancelled")
+    .order("appointment_time", { ascending: true });
+
+  const consultationsToday = todayAppointments?.length || 0;
+  const nextAppointment = todayAppointments?.[0];
+  const nextAppointmentTime = nextAppointment?.appointment_time || null;
+
+  // Total pacientes ativos
+  const { count: totalActivePatients } = await supabase
     .from("patients")
     .select("*", { count: "exact", head: true })
     .eq("doctor_id", user.id)
     .eq("is_active", true);
 
-  // Buscar contagem de consultas do mês atual
-  const monthStart = startOfMonth(new Date()).toISOString();
-  const { count: consultationsCount } = await supabase
+  // === TODAY AGENDA DATA ===
+  const formattedTodayAppointments = (todayAppointments || []).map((a: any) => ({
+    id: a.id,
+    patient_id: a.patient_id,
+    appointment_time: a.appointment_time,
+    status: a.status,
+    patient: a.patient,
+  }));
+
+  // === INSIGHTS CARD DATA ===
+
+  // Consultas mês atual
+  const { count: currentMonthTotal } = await supabase
     .from("consultations")
     .select("*", { count: "exact", head: true })
     .eq("doctor_id", user.id)
     .gte("consultation_date", monthStart);
 
-  // Buscar pacientes com alergias
-  const { count: allergiesCount } = await supabase
-    .from("patients")
+  // Consultas mês anterior
+  const { count: previousMonthTotal } = await supabase
+    .from("consultations")
     .select("*", { count: "exact", head: true })
     .eq("doctor_id", user.id)
-    .eq("is_active", true)
-    .not("allergies", "is", null)
-    .neq("allergies", "");
+    .gte("consultation_date", previousMonthStart)
+    .lte("consultation_date", previousMonthEnd);
 
-  // Calcular tempo economizado (estimativa: 15min por consulta)
-  const timeSavedMinutes = (consultationsCount || 0) * 15;
-
-  // Buscar consultas por mês (últimos 6 meses)
-  const sixMonthsAgo = subMonths(new Date(), 5);
-  const { data: monthlyData } = await supabase
+  // Dados diários (últimos 30 dias para o gráfico)
+  const thirtyDaysAgo = subDays(today, 30).toISOString();
+  const { data: dailyConsultations } = await supabase
     .from("consultations")
     .select("consultation_date")
     .eq("doctor_id", user.id)
-    .gte("consultation_date", startOfMonth(sixMonthsAgo).toISOString())
+    .gte("consultation_date", thirtyDaysAgo)
     .order("consultation_date", { ascending: true });
 
-  // Agrupar por mês
-  const monthlyChartData = (() => {
-    const months: Record<string, number> = {};
-    
-    // Inicializar os últimos 6 meses
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = subMonths(new Date(), i);
-      const monthLabel = format(monthDate, "MMM", { locale: ptBR });
-      months[monthLabel] = 0;
+  // Agrupar por dia
+  const dailyData = (() => {
+    const days: Record<string, number> = {};
+
+    for (let i = 30; i >= 0; i--) {
+      const date = subDays(today, i);
+      const dateStr = format(date, "yyyy-MM-dd");
+      days[dateStr] = 0;
     }
 
-    // Contar consultas por mês
-    monthlyData?.forEach((consultation) => {
-      const consultationDate = new Date(consultation.consultation_date);
-      const monthLabel = format(consultationDate, "MMM", { locale: ptBR });
-      if (months[monthLabel] !== undefined) {
-        months[monthLabel]++;
+    dailyConsultations?.forEach((c) => {
+      const dateStr = format(new Date(c.consultation_date), "yyyy-MM-dd");
+      if (days[dateStr] !== undefined) {
+        days[dateStr]++;
       }
     });
 
-    return Object.entries(months).map(([month, total]) => ({ month, total }));
+    return Object.entries(days).map(([date, count]) => ({ date, count }));
   })();
 
-  // Buscar distribuição por faixa etária
+  // === EFFICIENCY METRICS DATA ===
+
+  const timeSavedMinutes = (currentMonthTotal || 0) * 15;
+
+  // Taxa de retorno (pacientes com 2+ consultas)
+  const { data: patientConsultations } = await supabase
+    .from("consultations")
+    .select("patient_id")
+    .eq("doctor_id", user.id);
+
+  const patientCounts = patientConsultations?.reduce((acc: Record<string, number>, c) => {
+    acc[c.patient_id] = (acc[c.patient_id] || 0) + 1;
+    return acc;
+  }, {});
+
+  const returningPatients = Object.values(patientCounts || {}).filter((count) => count >= 2).length;
+  const uniquePatients = Object.keys(patientCounts || {}).length;
+  const returnRate = uniquePatients > 0 ? Math.round((returningPatients / uniquePatients) * 100) : 0;
+
+  // Distribuição etária
   const { data: patientsData } = await supabase
     .from("patients")
     .select("date_of_birth")
     .eq("doctor_id", user.id)
     .eq("is_active", true);
 
-  // Calcular faixas etárias
-  const ageDistributionData = (() => {
+  const ageDistribution = (() => {
     const faixas: Record<string, number> = {
       "0-1 ano": 0,
       "1-3 anos": 0,
@@ -106,19 +142,12 @@ export default async function DashboardPage() {
 
     patientsData?.forEach((patient) => {
       const birthDate = new Date(patient.date_of_birth);
-      const today = new Date();
-      const ageInYears =
-        (today.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      const ageInYears = (today.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 
-      if (ageInYears < 1) {
-        faixas["0-1 ano"]++;
-      } else if (ageInYears < 4) {
-        faixas["1-3 anos"]++;
-      } else if (ageInYears < 7) {
-        faixas["4-6 anos"]++;
-      } else {
-        faixas["7+ anos"]++;
-      }
+      if (ageInYears < 1) faixas["0-1 ano"]++;
+      else if (ageInYears < 4) faixas["1-3 anos"]++;
+      else if (ageInYears < 7) faixas["4-6 anos"]++;
+      else faixas["7+ anos"]++;
     });
 
     return Object.entries(faixas)
@@ -126,74 +155,69 @@ export default async function DashboardPage() {
       .map(([faixa, total]) => ({ faixa, total }));
   })();
 
-  // Buscar últimas 5 consultas
-  const { data: recentConsultations } = await supabase
-    .from("consultations")
-    .select(
-      `
-      id,
-      status,
-      chief_complaint,
-      created_at,
-      patient:patients(full_name)
-    `
-    )
-    .eq("doctor_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(5);
+  // === UPCOMING ACTIVITIES DATA ===
 
-  // Formatar dados para o componente
-  const formattedConsultations = (recentConsultations || []).map((c: any) => ({
-    id: c.id,
-    status: c.status as "completed" | "processing" | "error",
-    chief_complaint: c.chief_complaint,
-    created_at: c.created_at,
-    patient: {
-      full_name: c.patient?.full_name || "Paciente",
-    },
-  }));
+  const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+
+  const { data: weekAppointments } = await supabase
+    .from("appointments")
+    .select("appointment_date")
+    .eq("doctor_id", user.id)
+    .gte("appointment_date", format(weekStart, "yyyy-MM-dd"))
+    .lte("appointment_date", format(weekEnd, "yyyy-MM-dd"))
+    .neq("status", "cancelled");
+
+  const weekData = (() => {
+    const days: Record<string, number> = {};
+
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(weekStart, i);
+      const dateStr = format(date, "yyyy-MM-dd");
+      days[dateStr] = 0;
+    }
+
+    weekAppointments?.forEach((a) => {
+      const dateStr = a.appointment_date;
+      if (days[dateStr] !== undefined) {
+        days[dateStr]++;
+      }
+    });
+
+    return Object.entries(days).map(([date, count]) => ({ date, count }));
+  })();
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">
-            Bem-vindo, Dr(a). {profile?.full_name?.split(" ")[0] || "Doutor"}!
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Sua plataforma de documentação clínica está pronta.
-          </p>
+
+      <div className="py-8 max-w-7xl mx-auto space-y-6">
+        {/* Hero Section */}
+        <HeroSection
+          consultationsToday={consultationsToday}
+          nextAppointmentTime={nextAppointmentTime}
+          totalActivePatients={totalActivePatients || 0}
+        />
+
+        {/* Grid Principal: Agenda + Insights */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <TodayAgenda appointments={formattedTodayAppointments} />
+          <InsightsCard
+            currentMonthTotal={currentMonthTotal || 0}
+            previousMonthTotal={previousMonthTotal || 0}
+            dailyData={dailyData}
+          />
         </div>
-        <Link href="/consultations/new-recording">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Consulta
-          </Button>
-        </Link>
-      </div>
 
-      {/* Stats Cards */}
-      <StatsCards
-        consultationsCount={consultationsCount || 0}
-        patientsCount={patientsCount || 0}
-        timeSavedMinutes={timeSavedMinutes}
-        allergiesCount={allergiesCount || 0}
-      />
+        {/* Atividades Futuras */}
+        <UpcomingActivities weekAppointments={weekData} />
 
-      {/* Charts Grid */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <ConsultationsChart data={monthlyChartData} />
-        <AgeDistributionChart data={ageDistributionData} />
-      </div>
-
-      {/* Agendamentos de Hoje */}
-      <TodayAppointments />
-
-      {/* Recent Activity & Overdue Vaccines */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <RecentActivity consultations={formattedConsultations} />
-        <OverdueVaccines />
+        {/* Métricas de Eficiência */}
+        <EfficiencyMetrics
+          consultationsThisMonth={currentMonthTotal || 0}
+          timeSavedMinutes={timeSavedMinutes}
+          returnRate={returnRate}
+          ageDistribution={ageDistribution}
+        />
       </div>
     </div>
   );

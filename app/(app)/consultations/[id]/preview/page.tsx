@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, Pill, FileCheck, Users, Trash2, ShieldAlert, Cake, UserCheck } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, Pill, FileCheck, Users, Trash2, ShieldAlert, Cake, UserCheck, RefreshCw, Archive } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -335,6 +335,51 @@ export default async function ConsultationPreviewPage({
         {consultation.audio_url && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <AudioPlayer consultationId={id} />
+          </div>
+        )}
+
+        {/* Áudio Original (Backup) */}
+        {consultation.original_audio_url && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Archive className="h-5 w-5 text-gray-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Áudio Original</h2>
+              <Badge variant="outline" className="ml-auto">
+                Backup
+              </Badge>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Backup do áudio gravado antes do processamento. Use para reprocessar em caso de erro ou baixar o arquivo original.
+            </p>
+            <div className="flex gap-3">
+              <form action={`/api/consultations/${id}/original-audio`} method="GET">
+                <Button 
+                  type="submit"
+                  variant="outline" 
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Baixar Áudio Original
+                </Button>
+              </form>
+              
+              {(consultation.status === 'error' || consultation.status === 'completed') && (
+                <form action="/api/consultations/process" method="POST">
+                  <input type="hidden" name="consultationId" value={id} />
+                  <input type="hidden" name="useOriginal" value="true" />
+                  <Button 
+                    type="submit"
+                    variant="default" 
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Reprocessar com Áudio Original
+                  </Button>
+                </form>
+              )}
+            </div>
           </div>
         )}
 

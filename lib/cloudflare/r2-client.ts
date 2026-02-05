@@ -70,6 +70,58 @@ export async function uploadAudio(
 }
 
 /**
+ * Upload do áudio original (backup) para Cloudflare R2
+ * Similar ao uploadAudio, mas adiciona sufixo '_original' ao nome do arquivo
+ * 
+ * @param key - Caminho/nome do arquivo no bucket (ex: "user123/audio456.mp3")
+ * @param body - Buffer ou Blob do arquivo
+ * @param contentType - MIME type do arquivo
+ * @returns URL pública do arquivo original
+ * 
+ * @example
+ * // Input key: "user123/consultation789.webm"
+ * // Output URL: "https://.../user123/consultation789_original.webm"
+ */
+export async function uploadOriginalAudio(
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<string> {
+  try {
+    // Adicionar sufixo _original antes da extensão
+    const keyParts = key.split('.');
+    const extension = keyParts.pop();
+    const basePath = keyParts.join('.');
+    const originalKey = `${basePath}_original.${extension}`;
+
+    console.log(`📤 Uploading ORIGINAL audio to R2: ${originalKey} (${(body.length / 1024 / 1024).toFixed(2)}MB)`);
+
+    const command = new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: originalKey,
+      Body: body,
+      ContentType: contentType,
+      Metadata: {
+        isOriginal: "true",
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    await r2Client.send(command);
+
+    const publicUrl = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/${originalKey}`;
+
+    console.log(`✅ Original audio upload concluído: ${originalKey}`);
+    return publicUrl;
+  } catch (error: any) {
+    console.error("❌ Erro no upload do áudio original para R2:", error);
+    // Não lançar erro - backup é best-effort, não deve bloquear o fluxo principal
+    console.warn("⚠️ Continuando sem backup do áudio original");
+    throw new Error(`Falha ao fazer upload do áudio original para R2: ${error.message}`);
+  }
+}
+
+/**
  * Download de arquivo do Cloudflare R2
  * @param key - Caminho/nome do arquivo no bucket
  * @returns Buffer do arquivo e ContentType

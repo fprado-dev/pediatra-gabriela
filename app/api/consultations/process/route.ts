@@ -8,7 +8,7 @@ import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
-export const maxDuration = 300; // 5 minutos para processamento
+export const maxDuration = 600; // 10 minutos para processamento de áudios grandes
 export const dynamic = 'force-dynamic';
 
 /**
@@ -49,8 +49,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     consultationId = body.consultationId; // Salvar em variável externa
+    const useOriginal = body.useOriginal === true; // Flag para usar áudio original
 
     console.log(`📋 Consultation ID: ${consultationId}`);
+    if (useOriginal) {
+      console.log(`🔄 RETRY COM ÁUDIO ORIGINAL solicitado`);
+    }
 
     if (!consultationId) {
       return NextResponse.json(
@@ -76,7 +80,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!consultation.audio_url) {
+    // Decidir qual áudio usar: original (backup) ou processado
+    let audioUrlToUse: string;
+    if (useOriginal && consultation.original_audio_url) {
+      audioUrlToUse = consultation.original_audio_url;
+      console.log(`🔄 Usando áudio ORIGINAL (backup) para processamento`);
+    } else {
+      audioUrlToUse = consultation.audio_url;
+      if (useOriginal && !consultation.original_audio_url) {
+        console.warn(`⚠️ Áudio original solicitado mas não disponível, usando áudio normal`);
+      }
+    }
+
+    if (!audioUrlToUse) {
       return NextResponse.json(
         { error: "URL do áudio não encontrada" },
         { status: 400 }
@@ -87,11 +103,10 @@ export async function POST(request: NextRequest) {
     console.log("📥 Step 1/4: Baixando áudio do R2...");
     await updateProcessingStep(supabase, consultationId, "download", "in_progress");
 
-    const audioUrl = consultation.audio_url;
-    console.log(`📍 Audio URL: ${audioUrl}`);
+    console.log(`📍 Audio URL: ${audioUrlToUse}`);
 
     // Extrair key do arquivo do R2
-    const audioKey = extractKeyFromUrl(audioUrl);
+    const audioKey = extractKeyFromUrl(audioUrlToUse);
     console.log(`📁 Key do áudio: ${audioKey}`);
 
     // Baixar do Cloudflare R2
@@ -117,6 +132,7 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Transcrever com Whisper
     console.log("🎤 Step 2/4: Transcrevendo áudio...");
+    const transcriptionStartTime = Date.now();
     await updateProcessingStep(supabase, consultationId, "transcription", "in_progress");
 
     const rawTranscription = await transcribeAudio({
@@ -124,7 +140,8 @@ export async function POST(request: NextRequest) {
       language: "pt",
     });
 
-    console.log(`📝 Transcrição: ${rawTranscription.length} caracteres`);
+    const transcriptionDuration = ((Date.now() - transcriptionStartTime) / 1000).toFixed(1);
+    console.log(`📝 Transcrição: ${rawTranscription.length} caracteres (${transcriptionDuration}s)`);
     console.log(`   Preview: ${rawTranscription.substring(0, 200)}...`);
 
     // 🎙️ Detectar se tem diarização automática de speakers
@@ -147,9 +164,13 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Limpar texto
     console.log("🧹 Step 3/4: Limpando texto...");
+    const cleaningStartTime = Date.now();
     await updateProcessingStep(supabase, consultationId, "cleaning", "in_progress");
 
     const cleanedText = await cleanTranscription(rawTranscription);
+
+    const cleaningDuration = ((Date.now() - cleaningStartTime) / 1000).toFixed(1);
+    console.log(`✅ Limpeza concluída (${cleaningDuration}s)`);
 
     await supabase
       .from("consultations")
@@ -160,9 +181,13 @@ export async function POST(request: NextRequest) {
 
     // Step 4: Extrair campos estruturados
     console.log("🤖 Step 4/4: Extraindo campos estruturados...");
+    const extractionStartTime = Date.now();
     await updateProcessingStep(supabase, consultationId, "extraction", "in_progress");
 
     const extractedFields = await extractConsultationFields(cleanedText);
+
+    const extractionDuration = ((Date.now() - extractionStartTime) / 1000).toFixed(1);
+    console.log(`✅ Extração concluída (${extractionDuration}s)`);
 
     // Salvar campos extraídos e versão original para versionamento
     await supabase
@@ -187,7 +212,8 @@ export async function POST(request: NextRequest) {
 
     await updateProcessingStep(supabase, consultationId, "extraction", "completed");
 
-    console.log("✅ Processamento concluído com sucesso!\n");
+    const totalDuration = ((Date.now() - transcriptionStartTime) / 1000).toFixed(1);
+    console.log(`✅ Processamento concluído com sucesso! Tempo total: ${totalDuration}s\n`);
 
     return NextResponse.json({
       success: true,

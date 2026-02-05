@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { uploadAudio, listChunks, downloadChunk, deleteChunks } from "@/lib/cloudflare/r2-client";
+import { uploadAudio, uploadOriginalAudio, listChunks, downloadChunk, deleteChunks } from "@/lib/cloudflare/r2-client";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
@@ -221,6 +221,24 @@ export async function POST(request: NextRequest) {
     const extension = fileType.includes("webm") ? "webm" : fileType.includes("mp4") ? "mp4" : "mp3";
     const r2FileName = `${user.id}/${consultation.id}.${extension}`;
 
+    // STEP 1: Upload áudio original (backup) PRIMEIRO
+    let originalAudioUrl: string | null = null;
+    try {
+      console.log(`📦 Fazendo backup do áudio original...`);
+      originalAudioUrl = await uploadOriginalAudio(r2FileName, buffer, fileType);
+      console.log(`✅ Backup do áudio original salvo: ${originalAudioUrl}`);
+      
+      // Salvar original_audio_url imediatamente no banco
+      await supabase
+        .from("consultations")
+        .update({ original_audio_url: originalAudioUrl })
+        .eq("id", consultation.id);
+    } catch (originalError: any) {
+      // Log warning mas não bloquear - backup é best-effort
+      console.warn(`⚠️ Falha ao salvar backup do áudio original (continuando): ${originalError.message}`);
+    }
+
+    // STEP 2: Upload normal do áudio
     let audioUrl: string;
     try {
       audioUrl = await uploadAudio(r2FileName, buffer, fileType);

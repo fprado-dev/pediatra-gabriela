@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Loader2, Upload, FileAudio, Bot, CheckCheck, AlertCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Upload, FileAudio, Bot, CheckCheck, AlertCircle, Download, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 interface ProcessingStep {
   id: string;
@@ -24,8 +26,11 @@ interface ProcessingStatusProps {
 }
 
 export function ProcessingStatus({ consultationId, onComplete, onError }: ProcessingStatusProps) {
+  const router = useRouter();
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [hasOriginalAudio, setHasOriginalAudio] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [steps, setSteps] = useState<ProcessingStep[]>([
     {
       id: "upload",
@@ -66,7 +71,7 @@ export function ProcessingStatus({ consultationId, onComplete, onError }: Proces
       try {
         const { data: consultation, error: fetchError } = await supabase
           .from("consultations")
-          .select("status, processing_steps, processing_error")
+          .select("status, processing_steps, processing_error, original_audio_url")
           .eq("id", consultationId)
           .single();
 
@@ -82,6 +87,11 @@ export function ProcessingStatus({ consultationId, onComplete, onError }: Proces
 
         console.log("Status da consulta:", consultation.status);
         console.log("Processing steps:", consultation.processing_steps);
+
+        // Verificar se tem áudio original disponível
+        if (consultation.original_audio_url) {
+          setHasOriginalAudio(true);
+        }
 
         // Calcular progresso baseado nos steps
         const processingSteps = consultation.processing_steps || [];
@@ -218,7 +228,80 @@ export function ProcessingStatus({ consultationId, onComplete, onError }: Proces
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-800">{error}</p>
+            <div className="flex-1">
+              <p className="text-sm text-red-800 mb-3">{error}</p>
+              
+              {hasOriginalAudio && (
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`/api/consultations/${consultationId}/original-audio`);
+                        if (response.ok) {
+                          const data = await response.json();
+                          window.open(data.signedUrl, '_blank');
+                        }
+                      } catch (err) {
+                        console.error('Erro ao baixar áudio original:', err);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Baixar Áudio Original
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="sm"
+                    disabled={isRetrying}
+                    onClick={async () => {
+                      try {
+                        setIsRetrying(true);
+                        setError(null);
+                        setProgress(25); // Reset para início do processamento
+                        
+                        const response = await fetch('/api/consultations/process', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ 
+                            consultationId, 
+                            useOriginal: true 
+                          }),
+                        });
+
+                        if (response.ok) {
+                          // Polling vai detectar e atualizar automaticamente
+                        } else {
+                          const data = await response.json();
+                          setError(data.error || 'Erro ao reprocessar');
+                          setIsRetrying(false);
+                        }
+                      } catch (err) {
+                        console.error('Erro ao reprocessar:', err);
+                        setError('Erro ao tentar reprocessar');
+                        setIsRetrying(false);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    {isRetrying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Reprocessando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4" />
+                        Reprocessar com Áudio Original
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

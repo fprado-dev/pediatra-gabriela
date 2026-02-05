@@ -7,6 +7,41 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { unlink, stat } from "fs/promises";
 
+/**
+ * Constrói prompt otimizado para Whisper usando CORE Framework
+ * Baseado em Prompt Expert Skill para máxima precisão
+ */
+function buildOptimizedWhisperPrompt(): string {
+  return `ROLE: Transcritor médico especializado em consultas pediátricas no Brasil.
+
+CONTEXT: Gravação de consulta pediátrica com médica pediatra e responsável (mãe/pai) discutindo saúde da criança. Português brasileiro formal e coloquial misturado.
+
+TASK: Transcrever áudio com alta precisão mantendo:
+1. Terminologia médica exata (sem simplificações)
+2. Pontuação adequada (vírgulas, pontos, interrogações)
+3. Fala natural (não corrigir gramática coloquial)
+4. Números e medidas exatos (doses, peso, altura, temperatura)
+
+VOCABULÁRIO CRÍTICO (usar exatamente):
+Sintomas: febre, tosse, coriza, diarreia, vômito, dor abdominal, cefaleia
+Exames: ausculta pulmonar, palpação abdominal, oroscopia, otoscopia
+Medidas: peso (kg), altura (cm), perímetro cefálico (PC em cm), temperatura (°C)
+Medicamentos: dipirona, paracetamol, ibuprofeno, amoxicilina, azitromicina
+Desenvolvimento: marcos do desenvolvimento, linguagem, motor, cognitivo
+Gestação: pré-natal, parto, idade gestacional, bolsa rota, prematuro
+Alimentação: aleitamento materno, aleitamento exclusivo, pega, fissura mamilar
+Vacinação: BCG, hepatite B, pentavalente, rotavírus, pneumocócica, tríplice viral
+
+CONSTRAINTS:
+NEVER: Omitir números ou medidas
+NEVER: Simplificar termos médicos para leigos
+NEVER: Adicionar informações não faladas
+ALWAYS: Manter acentuação correta do português BR
+ALWAYS: Usar vírgulas para pausas naturais da fala
+
+OUTPUT: Texto corrido com pontuação adequada, pronto para revisão médica.`;
+}
+
 interface TranscribeOptions {
   audioPath: string;
   language?: string;
@@ -14,10 +49,14 @@ interface TranscribeOptions {
 }
 
 /**
- * Transcreve um arquivo de áudio usando Whisper API
- * Se o arquivo for muito grande, divide em chunks e transcreve separadamente
+ * Transcreve um arquivo de áudio usando Whisper API (whisper-1)
+ * 
+ * Estratégia:
+ * 1. Se arquivo < 25MB: transcreve diretamente
+ * 2. Se arquivo ≥ 25MB: comprime ou divide em chunks
+ * 
  * @param options - Opções de transcrição
- * @returns Texto transcrito
+ * @returns Texto transcrito (sem diarização)
  */
 export async function transcribeAudio(options: TranscribeOptions): Promise<string> {
   const { audioPath, language = "pt", prompt } = options;
@@ -75,18 +114,20 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<strin
     // Estratégia 2: Transcrever arquivo único (pequeno ou comprimido com sucesso)
     const audioFile = fs.createReadStream(finalPath);
 
-    // 🎙️ CHAMAR API com configurações MÍNIMAS
-    // NOTA: gpt-4o-transcribe-diarize NÃO aceita "prompt", "temperature" nem "verbose_json"
-    // OBRIGATÓRIO: chunking_strategy para modelos de diarização
+    // 🎯 PROMPT OTIMIZADO usando CORE Framework (Prompt Expert Skill)
+    const contextPrompt = prompt || buildOptimizedWhisperPrompt();
+
     const response = await openai.audio.transcriptions.create({
       file: audioFile,
-      model: "gpt-4o-transcribe-diarize",
+      model: "whisper-1",
       language: language || "pt",
-      response_format: "json",
-      chunking_strategy: "auto",
-    } as any);
+      prompt: contextPrompt,
+      response_format: "text",
+      temperature: 0, // Mais preciso e determinístico
+    });
 
-    console.log(`✅ Transcrição concluída`);
+    const transcription = response.trim();
+    console.log(`✅ Transcrição concluída: ${transcription.length} caracteres`);
 
     // Limpar arquivo comprimido temporário
     if (compressedPath) {
@@ -98,34 +139,13 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<strin
       }
     }
 
-    // 🎙️ PROCESSAR DIARIZAÇÃO - Formatar com speakers
-    let formattedTranscription = "";
-    const responseData = response as any;
-
-    if (responseData.segments && Array.isArray(responseData.segments) && responseData.segments.length > 0) {
-      console.log(`🎙️ Diarização detectada: ${responseData.segments.length} segments`);
-
-      const speakers = [...new Set(responseData.segments.map((s: any) => s.speaker))];
-      console.log(`👥 Falantes identificados: ${speakers.join(", ")}`);
-
-      // Formatar: [Speaker X]: texto
-      formattedTranscription = responseData.segments
-        .map((seg: any) => `[${seg.speaker}]: ${seg.text.trim()}`)
-        .join("\n\n");
-
-      console.log(`✅ Transcrição formatada com ${responseData.segments.length} falas separadas por speaker`);
-    } else {
-      console.warn("⚠️ Sem segments, usando texto padrão (sem diarização)");
-      formattedTranscription = responseData.text || "";
-    }
-
     // 🔥 DEDUPLIZAÇÃO: Remover repetições massivas
-    console.log("\n🔄 Aplicando deduplização de texto...");
-    const deduplicatedText = deduplicateText(formattedTranscription);
+    console.log("🔄 Aplicando deduplização de texto...");
+    const deduplicatedText = deduplicateText(transcription);
 
-    if (deduplicatedText.length < formattedTranscription.length * 0.5) {
+    if (deduplicatedText.length < transcription.length * 0.5) {
       console.warn(
-        `⚠️ Deduplização removeu mais de 50% do texto (${formattedTranscription.length} → ${deduplicatedText.length} chars). ` +
+        `⚠️ Deduplização removeu mais de 50% do texto (${transcription.length} → ${deduplicatedText.length} chars). ` +
         `Isso pode indicar um problema com o áudio ou transcrição.`
       );
     }
@@ -172,15 +192,10 @@ async function transcribeChunks(
       const audioFile = fs.createReadStream(chunk.path);
 
       // 🎯 PROMPT OTIMIZADO usando CORE Framework (chunks)
-      const baseContextPrompt = basePrompt ||
-        `Consulta pediátrica em português brasileiro. Médica pediatra e mãe conversam sobre saúde da criança.
-
-VOCABULÁRIO: febre, tosse, coriza, diarreia, vômito, dor, ausculta, palpação, temperatura, dipirona, paracetamol, amoxicilina, desenvolvimento, marcos, gestação, pré-natal, bolsa rota, prematuro, aleitamento materno, pega, fissura, vacinas, BCG, hepatite, pentavalente, peso, altura, perímetro cefálico, curva de crescimento.
-
-TRANSCREVER: Pontuação adequada, terminologia médica exata, fala natural.`;
+      const baseContextPrompt = basePrompt || buildOptimizedWhisperPrompt();
 
       const contextPrompt = previousText
-        ? `${baseContextPrompt}\nContinuação da consulta: ${previousText.slice(-120)}`
+        ? `${baseContextPrompt}\n\nCONTEXTO ANTERIOR: "${previousText.slice(-150)}..."`
         : baseContextPrompt;
 
       const response = await openai.audio.transcriptions.create({

@@ -5,38 +5,10 @@
 
 import ffmpeg from "fluent-ffmpeg";
 import { stat } from "fs/promises";
-import { execSync } from "child_process";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 
-// Detectar caminho do ffmpeg (sistema ou Vercel)
-function detectFfmpegPath(): string {
-  // Tentar usar variável de ambiente (Vercel)
-  if (process.env.FFMPEG_PATH) {
-    return process.env.FFMPEG_PATH;
-  }
-
-  // Tentar detectar no PATH
-  try {
-    const ffmpegPath = execSync('which ffmpeg', { encoding: 'utf8' }).trim();
-    if (ffmpegPath) {
-      return ffmpegPath;
-    }
-  } catch {
-    // Fallback para caminhos comuns
-  }
-
-  // Caminhos padrão por sistema operacional
-  const commonPaths = [
-    '/usr/bin/ffmpeg',           // Linux/Vercel
-    '/usr/local/bin/ffmpeg',     // macOS homebrew (Intel)
-    '/opt/homebrew/bin/ffmpeg',  // macOS homebrew (ARM)
-    'ffmpeg'                      // PATH
-  ];
-
-  return commonPaths[0]; // Usar primeiro como fallback
-}
-
-// Configurar caminho do ffmpeg
-const ffmpegPath = detectFfmpegPath();
+// Configurar caminho do ffmpeg usando o binário instalado
+const ffmpegPath = ffmpegInstaller.path;
 console.log(`🎬 FFmpeg path: ${ffmpegPath}`);
 ffmpeg.setFfmpegPath(ffmpegPath);
 

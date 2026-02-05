@@ -10,6 +10,13 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '200mb',
     },
   },
+
+  // Externalizar pacotes com binários nativos
+  serverExternalPackages: [
+    '@ffmpeg-installer/ffmpeg',
+    '@ffprobe-installer/ffprobe',
+    'fluent-ffmpeg',
+  ],
 };
 
 export default nextConfig;

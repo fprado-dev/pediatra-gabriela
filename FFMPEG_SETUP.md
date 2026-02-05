@@ -10,34 +10,48 @@ Este projeto usa FFmpeg para comprimir arquivos de áudio grandes antes de envi�
 
 ## Instalação
 
-### macOS
+### Desenvolvimento Local (Opcional)
+
+Para desenvolvimento local, você pode instalar ffmpeg no sistema, mas não é necessário pois usamos binários estáticos:
+
+**macOS:**
 ```bash
 brew install ffmpeg
 ```
 
-### Linux (Ubuntu/Debian)
+**Linux (Ubuntu/Debian):**
 ```bash
 sudo apt update
 sudo apt install ffmpeg
 ```
 
-### Windows
+**Windows:**
 1. Baixar de https://ffmpeg.org/download.html
 2. Adicionar ao PATH do sistema
 
-### Vercel (Produção)
-✅ FFmpeg já vem pré-instalado nas funções serverless da Vercel!
+### Produção (Vercel/Deploy)
 
-## Detecção Automática
+✅ **Sem configuração necessária!** 
 
-O sistema detecta automaticamente o caminho do FFmpeg:
+O projeto agora usa `@ffmpeg-installer/ffmpeg` e `@ffprobe-installer/ffprobe` que fornecem binários estáticos multiplataforma. Isso garante que o ffmpeg funcione em qualquer ambiente (desenvolvimento local, Vercel, Docker, etc.) sem necessidade de instalação manual.
 
-1. Variável de ambiente `FFMPEG_PATH` (Vercel)
-2. Comando `which ffmpeg` (sistema)
-3. Caminhos comuns:
-   - `/usr/bin/ffmpeg` (Linux/Vercel)
-   - `/usr/local/bin/ffmpeg` (macOS Intel)
-   - `/opt/homebrew/bin/ffmpeg` (macOS ARM)
+## Como Funciona
+
+O sistema usa binários estáticos fornecidos pelos pacotes npm:
+
+```typescript
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import ffprobeInstaller from "@ffprobe-installer/ffprobe";
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
+```
+
+Benefícios:
+- ✅ Funciona em qualquer plataforma (Linux, macOS, Windows)
+- ✅ Não requer instalação manual no servidor
+- ✅ Funciona no Vercel sem configuração adicional
+- ✅ Versões consistentes em todos os ambientes
 
 ## Verificar Instalação
 
@@ -68,20 +82,24 @@ audioFrequency: 16000       // 16 kHz (suficiente para fala)
 
 ## Troubleshooting
 
-### Erro: "ffmpeg not found"
+### Erro: "spawn /usr/bin/ffmpeg ENOENT" ou "Cannot find ffprobe"
+✅ **Resolvido!** Agora usamos binários estáticos via `@ffmpeg-installer/ffmpeg` e `@ffprobe-installer/ffprobe`.
+
+Se ainda tiver problemas:
+1. Verifique se os pacotes estão instalados:
 ```bash
-# Verificar instalação
-which ffmpeg
-
-# Se não instalado, instalar via homebrew (macOS)
-brew install ffmpeg
-
-# Linux
-sudo apt install ffmpeg
+npm list @ffmpeg-installer/ffmpeg @ffprobe-installer/ffprobe
 ```
 
-### Erro: "Module not found: @ffmpeg-installer"
-✅ **Resolvido!** Agora usamos FFmpeg do sistema, não via npm.
+2. Reinstale se necessário:
+```bash
+npm install --save @ffmpeg-installer/ffmpeg @ffprobe-installer/ffprobe
+```
+
+### Erro: "Module not found: @ffmpeg-installer/ffmpeg"
+```bash
+npm install --save @ffmpeg-installer/ffmpeg @ffprobe-installer/ffprobe
+```
 
 ### Arquivo ainda muito grande após compressão
 Se mesmo após compressão o arquivo exceder 25MB, considere:

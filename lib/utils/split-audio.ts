@@ -7,6 +7,15 @@ import ffmpeg from "fluent-ffmpeg";
 import { stat, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import ffprobeInstaller from "@ffprobe-installer/ffprobe";
+
+// Configurar caminhos dos binários
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
+
+console.log(`🎬 FFmpeg path: ${ffmpegInstaller.path}`);
+console.log(`🔍 FFprobe path: ${ffprobeInstaller.path}`);
 
 const WHISPER_MAX_SIZE = 25 * 1024 * 1024; // 25MB
 const CHUNK_DURATION_MINUTES = 10; // 10 minutos por chunk

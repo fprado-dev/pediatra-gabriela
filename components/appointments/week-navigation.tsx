@@ -16,15 +16,24 @@ interface WeekNavigationProps {
 export function WeekNavigation({ currentWeekStart, onWeekChange, onBlockCreated }: WeekNavigationProps) {
   const [showBlockModal, setShowBlockModal] = useState(false);
   const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+
+  // Criar data normalizada (meia-noite local) para evitar problemas de timezone
   const today = new Date();
-  const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayWeekStart = startOfWeek(normalizedToday, { weekStartsOn: 1 });
 
   const handlePreviousWeek = () => {
-    onWeekChange(subWeeks(currentWeekStart, 1));
+    const newWeekStart = subWeeks(currentWeekStart, 1);
+    // Normalizar a data para evitar problemas de timezone
+    const normalized = new Date(newWeekStart.getFullYear(), newWeekStart.getMonth(), newWeekStart.getDate());
+    onWeekChange(normalized);
   };
 
   const handleNextWeek = () => {
-    onWeekChange(addWeeks(currentWeekStart, 1));
+    const newWeekStart = addWeeks(currentWeekStart, 1);
+    // Normalizar a data para evitar problemas de timezone
+    const normalized = new Date(newWeekStart.getFullYear(), newWeekStart.getMonth(), newWeekStart.getDate());
+    onWeekChange(normalized);
   };
 
   const handleCurrentWeek = () => {

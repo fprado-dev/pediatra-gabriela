@@ -72,7 +72,22 @@ export function NewAppointmentModalV2({
 
   useEffect(() => {
     if (open) {
-      setDate(preselectedDate);
+      // Normalizar a data para evitar problemas de timezone
+      if (preselectedDate) {
+        const normalizedDate = new Date(
+          preselectedDate.getFullYear(),
+          preselectedDate.getMonth(),
+          preselectedDate.getDate()
+        );
+        console.log('📋 Modal recebeu:', {
+          dataOriginal: preselectedDate.toISOString(),
+          dataNormalizada: format(normalizedDate, "yyyy-MM-dd"),
+          horaPre: preselectedTime
+        });
+        setDate(normalizedDate);
+      } else {
+        setDate(preselectedDate);
+      }
       setTime(preselectedTime);
     }
   }, [open, preselectedDate, preselectedTime]);

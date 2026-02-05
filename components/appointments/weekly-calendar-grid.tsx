@@ -84,14 +84,22 @@ export function WeeklyCalendarGrid({
 
   const handleSlotClick = (dayIndex: number, slotTime: string) => {
     const date = weekDays[dayIndex];
-    const slotDateTime = parse(`${format(date, "yyyy-MM-dd")} ${slotTime}`, "yyyy-MM-dd HH:mm", new Date());
+    // Criar uma nova data normalizada (sem timezone) para evitar problemas
+    const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const slotDateTime = parse(`${format(normalizedDate, "yyyy-MM-dd")} ${slotTime}`, "yyyy-MM-dd HH:mm", new Date());
 
     // Não permitir criar agendamento no passado
     if (isBefore(slotDateTime, currentTime)) {
       return;
     }
 
-    onSlotClick(date, slotTime);
+    console.log('🗓️ Slot clicado:', {
+      data: format(normalizedDate, "yyyy-MM-dd"),
+      hora: slotTime,
+      dataCompleta: slotDateTime.toISOString()
+    });
+
+    onSlotClick(normalizedDate, slotTime);
   };
 
   // Calcular posição da linha da hora atual

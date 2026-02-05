@@ -229,7 +229,9 @@ export function validateAppointmentTime(
   }
 
   // Verifica expediente (incluindo duração)
-  if (!isWithinWorkingHours(time, schedule, durationMinutes)) {
+  const withinHours = isWithinWorkingHours(time, schedule, durationMinutes);
+
+  if (!withinHours) {
     errors.push('Fora do horário de atendimento (8h-18h)');
   }
 
@@ -273,10 +275,7 @@ export function validateAppointmentTime(
     const blockStart = new Date(block.start_datetime);
     const blockEnd = new Date(block.end_datetime);
 
-    return (
-      (isAfter(appointmentDateTime, blockStart) || isEqual(appointmentDateTime, blockStart)) &&
-      isBefore(appointmentDateTime, blockEnd)
-    );
+    return (isAfter(appointmentDateTime, blockStart) || isEqual(appointmentDateTime, blockStart)) && isBefore(appointmentDateTime, blockEnd);
   });
   if (isBlocked) {
     errors.push('Horário bloqueado');

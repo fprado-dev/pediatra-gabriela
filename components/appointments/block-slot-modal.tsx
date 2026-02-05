@@ -74,12 +74,24 @@ export function BlockSlotModal({
 
     try {
       const dateStr = format(date, "yyyy-MM-dd");
+
+      // Criar Date objects em horário local
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+
+      const startLocal = new Date(date.getFullYear(), date.getMonth(), date.getDate(), startHour, startMinute);
+      const endLocal = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endHour, endMinute);
+
+      // Converter para UTC ISO string
+      const startUTC = startLocal.toISOString();
+      const endUTC = endLocal.toISOString();
+
       const response = await fetch("/api/appointments/blocks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          start_datetime: `${dateStr}T${startTime}:00`,
-          end_datetime: `${dateStr}T${endTime}:00`,
+          start_datetime: startUTC,
+          end_datetime: endUTC,
           reason: reason || "Horário reservado",
         }),
       });

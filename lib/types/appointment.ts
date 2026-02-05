@@ -82,8 +82,8 @@ export interface UpdateAppointmentData {
 
 // Configurações padrão de horário
 export const DEFAULT_SCHEDULE = {
-  startHour: 10,
-  endHour: 17,
+  startHour: 8,
+  endHour: 18,
   lunchStart: 12,
   lunchEnd: 13,
   slotDuration: 60, // minutos (1 hora)
@@ -114,3 +114,39 @@ export const DAY_OF_WEEK_LABELS: Record<number, string> = {
   5: 'Sexta',
   6: 'Sábado',
 };
+
+// Tipos para react-big-calendar
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  resource?: AppointmentWithPatient | ScheduleBlock;
+  type: 'appointment' | 'block';
+  allDay?: boolean;
+}
+
+// Tipos para recorrência (futura implementação)
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly';
+
+export interface RecurringPattern {
+  frequency: RecurringFrequency;
+  interval: number; // ex: cada 2 semanas = interval 2
+  daysOfWeek?: number[]; // para recorrência semanal [1,3,5] = seg, qua, sex
+  endDate?: string; // data final da recorrência
+  occurrences?: number; // ou número de ocorrências
+}
+
+export interface RecurringAppointment {
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  start_date: string;
+  appointment_time: string;
+  duration_minutes: number;
+  appointment_type: AppointmentType;
+  notes?: string;
+  pattern: RecurringPattern;
+  created_at: string;
+  updated_at: string;
+}

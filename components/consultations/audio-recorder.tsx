@@ -8,7 +8,6 @@ import { Progress } from "@/components/ui/progress";
 import { Mic, Square, Pause, Play, Trash2, Upload, AlertCircle, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { compressAudio } from "@/lib/utils/audio-compressor";
-import { ensureMp3 } from "@/lib/utils/convert-audio-client";
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob, duration: number) => void;
@@ -26,7 +25,6 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
   const [audioLevel, setAudioLevel] = useState(0);
   const [isCompressing, setIsCompressing] = useState(false);
   const [compressionProgress, setCompressionProgress] = useState(0);
-  const [conversionStage, setConversionStage] = useState<string>("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -200,70 +198,24 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
   const handleUpload = async () => {
     if (!audioBlob) return;
 
-    // 🎵 ETAPA 1: Converter para MP3 se necessário (antes de qualquer outra coisa)
-    let processedBlob = audioBlob;
-    const needsConversion = !audioBlob.type.includes("mp3") && !audioBlob.type.includes("mpeg");
-    
-    if (needsConversion) {
-      console.log(`🔄 Convertendo ${audioBlob.type} para MP3 no cliente...`);
-      setIsCompressing(true);
-      setCompressionProgress(0);
-      setConversionStage("Convertendo para MP3...");
-      
-      try {
-        processedBlob = await ensureMp3(audioBlob, (progress) => {
-          // Mapear progresso da conversão (0-100%) para nossa escala (0-70%)
-          const mappedProgress = Math.floor((progress.progress / 100) * 70);
-          setCompressionProgress(mappedProgress);
-          
-          // Atualizar mensagem de estágio
-          if (progress.stage === "decoding") {
-            setConversionStage("Decodificando áudio...");
-          } else if (progress.stage === "encoding") {
-            setConversionStage(`Codificando MP3... ${progress.progress.toFixed(0)}%`);
-          } else if (progress.stage === "finalizing") {
-            setConversionStage("Finalizando conversão...");
-          }
-        });
-        
-        const reduction = ((audioBlob.size - processedBlob.size) / audioBlob.size * 100).toFixed(1);
-        console.log(`✅ Conversão completa: ${(processedBlob.size / 1024 / 1024).toFixed(2)}MB (redução de ${reduction}%)`);
-        toast.success(`Convertido para MP3: ${(processedBlob.size / 1024 / 1024).toFixed(1)}MB`);
-        
-        setIsCompressing(false);
-        setCompressionProgress(0);
-        setConversionStage("");
-      } catch (conversionError: any) {
-        console.error("❌ Erro na conversão, usando áudio original:", conversionError);
-        toast.warning("Usando áudio original (conversão falhou)");
-        processedBlob = audioBlob; // Fallback para original
-        setIsCompressing(false);
-        setCompressionProgress(0);
-        setConversionStage("");
-      }
-    } else {
-      console.log("ℹ️ Áudio já é MP3, não precisa conversão");
-    }
-
-    // 🎵 ETAPA 2: Verificar tamanho e comprimir se necessário
     const MAX_SIZE = 200 * 1024 * 1024; // 200MB
-    const currentSize = processedBlob.size;
+    const originalSize = audioBlob.size;
 
-    // Se já cabe, enviar direto
-    if (currentSize <= MAX_SIZE) {
-      console.log(`✅ Áudio dentro do limite: ${(currentSize / 1024 / 1024).toFixed(2)}MB`);
-      onRecordingComplete(processedBlob, duration);
+    // Se já cabe, enviar direto (conversão WebM→MP3 será feita no servidor)
+    if (originalSize <= MAX_SIZE) {
+      console.log(`✅ Áudio dentro do limite: ${(originalSize / 1024 / 1024).toFixed(2)}MB`);
+      onRecordingComplete(audioBlob, duration);
       return;
     }
 
-    // Precisa comprimir ainda mais
-    console.log(`⚠️  Áudio excede 200MB: ${(currentSize / 1024 / 1024).toFixed(2)}MB`);
-    toast.info("Áudio muito grande, comprimindo ainda mais...");
+    // Precisa comprimir
+    console.log(`⚠️  Áudio excede 200MB: ${(originalSize / 1024 / 1024).toFixed(2)}MB`);
+    toast.info("Áudio muito grande, comprimindo...");
     setIsCompressing(true);
     setCompressionProgress(0);
 
     try {
-      const compressed = await compressUntilFits(processedBlob, MAX_SIZE);
+      const compressed = await compressUntilFits(audioBlob, MAX_SIZE);
       setIsCompressing(false);
       toast.success("Áudio comprimido com sucesso!");
       onRecordingComplete(compressed, duration);
@@ -429,21 +381,16 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
           </div>
         )}
 
-        {/* Progresso de conversão/compressão */}
+        {/* Progresso de compressão */}
         {isCompressing && (
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {conversionStage || "Processando áudio..."}
-              </span>
+              <span className="text-muted-foreground">Comprimindo áudio...</span>
               <span className="font-semibold">{compressionProgress}%</span>
             </div>
             <Progress value={compressionProgress} className="h-2" />
             <p className="text-xs text-muted-foreground text-center">
-              {conversionStage.includes("MP3") || conversionStage.includes("Codificando")
-                ? "Convertendo para formato otimizado..."
-                : "Otimizando áudio para envio. Isso pode levar alguns momentos."}
+              Otimizando áudio para envio. Isso pode levar alguns momentos.
             </p>
           </div>
         )}

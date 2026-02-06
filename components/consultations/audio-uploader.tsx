@@ -18,7 +18,6 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatFileSize } from "@/lib/utils/audio-compressor";
-import { ensureMp3 } from "@/lib/utils/convert-audio-client";
 
 interface AudioUploaderProps {
   onUploadComplete: (audioBlob: Blob, duration: number) => void;
@@ -44,8 +43,6 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [conversionProgress, setConversionProgress] = useState(0);
-  const [conversionStage, setConversionStage] = useState<string>("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -215,53 +212,12 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
     if (!selectedFile) return;
 
     try {
-      setIsProcessing(true);
-      
-      // 🎵 CONVERSÃO: Converter para MP3 se necessário
+      // Usar arquivo original - conversão WebM→MP3 será feita no servidor
       const blob = new Blob([selectedFile], { type: selectedFile.type });
-      const needsConversion = !selectedFile.type.includes("mp3") && !selectedFile.type.includes("mpeg");
-      
-      let finalBlob = blob;
-      
-      if (needsConversion) {
-        console.log(`🔄 Convertendo ${selectedFile.type} para MP3 no cliente...`);
-        setConversionStage("Convertendo para MP3...");
-        setConversionProgress(0);
-        
-        try {
-          finalBlob = await ensureMp3(blob, (progress) => {
-            setConversionProgress(progress.progress);
-            
-            if (progress.stage === "decoding") {
-              setConversionStage("Decodificando áudio...");
-            } else if (progress.stage === "encoding") {
-              setConversionStage(`Codificando MP3... ${progress.progress.toFixed(0)}%`);
-            } else if (progress.stage === "finalizing") {
-              setConversionStage("Finalizando conversão...");
-            }
-          });
-          
-          const reduction = ((blob.size - finalBlob.size) / blob.size * 100).toFixed(1);
-          console.log(`✅ Conversão completa: ${(finalBlob.size / 1024 / 1024).toFixed(2)}MB (redução de ${reduction}%)`);
-          toast.success(`Convertido para MP3: ${(finalBlob.size / 1024 / 1024).toFixed(1)}MB`);
-        } catch (conversionError: any) {
-          console.error("❌ Erro na conversão, usando áudio original:", conversionError);
-          toast.warning("Usando áudio original (conversão falhou)");
-          finalBlob = blob; // Fallback para original
-        }
-        
-        setConversionProgress(0);
-        setConversionStage("");
-      } else {
-        console.log("ℹ️ Áudio já é MP3, não precisa conversão");
-      }
-      
-      setIsProcessing(false);
-      onUploadComplete(finalBlob, duration);
+      onUploadComplete(blob, duration);
     } catch (err) {
       console.error("Erro ao confirmar upload:", err);
       toast.error("Erro ao processar arquivo");
-      setIsProcessing(false);
     }
   }, [selectedFile, duration, onUploadComplete]);
 
@@ -346,25 +302,8 @@ export function AudioUploader({ onUploadComplete, onCancel }: AudioUploaderProps
           </div>
         )}
 
-        {/* Progresso de conversão */}
-        {isProcessing && conversionProgress > 0 && (
-          <div className="space-y-3 p-4 rounded-lg bg-muted/50">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {conversionStage || "Processando..."}
-              </span>
-              <span className="font-semibold">{conversionProgress}%</span>
-            </div>
-            <Progress value={conversionProgress} className="h-2" />
-            <p className="text-xs text-muted-foreground text-center">
-              Convertendo para formato otimizado...
-            </p>
-          </div>
-        )}
-
         {/* Preview do arquivo selecionado */}
-        {selectedFile && !isProcessing && (
+        {selectedFile && (
           <div className="space-y-4">
             <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/50">
               <div className="p-3 rounded-lg bg-primary/10">

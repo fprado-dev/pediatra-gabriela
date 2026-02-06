@@ -324,7 +324,7 @@ export function NewConsultationRecording({
       });
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
+      // Não resetar uploadProgress aqui - deixar visível até transição para "processing"
     }
   };
 
@@ -367,28 +367,58 @@ export function NewConsultationRecording({
         formData.append("hash", hash);
       }
 
-      const response = await fetch("/api/consultations/upload-audio", {
-        method: "POST",
-        body: formData,
-      });
+      // Simular progresso durante upload (20% já foi usado para hash/duplicata)
+      setUploadProgress(30);
+      
+      // Usar XMLHttpRequest para ter progresso real de upload
+      await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // Listener de progresso
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            // Mapear progresso de upload (0-100%) para nossa escala (30-90%)
+            const percentComplete = (e.loaded / e.total) * 100;
+            const mappedProgress = 30 + Math.round((percentComplete / 100) * 60);
+            setUploadProgress(mappedProgress);
+            console.log(`📊 Upload: ${percentComplete.toFixed(0)}% (${mappedProgress}%)`);
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setUploadProgress(90);
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              reject(new Error(errorData.error || "Erro ao fazer upload do áudio"));
+            } catch {
+              reject(new Error(`Erro HTTP ${xhr.status}`));
+            }
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Erro de rede ao fazer upload'));
+        });
+        
+        xhr.open('POST', '/api/consultations/upload-audio');
+        xhr.send(formData);
+      }).then((data) => {
+        setUploadProgress(100);
+        setConsultationId(data.consultationId);
+        setFlowState("processing");
+        toast.success("Áudio enviado! Processando com IA...");
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao fazer upload do áudio");
-      }
-
-      const data = await response.json();
-      setConsultationId(data.consultationId);
-      setFlowState("processing");
-      toast.success("Áudio enviado! Processando com IA...");
-
-      // Iniciar processamento (chamada separada para funcionar na Vercel)
-      fetch("/api/consultations/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ consultationId: data.consultationId }),
-      }).catch((err) => {
-        console.error("Erro ao iniciar processamento:", err);
+        // Iniciar processamento (chamada separada para funcionar na Vercel)
+        fetch("/api/consultations/process", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ consultationId: data.consultationId }),
+        }).catch((err) => {
+          console.error("Erro ao iniciar processamento:", err);
+        });
       });
     } finally {
       setIsUploading(false);
@@ -400,6 +430,7 @@ export function NewConsultationRecording({
     setAudioDuration(0);
     setFlowState("input");
     setProcessingError(null);
+    setUploadProgress(0); // Resetar progresso ao regravar
   };
 
   // Handlers para o diálogo de duplicata
@@ -466,6 +497,7 @@ export function NewConsultationRecording({
 
   const handleProcessingComplete = (id: string) => {
     toast.success("Consulta processada com sucesso!");
+    setUploadProgress(0); // Resetar progresso ao completar
     // Redirecionar imediatamente sem setTimeout para evitar refresh
     router.push(`/consultations/${id}/preview`);
   };

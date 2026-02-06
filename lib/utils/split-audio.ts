@@ -54,13 +54,30 @@ export async function splitAudioByTime(
   chunkDurationMinutes: number = CHUNK_DURATION_MINUTES
 ): Promise<AudioChunk[]> {
   try {
+    // Validar entrada
+    if (!chunkDurationMinutes || chunkDurationMinutes <= 0 || isNaN(chunkDurationMinutes)) {
+      console.warn(`⚠️ Duração de chunk inválida (${chunkDurationMinutes}), usando 10 minutos`);
+      chunkDurationMinutes = 10;
+    }
+
     console.log(`✂️  Dividindo áudio em chunks de ${chunkDurationMinutes} minutos...`);
 
     // Obter duração total do áudio
     const metadata = await getAudioMetadata(inputPath);
     const totalDuration = metadata.format.duration || 0;
+
+    // Validar duração
+    if (!totalDuration || totalDuration === 0 || isNaN(totalDuration)) {
+      throw new Error("Não foi possível obter a duração do áudio. O arquivo pode estar corrompido.");
+    }
+
     const chunkDurationSeconds = chunkDurationMinutes * 60;
     const numChunks = Math.ceil(totalDuration / chunkDurationSeconds);
+
+    // Validar número de chunks
+    if (isNaN(numChunks) || numChunks <= 0 || !isFinite(numChunks)) {
+      throw new Error(`Número de chunks inválido: ${numChunks}`);
+    }
 
     console.log(`📊 Áudio total: ${(totalDuration / 60).toFixed(1)} min → ${numChunks} chunks`);
 
@@ -186,17 +203,60 @@ export async function cleanupChunks(chunks: AudioChunk[]): Promise<void> {
 export async function calculateOptimalChunkDuration(
   filePath: string
 ): Promise<number> {
-  const stats = await stat(filePath);
-  const metadata = await getAudioMetadata(filePath);
-  const totalDuration = metadata.format.duration || 0;
-  const totalSize = stats.size;
+  try {
+    const stats = await stat(filePath);
+    const metadata = await getAudioMetadata(filePath);
+    const totalDuration = metadata.format.duration || 0;
+    const totalSize = stats.size;
 
-  // Calcular MB por minuto
-  const mbPerMinute = (totalSize / 1024 / 1024) / (totalDuration / 60);
+    console.log(`📊 Metadados: ${totalDuration}s duração, ${(totalSize / 1024 / 1024).toFixed(2)}MB tamanho`);
 
-  // Calcular duração ideal para ficar abaixo de 20MB (margem de segurança)
-  const idealDurationMinutes = Math.floor(20 / mbPerMinute);
+    // Se não conseguiu obter duração, usar fallback baseado em tamanho
+    if (!totalDuration || totalDuration === 0 || isNaN(totalDuration)) {
+      console.warn("⚠️ Duração não detectada, usando duração estimada por tamanho");
+      
+      // Estimar: 1MB ≈ 1 minuto de áudio comprimido a 64kbps
+      const estimatedMinutes = (totalSize / 1024 / 1024);
+      
+      // Se arquivo é muito grande, usar chunks menores
+      if (totalSize > 50 * 1024 * 1024) {
+        console.log(`📏 Arquivo grande (${(totalSize / 1024 / 1024).toFixed(2)}MB), usando chunks de 5 minutos`);
+        return 5;
+      }
+      
+      // Usar 10 minutos como padrão seguro
+      console.log(`📏 Usando chunk padrão de 10 minutos`);
+      return 10;
+    }
 
-  // Mínimo 5 minutos, máximo 15 minutos
-  return Math.max(5, Math.min(15, idealDurationMinutes));
+    // Calcular MB por minuto
+    const mbPerMinute = (totalSize / 1024 / 1024) / (totalDuration / 60);
+
+    // Prevenir divisão por zero ou valores inválidos
+    if (!mbPerMinute || mbPerMinute === 0 || isNaN(mbPerMinute) || !isFinite(mbPerMinute)) {
+      console.warn("⚠️ Taxa MB/min inválida, usando chunk padrão de 10 minutos");
+      return 10;
+    }
+
+    console.log(`📈 Taxa: ${mbPerMinute.toFixed(2)}MB/min`);
+
+    // Calcular duração ideal para ficar abaixo de 20MB (margem de segurança)
+    const idealDurationMinutes = Math.floor(20 / mbPerMinute);
+
+    // Validar resultado
+    if (isNaN(idealDurationMinutes) || !isFinite(idealDurationMinutes)) {
+      console.warn("⚠️ Duração calculada inválida, usando 10 minutos");
+      return 10;
+    }
+
+    // Mínimo 5 minutos, máximo 15 minutos
+    const finalDuration = Math.max(5, Math.min(15, idealDurationMinutes));
+    console.log(`✅ Duração calculada: ${finalDuration} minutos por chunk`);
+    
+    return finalDuration;
+  } catch (error: any) {
+    console.error("❌ Erro ao calcular duração do chunk:", error);
+    console.warn("⚠️ Usando fallback: 10 minutos por chunk");
+    return 10; // Fallback seguro
+  }
 }

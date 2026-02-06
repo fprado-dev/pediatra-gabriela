@@ -3,8 +3,6 @@
  * Converte WebM/WAV/outros formatos para MP3 antes do upload
  */
 
-import lamejs from "lamejs";
-
 export interface ConversionProgress {
   stage: "decoding" | "encoding" | "finalizing";
   progress: number; // 0-100
@@ -25,6 +23,9 @@ export async function convertAudioToMp3(
   console.log(`📦 Tamanho original: ${(audioBlob.size / 1024 / 1024).toFixed(2)}MB`);
 
   try {
+    // Importar lamejs dinamicamente (só funciona no cliente)
+    const lamejs = await import('lamejs');
+    
     // Stage 1: Decodificar áudio usando Web Audio API
     onProgress?.({ stage: "decoding", progress: 10 });
     console.log("🎵 Decodificando áudio com Web Audio API...");

@@ -5,11 +5,23 @@
 
 "use client";
 
-import lamejs from "./lamejs-wrapper";
-
 export interface ConversionProgress {
   stage: "decoding" | "encoding" | "finalizing";
   progress: number; // 0-100
+}
+
+// Função para carregar lamejs dinamicamente
+async function loadLamejs() {
+  // @ts-ignore
+  if (typeof window !== 'undefined' && !window.lamejs) {
+    // Carregar via require dinâmico no cliente
+    const lamejsModule = require('lamejs');
+    // @ts-ignore
+    window.lamejs = lamejsModule;
+    return lamejsModule;
+  }
+  // @ts-ignore
+  return window.lamejs || require('lamejs');
 }
 
 /**
@@ -27,6 +39,9 @@ export async function convertAudioToMp3(
   console.log(`📦 Tamanho original: ${(audioBlob.size / 1024 / 1024).toFixed(2)}MB`);
 
   try {
+    // Carregar lamejs
+    const lamejs = await loadLamejs();
+    
     // Stage 1: Decodificar áudio usando Web Audio API
     onProgress?.({ stage: "decoding", progress: 10 });
     console.log("🎵 Decodificando áudio com Web Audio API...");

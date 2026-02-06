@@ -64,11 +64,27 @@ export async function splitAudioByTime(
 
     // Obter duração total do áudio
     const metadata = await getAudioMetadata(inputPath);
-    const totalDuration = metadata.format.duration || 0;
+    let totalDuration = metadata.format.duration || 0;
 
-    // Validar duração
+    // Se não conseguiu obter duração, estimar baseado no tamanho
     if (!totalDuration || totalDuration === 0 || isNaN(totalDuration)) {
-      throw new Error("Não foi possível obter a duração do áudio. O arquivo pode estar corrompido.");
+      console.warn("⚠️ Duração não detectada pelos metadados, estimando por tamanho do arquivo...");
+      
+      const stats = await stat(inputPath);
+      const fileSizeMB = stats.size / (1024 * 1024);
+      
+      // Estimar duração: assumindo áudio comprimido a 64kbps
+      // 64kbps = 8KB/s = 480KB/min ≈ 0.47MB/min
+      // Ou de forma mais conservadora: 1MB ≈ 2 minutos de áudio
+      const estimatedMinutes = fileSizeMB * 2;
+      totalDuration = estimatedMinutes * 60; // converter para segundos
+      
+      console.log(`📏 Estimativa: ${fileSizeMB.toFixed(2)}MB ≈ ${estimatedMinutes.toFixed(1)} minutos (${totalDuration.toFixed(0)}s)`);
+      
+      // Validar estimativa
+      if (!totalDuration || totalDuration <= 0 || isNaN(totalDuration)) {
+        throw new Error("Não foi possível estimar a duração do áudio.");
+      }
     }
 
     const chunkDurationSeconds = chunkDurationMinutes * 60;

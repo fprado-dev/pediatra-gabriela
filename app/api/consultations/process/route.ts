@@ -128,6 +128,27 @@ export async function POST(request: NextRequest) {
       throw new Error("Arquivo de áudio está vazio");
     }
 
+    // 🔄 CONVERSÃO: Se for WebM, converter para MP3 para ter metadados confiáveis
+    if (extension === "webm") {
+      console.log("🔄 Detectado WebM - convertendo para MP3 para metadados confiáveis...");
+      const mp3Path = join(tmpdir(), `audio-${Date.now()}-converted.mp3`);
+      
+      try {
+        // Usar compressAudio que já converte para MP3
+        const { compressAudio } = await import("@/lib/utils/compress-audio");
+        await compressAudio(tempFilePath, mp3Path);
+        
+        // Trocar arquivo original pelo convertido
+        await unlink(tempFilePath);
+        tempFilePath = mp3Path;
+        
+        console.log(`✅ WebM convertido para MP3 com sucesso: ${tempFilePath}`);
+      } catch (conversionError: any) {
+        console.warn(`⚠️ Erro ao converter WebM, continuando com original: ${conversionError.message}`);
+        // Se falhar, continuar com WebM original
+      }
+    }
+
     await updateProcessingStep(supabase, consultationId, "download", "completed");
 
     // Step 2: Transcrever com Whisper

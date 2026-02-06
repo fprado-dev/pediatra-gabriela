@@ -142,10 +142,12 @@ export async function POST(
 
         await updateProcessingStep(supabase, consultationId, "cleaning", "in_progress");
 
-        const cleanedText = await cleanTranscription(consultation.raw_transcription, {
-          patientName: patient?.full_name,
-          patientAge,
-        });
+        // 🔥 USANDO TRANSCRIÇÃO DIRETA (sem limpeza por GPT)
+        // GPT-4o na extração já lida bem com ruídos e repetições
+        const cleanedText = consultation.raw_transcription;
+        const cleanedWords = cleanedText.trim().split(/\s+/).length;
+        console.log(`📊 Usando transcrição direta: ${cleanedText.length} caracteres, ${cleanedWords} palavras`);
+        console.log(`   Preview: ${cleanedText.substring(0, 200)}...`);
 
         await supabase
           .from("consultations")
@@ -157,7 +159,7 @@ export async function POST(
 
         await updateProcessingStep(supabase, consultationId, "cleaning", "completed");
 
-        console.log("✅ Limpeza refeita com sucesso");
+        console.log("✅ Texto preparado para extração (sem perda de conteúdo)");
         return NextResponse.json({
           success: true,
           message: "Limpeza de texto concluída com sucesso",

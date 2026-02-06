@@ -139,18 +139,12 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<strin
       }
     }
 
-    // 🔥 DEDUPLIZAÇÃO: Remover repetições massivas
-    console.log("🔄 Aplicando deduplização de texto...");
-    const deduplicatedText = deduplicateText(transcription);
-
-    if (deduplicatedText.length < transcription.length * 0.5) {
-      console.warn(
-        `⚠️ Deduplização removeu mais de 50% do texto (${transcription.length} → ${deduplicatedText.length} chars). ` +
-        `Isso pode indicar um problema com o áudio ou transcrição.`
-      );
-    }
-
-    return deduplicatedText;
+    // 🔥 DEDUPLIZAÇÃO DESABILITADA: Preservar conteúdo máximo
+    // GPT-4o na extração já lida bem com repetições naturais
+    console.log("ℹ️  Deduplização desabilitada - preservando conteúdo completo");
+    console.log(`📊 Transcrição final: ${transcription.length} caracteres`);
+    
+    return transcription;
   } catch (error: any) {
     console.error("❌ Erro na transcrição:", error);
 
@@ -268,16 +262,9 @@ async function transcribeChunks(
   const fullTranscription = transcriptions.join(" ");
   console.log(`✅ Transcrição completa: ${fullTranscription.length} caracteres`);
 
-  // 🔥 DEDUPLIZAÇÃO: Remover repetições massivas do Whisper
-  console.log("\n🔄 Aplicando deduplização de texto (chunks)...");
-  const deduplicatedText = deduplicateText(fullTranscription);
-
-  if (deduplicatedText.length < fullTranscription.length * 0.5) {
-    console.warn(
-      `⚠️ Deduplização removeu mais de 50% do texto (${fullTranscription.length} → ${deduplicatedText.length} chars). ` +
-      `Isso pode indicar um problema com o áudio ou transcrição.`
-    );
-  }
-
-  return deduplicatedText;
+  // 🔥 DEDUPLIZAÇÃO DESABILITADA: Preservar conteúdo máximo
+  // GPT-4o na extração já lida bem com repetições naturais
+  console.log("ℹ️  Deduplização desabilitada - preservando conteúdo completo dos chunks");
+  
+  return fullTranscription;
 }

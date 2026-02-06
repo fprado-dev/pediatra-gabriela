@@ -43,7 +43,7 @@ export interface ConsultationFields {
   quality_score?: number;
 }
 
-const MIN_WORDS_FOR_EXTRACTION = 20;
+const MIN_WORDS_FOR_EXTRACTION = 10; // Reduzido de 20 para aceitar consultas mais curtas
 
 /**
  * Extrai campos estruturados de uma consulta médica a partir do texto limpo
@@ -70,6 +70,7 @@ export async function extractConsultationFields(
 
   try {
     console.log("🤖 Iniciando extração de campos estruturados...");
+    console.log(`📊 Input: ${cleanedText.length} caracteres, ${wordCount} palavras`);
 
     // Criar contexto rico do paciente
     let patientContextText = "";
@@ -360,7 +361,7 @@ Retorne APENAS um objeto JSON válido com esta estrutura exata:
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
       temperature: 0.5, // Equilíbrio entre precisão e criatividade clínica
-      max_tokens: 4000,
+      max_tokens: 8000, // Aumentado de 4000 para suportar consultas mais longas
     });
 
     const content = response.choices[0].message.content;
@@ -456,6 +457,27 @@ Retorne APENAS um objeto JSON válido com esta estrutura exata:
 
     if (result.medication_alerts) {
       console.log(`   - ⚠️ Alertas: ${result.medication_alerts}`);
+    }
+
+    // Calcular taxa de preservação de conteúdo
+    const totalExtractedText = [
+      result.chief_complaint,
+      result.history,
+      result.physical_exam,
+      result.diagnosis,
+      result.plan,
+      result.notes,
+      result.development_notes,
+      result.prenatal_perinatal_history
+    ].filter(Boolean).join(" ");
+    
+    const extractedWords = totalExtractedText.trim().split(/\s+/).length;
+    const preservationRate = ((extractedWords / wordCount) * 100).toFixed(1);
+    
+    console.log(`\n📈 Taxa de preservação: ${extractedWords}/${wordCount} palavras (${preservationRate}%)`);
+    
+    if (Number(preservationRate) < 30) {
+      console.warn(`⚠️ Taxa de preservação baixa (${preservationRate}%). Pode indicar perda excessiva de informação.`);
     }
 
     return result;

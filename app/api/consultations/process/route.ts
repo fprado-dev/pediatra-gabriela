@@ -162,7 +162,8 @@ export async function POST(request: NextRequest) {
     });
 
     const transcriptionDuration = ((Date.now() - transcriptionStartTime) / 1000).toFixed(1);
-    console.log(`📝 Transcrição: ${rawTranscription.length} caracteres (${transcriptionDuration}s)`);
+    const transcriptionWords = rawTranscription.trim().split(/\s+/).length;
+    console.log(`📝 Transcrição: ${rawTranscription.length} caracteres, ${transcriptionWords} palavras (${transcriptionDuration}s)`);
     console.log(`   Preview: ${rawTranscription.substring(0, 200)}...`);
 
     // 🎙️ Detectar se tem diarização automática de speakers
@@ -183,15 +184,16 @@ export async function POST(request: NextRequest) {
 
     await updateProcessingStep(supabase, consultationId, "transcription", "completed");
 
-    // Step 3: Limpar texto
-    console.log("🧹 Step 3/4: Limpando texto...");
-    const cleaningStartTime = Date.now();
+    // Step 3: Preparar texto (sem limpeza por GPT)
+    console.log("🧹 Step 3/4: Preparando texto para extração...");
     await updateProcessingStep(supabase, consultationId, "cleaning", "in_progress");
 
-    const cleanedText = await cleanTranscription(rawTranscription);
-
-    const cleaningDuration = ((Date.now() - cleaningStartTime) / 1000).toFixed(1);
-    console.log(`✅ Limpeza concluída (${cleaningDuration}s)`);
+    // 🔥 USANDO TRANSCRIÇÃO DIRETA (sem limpeza por GPT)
+    // GPT-4o na extração já lida bem com ruídos e repetições naturais
+    const cleanedText = rawTranscription;
+    const cleanedWords = cleanedText.trim().split(/\s+/).length;
+    console.log(`📊 Texto para extração: ${cleanedText.length} caracteres, ${cleanedWords} palavras (perda: 0%)`);
+    console.log(`   Preview: ${cleanedText.substring(0, 200)}...`);
 
     await supabase
       .from("consultations")

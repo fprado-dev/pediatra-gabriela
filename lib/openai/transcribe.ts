@@ -189,6 +189,28 @@ async function transcribeChunks(
     console.log(`📝 Chunk ${i + 1}/${chunks.length} (${progress}%)...`);
 
     try {
+      // Validar tamanho do chunk antes de transcrever
+      const chunkStats = await fs.promises.stat(chunk.path);
+      const chunkSizeKB = chunkStats.size / 1024;
+      
+      // Se chunk está vazio ou muito pequeno (< 10KB), pular
+      if (chunkSizeKB < 10) {
+        console.warn(`  ⚠️ Chunk ${i + 1} muito pequeno (${chunkSizeKB.toFixed(2)}KB), pulando...`);
+        
+        // Se já temos transcrições, parar aqui (chegamos no fim do áudio real)
+        if (transcriptions.length > 0) {
+          console.log(`  ℹ️ Fim do áudio real detectado no chunk ${i + 1}, parando transcrição.`);
+          break;
+        }
+        
+        // Se é o primeiro chunk e está vazio, algo está errado
+        if (i === 0) {
+          throw new Error("Primeiro chunk está vazio - áudio pode estar corrompido");
+        }
+        
+        continue;
+      }
+
       const audioFile = fs.createReadStream(chunk.path);
 
       // 🎯 PROMPT OTIMIZADO usando CORE Framework (chunks)

@@ -111,8 +111,25 @@ export async function splitAudioByTime(
       // Verificar tamanho do chunk
       const stats = await stat(chunkPath);
       const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+      const sizeKB = stats.size / 1024;
 
       console.log(`  ✓ Chunk ${i + 1}/${numChunks}: ${sizeMB}MB (${startTime / 60}min - ${(startTime + chunkDurationSeconds) / 60}min)`);
+
+      // Se chunk está vazio ou muito pequeno (< 10KB), provavelmente chegamos no fim do áudio real
+      if (sizeKB < 10) {
+        console.warn(`  ⚠️  Chunk ${i + 1} vazio ou muito pequeno (${sizeKB.toFixed(2)}KB)`);
+        console.log(`  ℹ️  Parando criação de chunks - fim do áudio real detectado`);
+        
+        // Remover o chunk vazio
+        try {
+          await unlink(chunkPath);
+        } catch (e) {
+          console.warn(`  ⚠️ Erro ao remover chunk vazio: ${e}`);
+        }
+        
+        // Parar de criar mais chunks
+        break;
+      }
 
       // Se chunk ainda for muito grande, avisar
       if (stats.size > WHISPER_MAX_SIZE) {

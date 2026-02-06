@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { Mic, Square, Pause, Play, Trash2, Upload, AlertCircle, Loader2 } from "lucide-react";
+import { Mic, Square, Pause, Play, Trash2, Upload, AlertCircle, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { compressAudio } from "@/lib/utils/audio-compressor";
 
@@ -283,6 +283,40 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const handleDownloadAudio = () => {
+    if (!audioBlob) return;
+    
+    // Criar URL temporário para o blob
+    const url = URL.createObjectURL(audioBlob);
+    
+    // Detectar extensão baseada no tipo do blob
+    let extension = "webm"; // padrão
+    if (audioBlob.type) {
+      if (audioBlob.type.includes("mp4")) extension = "mp4";
+      else if (audioBlob.type.includes("webm")) extension = "webm";
+      else if (audioBlob.type.includes("wav")) extension = "wav";
+      else if (audioBlob.type.includes("m4a")) extension = "m4a";
+      else if (audioBlob.type.includes("mp3")) extension = "mp3";
+      else if (audioBlob.type.includes("aac")) extension = "aac";
+      else if (audioBlob.type.includes("ogg")) extension = "ogg";
+    }
+    
+    // Criar link de download
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `consulta-${new Date().getTime()}.${extension}`;
+    
+    // Adicionar ao DOM, clicar e remover
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Limpar URL temporário
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    
+    toast.success("Download iniciado!");
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -398,6 +432,16 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
 
           {recordingState === "stopped" && (
             <>
+              <Button 
+                size="lg" 
+                variant="secondary"
+                onClick={handleDownloadAudio} 
+                className="gap-2"
+                disabled={isCompressing}
+              >
+                <Download className="h-5 w-5" />
+                Baixar Original
+              </Button>
               <Button 
                 size="lg" 
                 onClick={handleUpload} 

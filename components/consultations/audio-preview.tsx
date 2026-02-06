@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Play, Pause, RotateCcw, Clock, FileAudio, Loader2 } from "lucide-react";
+import { Play, Pause, RotateCcw, Clock, FileAudio, Loader2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AudioPreviewProps {
@@ -82,6 +82,36 @@ export function AudioPreview({
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleDownloadAudio = () => {
+    // Criar URL temporário para o blob
+    const url = URL.createObjectURL(audioBlob);
+    
+    // Detectar extensão baseada no tipo do blob
+    let extension = "webm"; // padrão
+    if (audioBlob.type) {
+      if (audioBlob.type.includes("mp4")) extension = "mp4";
+      else if (audioBlob.type.includes("webm")) extension = "webm";
+      else if (audioBlob.type.includes("wav")) extension = "wav";
+      else if (audioBlob.type.includes("m4a")) extension = "m4a";
+      else if (audioBlob.type.includes("mp3")) extension = "mp3";
+      else if (audioBlob.type.includes("aac")) extension = "aac";
+      else if (audioBlob.type.includes("ogg")) extension = "ogg";
+    }
+    
+    // Criar link de download
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `consulta-${new Date().getTime()}.${extension}`;
+    
+    // Adicionar ao DOM, clicar e remover
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Limpar URL temporário
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   };
 
   return (
@@ -177,30 +207,44 @@ export function AudioPreview({
         )}
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3">
+          {/* Linha 1: Download do áudio original */}
           <Button
-            variant="outline"
-            className="flex-1"
-            onClick={onReRecord}
+            variant="secondary"
+            className="w-full"
+            onClick={handleDownloadAudio}
             disabled={isUploading}
           >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Regravar
+            <Download className="h-4 w-4 mr-2" />
+            Baixar Áudio Original
           </Button>
-          <Button
-            className="flex-1"
-            onClick={onConfirm}
-            disabled={isUploading}
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              "Confirmar e Enviar"
-            )}
-          </Button>
+          
+          {/* Linha 2: Ações principais */}
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={onReRecord}
+              disabled={isUploading}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Regravar
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={onConfirm}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                "Confirmar e Enviar"
+              )}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

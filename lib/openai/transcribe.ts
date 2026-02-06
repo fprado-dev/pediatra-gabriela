@@ -188,10 +188,14 @@ async function transcribeChunks(
 
     console.log(`📝 Chunk ${i + 1}/${chunks.length} (${progress}%)...`);
 
+    // Validar tamanho do chunk antes de transcrever
+    let chunkStats;
     try {
-      // Validar tamanho do chunk antes de transcrever
-      const chunkStats = await fs.promises.stat(chunk.path);
+      chunkStats = await fs.promises.stat(chunk.path);
       const chunkSizeKB = chunkStats.size / 1024;
+      const chunkSizeMB = chunkSizeKB / 1024;
+      
+      console.log(`  📦 Chunk ${i + 1}: ${chunkSizeMB.toFixed(2)}MB (${chunk.path})`);
       
       // Se chunk está vazio ou muito pequeno (< 10KB), pular
       if (chunkSizeKB < 10) {
@@ -236,6 +240,23 @@ async function transcribeChunks(
       console.log(`  ✓ Chunk ${i + 1} transcrito (${text.length} caracteres)`);
     } catch (error: any) {
       console.error(`  ✗ Erro no chunk ${i + 1}:`, error.message);
+      console.error(`     Path: ${chunk.path}`);
+      console.error(`     Tamanho: ${(chunkStats?.size || 0) / 1024}KB`);
+      
+      // Se já temos pelo menos algumas transcrições E o erro é de decodificação,
+      // continuar com o que temos em vez de falhar completamente
+      if (transcriptions.length >= 3 && error.message.includes("could not be decoded")) {
+        console.warn(`  ⚠️ Continuando sem chunk ${i + 1} - já temos ${transcriptions.length} chunks transcritos`);
+        console.warn(`  ⚠️ Chunk problemático será ignorado para não perder todo o áudio`);
+        
+        // Adicionar nota na transcrição sobre o chunk perdido
+        const missingNote = `\n[Nota: Trecho entre ${(chunk.startTime / 60).toFixed(0)}-${((chunk.startTime + chunk.duration) / 60).toFixed(0)} minutos não pôde ser transcrito devido a problema no áudio]\n`;
+        transcriptions.push(missingNote);
+        
+        continue; // Continuar para próximo chunk
+      }
+      
+      // Se é um dos primeiros chunks ou erro crítico, falhar
       throw new Error(`Falha ao transcrever chunk ${i + 1}: ${error.message}`);
     }
   }

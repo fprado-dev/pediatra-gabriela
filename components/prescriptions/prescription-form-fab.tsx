@@ -33,7 +33,7 @@ import {
 import Link from "next/link";
 
 interface PrescriptionFormFABProps {
-  consultationId: string;
+  consultationId: string | undefined;
   isSaving: boolean;
   onSave: () => void;
   onUseTemplate: () => void;

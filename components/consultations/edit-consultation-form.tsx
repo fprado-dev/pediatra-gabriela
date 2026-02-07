@@ -32,6 +32,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { PhysicalExamTemplateSelector } from "./physical-exam-template-selector";
 import { BackButton } from "./back-button";
+import { TextImprover } from "./text-improver";
 
 // Esquema de validação
 const consultationSchema = z.object({
@@ -268,9 +269,16 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
             <CardContent className="space-y-4">
               {/* Queixa Principal */}
               <div className="space-y-2">
-                <Label htmlFor="chief_complaint">
-                  Queixa Principal <span className="text-red-500">*</span>
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="chief_complaint">
+                    Queixa Principal <span className="text-red-500">*</span>
+                  </Label>
+                  <TextImprover
+                    value={watch("chief_complaint") || ""}
+                    onChange={(newValue) => setValue("chief_complaint", newValue)}
+                    fieldName="chief_complaint"
+                  />
+                </div>
                 <Textarea
                   id="chief_complaint"
                   placeholder="Ex: Febre há 2 dias..."
@@ -284,7 +292,14 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
 
               {/* HMA - História da Moléstia Atual */}
               <div className="space-y-2">
-                <Label htmlFor="hma">História da Moléstia Atual (HMA)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="hma">História da Moléstia Atual (HMA)</Label>
+                  <TextImprover
+                    value={watch("hma") || ""}
+                    onChange={(newValue) => setValue("hma", newValue)}
+                    fieldName="hma"
+                  />
+                </div>
                 <Textarea
                   id="hma"
                   placeholder="Foco na queixa atual: evolução dos sintomas, início, fatores de melhora/piora..."
@@ -295,7 +310,14 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
 
               {/* History - Informações Complementares */}
               <div className="space-y-2">
-                <Label htmlFor="history">Informações Complementares (History)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="history">Informações Complementares (History)</Label>
+                  <TextImprover
+                    value={watch("history") || ""}
+                    onChange={(newValue) => setValue("history", newValue)}
+                    fieldName="history"
+                  />
+                </div>
                 <Textarea
                   id="history"
                   placeholder="Contexto geral: rotina alimentar, padrão de sono, hábitos, informações de base não relacionadas à queixa atual..."
@@ -306,7 +328,14 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
 
               {/* Histórico Familiar */}
               <div className="space-y-2">
-                <Label htmlFor="family_history">Histórico Familiar</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="family_history">Histórico Familiar</Label>
+                  <TextImprover
+                    value={watch("family_history") || ""}
+                    onChange={(newValue) => setValue("family_history", newValue)}
+                    fieldName="family_history"
+                  />
+                </div>
                 <Textarea
                   id="family_history"
                   placeholder="Doenças hereditárias, alergias familiares, condições crônicas relevantes..."
@@ -319,20 +348,27 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="physical_exam">Exame Físico</Label>
-                  <PhysicalExamTemplateSelector
-                    patientId={patient?.id}
-                    patientName={patient?.full_name}
-                    dateOfBirth={patient?.date_of_birth}
-                    sex={patient?.sex}
-                    onInsert={(text, mode) => {
-                      const currentText = watch("physical_exam") || "";
-                      if (mode === "replace") {
-                        setValue("physical_exam", text);
-                      } else {
-                        setValue("physical_exam", currentText ? `${currentText}\n\n${text}` : text);
-                      }
-                    }}
-                  />
+                  <div className="flex items-center gap-2">
+                    <TextImprover
+                      value={watch("physical_exam") || ""}
+                      onChange={(newValue) => setValue("physical_exam", newValue)}
+                      fieldName="physical_exam"
+                    />
+                    <PhysicalExamTemplateSelector
+                      patientId={patient?.id}
+                      patientName={patient?.full_name}
+                      dateOfBirth={patient?.date_of_birth}
+                      sex={patient?.sex}
+                      onInsert={(text, mode) => {
+                        const currentText = watch("physical_exam") || "";
+                        if (mode === "replace") {
+                          setValue("physical_exam", text);
+                        } else {
+                          setValue("physical_exam", currentText ? `${currentText}\n\n${text}` : text);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
                 <Textarea
                   id="physical_exam"
@@ -359,7 +395,14 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
 
               {/* Conduta */}
               <div className="space-y-2">
-                <Label htmlFor="conduct">Conduta</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="conduct">Conduta</Label>
+                  <TextImprover
+                    value={watch("conduct") || ""}
+                    onChange={(newValue) => setValue("conduct", newValue)}
+                    fieldName="conduct"
+                  />
+                </div>
                 <Textarea
                   id="conduct"
                   placeholder="Exames solicitados, encaminhamentos, procedimentos realizados..."
@@ -370,7 +413,14 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
 
               {/* Plano Terapêutico */}
               <div className="space-y-2">
-                <Label htmlFor="plan">Plano Terapêutico</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="plan">Plano Terapêutico</Label>
+                  <TextImprover
+                    value={watch("plan") || ""}
+                    onChange={(newValue) => setValue("plan", newValue)}
+                    fieldName="plan"
+                  />
+                </div>
                 <Textarea
                   id="plan"
                   placeholder="Descreva o plano de tratamento..."
@@ -506,7 +556,14 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
 
               {/* Desenvolvimento */}
               <div className="space-y-2 pt-2">
-                <Label htmlFor="development_notes">Notas de Desenvolvimento</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="development_notes">Notas de Desenvolvimento</Label>
+                  <TextImprover
+                    value={watch("development_notes") || ""}
+                    onChange={(newValue) => setValue("development_notes", newValue)}
+                    fieldName="development_notes"
+                  />
+                </div>
                 <Textarea
                   id="development_notes"
                   placeholder="Marcos do desenvolvimento, observações..."
@@ -529,7 +586,14 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                 Informações sobre gestação, parto e período neonatal (crítico para recém-nascidos e lactentes)
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-end">
+                <TextImprover
+                  value={watch("prenatal_perinatal_history") || ""}
+                  onChange={(newValue) => setValue("prenatal_perinatal_history", newValue)}
+                  fieldName="prenatal_perinatal_history"
+                />
+              </div>
               <Textarea
                 id="prenatal_perinatal_history"
                 placeholder="Ex: Nasceu prematuro (35 semanas), mãe teve diabetes gestacional, ficou 5 dias em UTI neonatal..."
@@ -548,7 +612,14 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                 Observações Adicionais
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-end">
+                <TextImprover
+                  value={watch("notes") || ""}
+                  onChange={(newValue) => setValue("notes", newValue)}
+                  fieldName="notes"
+                />
+              </div>
               <Textarea
                 id="notes"
                 placeholder="Notas adicionais, observações, lembretes..."

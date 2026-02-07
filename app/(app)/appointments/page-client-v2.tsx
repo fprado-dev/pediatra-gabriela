@@ -45,11 +45,17 @@ export function AppointmentsPageClientV2() {
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithPatient | null>(null);
   const [selectedBlock, setSelectedBlock] = useState<ScheduleBlock | null>(null);
 
-  // Load initial data - apenas no mount e quando muda de view
+  // Load initial data on mount
+  useEffect(() => {
+    refreshCalendar(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+  
+  // Refresh when view changes
   useEffect(() => {
     refreshCalendar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentView]); // Removido selectedDate para navegação fluida
+  }, [currentView]); // Refresh when view changes
 
   // Handlers
   const handleSelectSlot = (slotInfo: { start: Date; end: Date; action: string }) => {

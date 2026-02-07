@@ -188,37 +188,34 @@ export default async function DashboardPage() {
   })();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <HeroSection
+        consultationsToday={consultationsToday}
+        nextAppointmentTime={nextAppointmentTime}
+        totalActivePatients={totalActivePatients || 0}
+      />
 
-      <div className="py-8 max-w-7xl mx-auto space-y-6">
-        {/* Hero Section */}
-        <HeroSection
-          consultationsToday={consultationsToday}
-          nextAppointmentTime={nextAppointmentTime}
-          totalActivePatients={totalActivePatients || 0}
-        />
-
-        {/* Grid Principal: Agenda + Insights */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <TodayAgenda appointments={formattedTodayAppointments} />
-          <InsightsCard
-            currentMonthTotal={currentMonthTotal || 0}
-            previousMonthTotal={previousMonthTotal || 0}
-            dailyData={dailyData}
-          />
-        </div>
-
-        {/* Atividades Futuras */}
-        <UpcomingActivities weekAppointments={weekData} />
-
-        {/* Métricas de Eficiência */}
-        <EfficiencyMetrics
-          consultationsThisMonth={currentMonthTotal || 0}
-          timeSavedMinutes={timeSavedMinutes}
-          returnRate={returnRate}
-          ageDistribution={ageDistribution}
+      {/* Grid Principal: Agenda + Insights */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <TodayAgenda appointments={formattedTodayAppointments} />
+        <InsightsCard
+          currentMonthTotal={currentMonthTotal || 0}
+          previousMonthTotal={previousMonthTotal || 0}
+          dailyData={dailyData}
         />
       </div>
+
+      {/* Atividades Futuras */}
+      <UpcomingActivities weekAppointments={weekData} />
+
+      {/* Métricas de Eficiência */}
+      <EfficiencyMetrics
+        consultationsThisMonth={currentMonthTotal || 0}
+        timeSavedMinutes={timeSavedMinutes}
+        returnRate={returnRate}
+        ageDistribution={ageDistribution}
+      />
     </div>
   );
 }

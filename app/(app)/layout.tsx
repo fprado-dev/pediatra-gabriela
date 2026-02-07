@@ -34,9 +34,7 @@ export default async function ProtectedLayout({
   };
 
   return (
-    <TimerRecordingProvider>
-      <AppShell user={userData}>{children}</AppShell>
-    </TimerRecordingProvider>
+    <AppShell user={userData}>{children}</AppShell>
   );
 }
 

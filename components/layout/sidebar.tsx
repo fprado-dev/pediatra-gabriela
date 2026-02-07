@@ -4,7 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Home, Users, Calendar } from "lucide-react";
+import { FileText, Home, Users, Calendar, Pill, Award } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { NavUser } from "@/components/layout/nav-user";
@@ -17,10 +17,12 @@ type User = {
 };
 
 const NAV = [
-  { title: "Dashboard", href: "/dashboard", icon: Home },
+  { title: "Visão Geral", href: "/dashboard", icon: Home },
   { title: "Agenda", href: "/appointments", icon: Calendar },
   { title: "Consultas", href: "/consultations", icon: FileText },
   { title: "Pacientes", href: "/patients", icon: Users },
+  { title: "Receitas", href: "/prescriptions/new", icon: Pill },
+  { title: "Atestados", href: "/medical-certificates/new", icon: Award },
 ] as const;
 
 export function AppSidebar({ user }: { user: User }) {

@@ -6,6 +6,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import {
+  savePrescriptionToConsultation,
+  createMinimalConsultationForPrescription,
+} from "@/lib/supabase/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -107,7 +111,7 @@ interface Template {
 }
 
 interface PrescriptionFormProps {
-  consultationId: string;
+  consultationId?: string;
   patient: Patient;
   clinicalData: ClinicalData;
   existingPrescription?: PrescriptionData | null;
@@ -401,18 +405,37 @@ export function PrescriptionForm({
         observeFeeding,
       };
 
-      const { error } = await supabase
-        .from("consultations")
-        .update({
-          prescription_data: prescriptionData,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", consultationId);
+      let savedConsultationId = consultationId;
 
-      if (error) throw error;
+      if (consultationId) {
+        // Se tem consultation_id, atualizar consulta existente
+        const { error } = await savePrescriptionToConsultation(
+          supabase,
+          consultationId,
+          prescriptionData
+        );
+
+        if (error) throw error;
+      } else {
+        // Se não tem consultation_id, criar consulta mínima
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("Usuário não autenticado");
+        }
+
+        const { data: newConsultation, error } =
+          await createMinimalConsultationForPrescription(supabase, {
+            patientId: patient.id,
+            doctorId: user.id,
+            prescriptionData,
+          });
+
+        if (error || !newConsultation) throw error;
+        savedConsultationId = newConsultation.id;
+      }
 
       toast.success("Receita salva com sucesso!");
-      router.push(`/consultations/${consultationId}/prescription/view`);
+      router.push(`/consultations/${savedConsultationId}/prescription/view`);
     } catch (error) {
       console.error("Erro ao salvar:", error);
       toast.error("Erro ao salvar receita");

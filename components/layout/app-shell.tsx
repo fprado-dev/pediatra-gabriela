@@ -19,19 +19,16 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-svh bg-background">
+    <div className="min-h-svh bg-gray-50 ">
       <div className="flex min-h-svh">
-        <aside className="w-64 shrink-0 border-r bg-card">
+        <aside className="w-64 shrink-0 border-r sticky top-0 left-0 h-screen">
           <AppSidebar user={user} />
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <main className="min-w-0 flex-1">{children}</main>
+        <div className="flex flex-1 flex-col max-w-7xl mx-auto  ">
+          <main className="flex-1 py-8 ">{children}</main>
         </div>
       </div>
-      
-      {/* Timer Widget - Aparece em todas as páginas autenticadas */}
-      <TimerWidget />
     </div>
   );
 }

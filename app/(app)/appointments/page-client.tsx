@@ -35,6 +35,7 @@ export function AppointmentsPageClient() {
 
   useEffect(() => {
     fetchAppointments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWeekStart]);
 
   const fetchAppointments = async () => {

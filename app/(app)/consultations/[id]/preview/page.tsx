@@ -122,17 +122,7 @@ export default async function ConsultationPreviewPage({
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       {/* FAB de ações */}
-      <ConsultationActionsFAB
-        consultationId={id}
-        hasPrescription={!!consultation.prescription_data}
-        patientName={patient?.full_name || ""}
-        patientDateOfBirth={patient?.date_of_birth || ""}
-        responsibleName={patient?.responsible_name}
-        consultationDate={consultation.created_at}
-        doctorName={profile?.full_name || ""}
-        doctorCRM={profile?.crm || ""}
-        doctorSpecialty={profile?.specialty}
-      />
+      <ConsultationActionsFAB consultationId={id} />
 
       <div className="px-6 max-w-7xl mx-auto space-y-6">
 

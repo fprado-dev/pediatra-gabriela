@@ -36,7 +36,7 @@ export default async function NewConsultationRecordingPage({ searchParams }: Pag
 
   return (
     <NewConsultationRecording 
-      patients={patients || []} 
+      patients={(patients as any) || []} 
       preSelectedPatientId={patientId}
       appointmentId={appointmentId}
     />

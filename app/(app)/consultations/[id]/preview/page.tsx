@@ -81,7 +81,7 @@ export default async function ConsultationPreviewPage({
     .eq("id", id)
     .eq("doctor_id", user.id)
     .single();
-  
+
   // Extrair consultation type
   const consultationType = consultation?.consultation_type;
   const consultationSubtype = consultation?.consultation_subtype;
@@ -150,7 +150,7 @@ export default async function ConsultationPreviewPage({
               </div>
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                <span>{format(new Date(consultation.created_at), "dd 'de' MMMM, yyyy", { locale: ptBR })}</span>
+                <span>{format(new Date(consultation.created_at || new Date()), "dd 'de' MMMM, yyyy", { locale: ptBR })}</span>
               </div>
             </div>
           </div>
@@ -165,10 +165,10 @@ export default async function ConsultationPreviewPage({
           <ProcessingRetry
             consultationId={id}
             status={consultation.status}
-            processingSteps={consultation.processing_steps}
-            processingError={consultation.processing_error}
-            rawTranscription={consultation.raw_transcription}
-            cleanedTranscription={consultation.cleaned_transcription}
+            processingSteps={consultation.processing_steps as any}
+            processingError={consultation.processing_error || undefined}
+            rawTranscription={consultation.raw_transcription || undefined}
+            cleanedTranscription={consultation.cleaned_transcription || undefined}
           />
         )}
 
@@ -183,8 +183,8 @@ export default async function ConsultationPreviewPage({
               <div className="flex items-center gap-3">
                 {consultationType ? (
                   (() => {
-                    const Icon = getConsultationTypeIcon(consultationType);
-                    const colors = getConsultationTypeColor(consultationType);
+                    const Icon = getConsultationTypeIcon(consultationType as any);
+                    const colors = getConsultationTypeColor(consultationType as any);
                     return (
                       <>
                         <div className={`p-2 rounded-lg ${colors.bg}`}>
@@ -195,7 +195,7 @@ export default async function ConsultationPreviewPage({
                             Tipo de Consulta
                           </h2>
                           <p className="text-base font-semibold text-gray-900">
-                            {getConsultationTypeLabel(consultationType, consultationSubtype)}
+                            {getConsultationTypeLabel(consultationType as any, consultationSubtype as any)}
                           </p>
                         </div>
                       </>
@@ -403,7 +403,7 @@ export default async function ConsultationPreviewPage({
               <h2 className="text-sm font-medium text-gray-500">
                 Hipóteses Diagnósticas
               </h2>
-              {consultation.diagnosis && consultation.diagnosis_is_ai_suggestion && (
+              {consultation.diagnosis && (consultation as any).diagnosis_is_ai_suggestion && (
                 <Badge variant="outline" className="text-xs text-blue-600 ml-auto">
                   Sugestão IA
                 </Badge>
@@ -480,7 +480,7 @@ export default async function ConsultationPreviewPage({
 
         {/* 12. HISTÓRICO DE CONSULTAS ANTERIORES (antes do áudio) */}
         {previousConsultations && (
-          <PreviousConsultationsCard data={previousConsultations} />
+          <PreviousConsultationsCard data={previousConsultations as any} />
         )}
 
         {/* Audio Player */}
@@ -505,9 +505,9 @@ export default async function ConsultationPreviewPage({
             </p>
             <div className="flex gap-3">
               <form action={`/api/consultations/${id}/original-audio`} method="GET">
-                <Button 
+                <Button
                   type="submit"
-                  variant="outline" 
+                  variant="outline"
                   size="sm"
                   className="gap-2"
                 >
@@ -515,14 +515,14 @@ export default async function ConsultationPreviewPage({
                   Baixar Áudio Original
                 </Button>
               </form>
-              
+
               {(consultation.status === 'error' || consultation.status === 'completed') && (
                 <form action="/api/consultations/process" method="POST">
                   <input type="hidden" name="consultationId" value={id} />
                   <input type="hidden" name="useOriginal" value="true" />
-                  <Button 
+                  <Button
                     type="submit"
-                    variant="default" 
+                    variant="default"
                     size="sm"
                     className="gap-2"
                   >

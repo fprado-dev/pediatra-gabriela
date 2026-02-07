@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -192,6 +193,46 @@ export function PrescriptionForm({
     }
   };
 
+  // Converter texto simples para HTML básico
+  const textToHtml = (text: string): string => {
+    if (!text) return "";
+    
+    // Dividir em parágrafos (quebras duplas)
+    const paragraphs = text.split("\n\n");
+    
+    return paragraphs
+      .map((para) => {
+        const trimmed = para.trim();
+        if (!trimmed) return "";
+        
+        // Detectar listas com marcadores
+        if (trimmed.includes("\n- ") || trimmed.startsWith("- ")) {
+          const items = trimmed
+            .split("\n")
+            .filter((line) => line.trim().startsWith("- "))
+            .map((line) => `<li>${line.replace(/^-\s*/, "").trim()}</li>`)
+            .join("");
+          return `<ul>${items}</ul>`;
+        }
+        
+        // Detectar listas numeradas
+        if (/^\d+\./.test(trimmed)) {
+          const items = trimmed
+            .split("\n")
+            .filter((line) => /^\d+\./.test(line.trim()))
+            .map((line) => `<li>${line.replace(/^\d+\.\s*/, "").trim()}</li>`)
+            .join("");
+          return `<ol>${items}</ol>`;
+        }
+        
+        // Parágrafo normal (preservar quebras simples como <br>)
+        const withBreaks = trimmed.replace(/\n/g, "<br>");
+        return `<p>${withBreaks}</p>`;
+      })
+      .filter((p) => p)
+      .join("");
+  };
+
   // Gerar seção com IA
   const generateSection = async (section: string) => {
     setIsGenerating(section);
@@ -233,13 +274,13 @@ export function PrescriptionForm({
           }
           break;
         case "orientations":
-          setOrientations(data.content || "");
+          setOrientations(textToHtml(data.content || ""));
           break;
         case "alertSigns":
-          setAlertSigns(data.content || "");
+          setAlertSigns(textToHtml(data.content || ""));
           break;
         case "prevention":
-          setPrevention(data.content || "");
+          setPrevention(textToHtml(data.content || ""));
           break;
       }
 
@@ -269,7 +310,7 @@ export function PrescriptionForm({
       }
 
       // Aplicar medicações
-      if (template.medications && template.medications.length > 0) {
+      if (template.medications && Array.isArray(template.medications) && template.medications.length > 0) {
         setMedications(
           template.medications.map((m: any) => {
             // Combinar campos do template em instructions
@@ -292,8 +333,8 @@ export function PrescriptionForm({
       }
 
       // Aplicar outros campos (usando nomes corretos do schema)
-      if (template.instructions) setOrientations(template.instructions);
-      if (template.warnings) setAlertSigns(template.warnings);
+      if (template.instructions) setOrientations(textToHtml(template.instructions));
+      if (template.warnings) setAlertSigns(textToHtml(template.warnings));
 
       toast.success(`Template "${template.name}" carregado!`);
     } catch (error) {
@@ -360,7 +401,7 @@ export function PrescriptionForm({
         name: templateName,
         category: templateCategory,
         description: templateDescription || null,
-        medications: medications.filter((m) => m.name.trim()),
+        medications: medications.filter((m) => m.name.trim()) as any,
         instructions: orientations || null,
         warnings: alertSigns || null,
         alert_signs: alertSigns || null,
@@ -574,13 +615,12 @@ export function PrescriptionForm({
               </Button>
             </CardHeader>
             <CardContent>
-              <Textarea
+              <RichTextEditor
                 placeholder="Orientações de cuidado, alimentação, repouso..."
                 value={orientations}
-                onChange={(e) => setOrientations(e.target.value)}
-                rows={15}
-                className="resize-none"
+                onChange={setOrientations}
                 disabled={isGenerating === "orientations"}
+                minHeight="300px"
               />
             </CardContent>
           </Card>
@@ -607,13 +647,12 @@ export function PrescriptionForm({
               </Button>
             </CardHeader>
             <CardContent>
-              <Textarea
+              <RichTextEditor
                 placeholder="Quando procurar atendimento médico imediatamente..."
                 value={alertSigns}
-                onChange={(e) => setAlertSigns(e.target.value)}
-                rows={10}
-                className="resize-none"
+                onChange={setAlertSigns}
                 disabled={isGenerating === "alertSigns"}
+                minHeight="200px"
               />
             </CardContent>
           </Card>
@@ -640,13 +679,12 @@ export function PrescriptionForm({
               </Button>
             </CardHeader>
             <CardContent>
-              <Textarea
+              <RichTextEditor
                 placeholder="Orientações preventivas para evitar novos episódios..."
                 value={prevention}
-                onChange={(e) => setPrevention(e.target.value)}
-                rows={10}
-                className="resize-none"
+                onChange={setPrevention}
                 disabled={isGenerating === "prevention"}
+                minHeight="200px"
               />
             </CardContent>
           </Card>
@@ -707,11 +745,11 @@ export function PrescriptionForm({
                 </div>
               </div>
 
-              <Textarea
+              <RichTextEditor
                 placeholder="Outras anotações..."
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
+                onChange={setNotes}
+                minHeight="100px"
               />
             </CardContent>
           </Card>

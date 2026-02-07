@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from "pdf-lib";
 import fs from "fs";
 import path from "path";
+import { htmlToPdfElements, stripHtml, type PdfElement, type TextSegment } from "@/lib/pdf/html-to-pdf-elements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,9 +70,10 @@ class PrescriptionPDFBuilder {
 
   private cleanText(text: string | null | undefined): string {
     if (!text) return "";
+    // Remove emojis e caracteres especiais, mas preserva caracteres acentuados
     return text
       .replace(/[\u{1F300}-\u{1F9FF}]/gu, "")
-      .replace(/[^\x00-\x7F\xA0-\xFF]/g, "")
+      .replace(/[^\x20-\x7E\xA0-\xFF]/g, "")
       .trim();
   }
 
@@ -125,6 +127,136 @@ class PrescriptionPDFBuilder {
         color,
       });
       this.y -= LAYOUT.lineHeight;
+    }
+  }
+
+  /**
+   * Renderiza segmentos de texto com formatação inline (negrito, itálico)
+   */
+  private drawTextSegments(
+    segments: TextSegment[],
+    x: number,
+    fontSize: number,
+    color = COLORS.text
+  ) {
+    const maxWidth = LAYOUT.pageWidth - LAYOUT.margin * 2 - (x - LAYOUT.margin);
+    let currentX = x;
+    let line: { text: string; font: PDFFont; width: number }[] = [];
+    let lineWidth = 0;
+
+    for (const segment of segments) {
+      const cleanedText = this.cleanText(segment.text);
+      const font = segment.bold ? this.fontBold : this.font;
+      const words = cleanedText.split(" ");
+
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const wordText = i < words.length - 1 ? word + " " : word;
+        const wordWidth = font.widthOfTextAtSize(wordText, fontSize);
+
+        // Verificar se precisa quebrar linha
+        if (lineWidth + wordWidth > maxWidth && line.length > 0) {
+          // Renderizar linha atual
+          this.checkNewPage();
+          currentX = x;
+          for (const part of line) {
+            this.currentPage.drawText(part.text, {
+              x: currentX,
+              y: this.y,
+              size: fontSize,
+              font: part.font,
+              color,
+            });
+            currentX += part.width;
+          }
+          this.y -= LAYOUT.lineHeight;
+          
+          // Resetar linha
+          line = [];
+          lineWidth = 0;
+        }
+
+        line.push({ text: wordText, font, width: wordWidth });
+        lineWidth += wordWidth;
+      }
+    }
+
+    // Renderizar última linha
+    if (line.length > 0) {
+      this.checkNewPage();
+      currentX = x;
+      for (const part of line) {
+        this.currentPage.drawText(part.text, {
+          x: currentX,
+          y: this.y,
+          size: fontSize,
+          font: part.font,
+          color,
+        });
+        currentX += part.width;
+      }
+      this.y -= LAYOUT.lineHeight;
+    }
+  }
+
+  /**
+   * Renderiza HTML estruturado (parágrafos, listas, etc.)
+   */
+  private drawHtmlContent(
+    html: string,
+    x: number,
+    fontSize: number,
+    color = COLORS.text
+  ) {
+    const elements = htmlToPdfElements(html);
+
+    for (const element of elements) {
+      if (element.type === "line-break") {
+        this.y -= LAYOUT.lineHeight / 2;
+        continue;
+      }
+
+      if (element.type === "paragraph" && element.content) {
+        this.drawTextSegments(element.content, x, fontSize, color);
+        this.y -= 4; // Espaçamento entre parágrafos
+        continue;
+      }
+
+      if (element.type === "bullet-list" && element.items) {
+        for (const item of element.items) {
+          this.checkNewPage();
+          // Desenhar bullet
+          this.currentPage.drawText("•", {
+            x,
+            y: this.y,
+            size: fontSize,
+            font: this.font,
+            color,
+          });
+          // Desenhar conteúdo do item
+          this.drawTextSegments(item, x + 15, fontSize, color);
+        }
+        this.y -= 4;
+        continue;
+      }
+
+      if (element.type === "ordered-list" && element.items) {
+        for (let i = 0; i < element.items.length; i++) {
+          this.checkNewPage();
+          // Desenhar número
+          this.currentPage.drawText(`${i + 1}.`, {
+            x,
+            y: this.y,
+            size: fontSize,
+            font: this.font,
+            color,
+          });
+          // Desenhar conteúdo do item
+          this.drawTextSegments(element.items[i], x + 20, fontSize, color);
+        }
+        this.y -= 4;
+        continue;
+      }
     }
   }
 
@@ -281,10 +413,16 @@ class PrescriptionPDFBuilder {
 
     this.drawSectionTitle(title, color);
 
-    const lines = content.split("\n");
-    for (const line of lines) {
-      if (line.trim()) {
-        this.drawText(line, LAYOUT.margin, 9, COLORS.text);
+    // Verificar se o conteúdo é HTML
+    if (content.includes("<p>") || content.includes("<ul>") || content.includes("<ol>")) {
+      this.drawHtmlContent(content, LAYOUT.margin, 9, COLORS.text);
+    } else {
+      // Fallback para texto simples
+      const lines = content.split("\n");
+      for (const line of lines) {
+        if (line.trim()) {
+          this.drawText(line, LAYOUT.margin, 9, COLORS.text);
+        }
       }
     }
     this.y -= 10;
@@ -335,10 +473,16 @@ class PrescriptionPDFBuilder {
     }
 
     if (data.notes) {
-      const lines = data.notes.split("\n");
-      for (const line of lines) {
-        if (line.trim()) {
-          this.drawText(line, LAYOUT.margin, 9, COLORS.text);
+      // Verificar se é HTML
+      if (data.notes.includes("<p>") || data.notes.includes("<ul>") || data.notes.includes("<ol>")) {
+        this.drawHtmlContent(data.notes, LAYOUT.margin, 9, COLORS.text);
+      } else {
+        // Fallback para texto simples
+        const lines = data.notes.split("\n");
+        for (const line of lines) {
+          if (line.trim()) {
+            this.drawText(line, LAYOUT.margin, 9, COLORS.text);
+          }
         }
       }
     }

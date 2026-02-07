@@ -180,10 +180,12 @@ export default async function PrescriptionViewPage({
                 <UserCheck className="h-3.5 w-3.5 text-gray-400" />
                 <span>{patient?.responsible_name}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                <span>{format(new Date(consultation.consultation_date), "dd 'de' MMMM, yyyy", { locale: ptBR })}</span>
-              </div>
+              {consultation.consultation_date && (
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                  <span>{format(new Date(consultation.consultation_date), "dd 'de' MMMM, yyyy", { locale: ptBR })}</span>
+                </div>
+              )}
             </div>
           </div>
           <Link href="/consultations">

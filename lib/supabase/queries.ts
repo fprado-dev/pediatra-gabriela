@@ -215,6 +215,7 @@ export async function createMinimalConsultationForPrescription(
       doctor_id: data.doctorId,
       status: "completed",
       chief_complaint: "Receita avulsa",
+      consultation_type: "consulta_rotina",
       diagnosis: "",
       plan: "",
       prescription_data: data.prescriptionData,

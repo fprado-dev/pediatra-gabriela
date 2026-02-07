@@ -56,13 +56,19 @@ export default async function EditConsultationPage({
     .eq("status", "completed")
     .neq("id", id)
     .not("weight_kg", "is", null)
+    .not("consultation_date", "is", null)
     .order("consultation_date", { ascending: false })
     .limit(5);
+
+  // Filtrar consultas com consultation_date não nulo para garantir type safety
+  const validPreviousMeasurements = (previousConsultations || []).filter(
+    (c): c is typeof c & { consultation_date: string } => c.consultation_date !== null
+  );
 
   return (
     <EditConsultationForm 
       consultation={consultation} 
-      previousMeasurements={previousConsultations || []}
+      previousMeasurements={validPreviousMeasurements}
     />
   );
 }

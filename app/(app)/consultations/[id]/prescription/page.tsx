@@ -82,16 +82,16 @@ export default async function PrescriptionPage({
         currentMedications: patient?.current_medications,
       }}
       clinicalData={{
-        chiefComplaint: consultation.chief_complaint,
-        diagnosis: consultation.diagnosis,
-        plan: consultation.plan,
+        chiefComplaint: consultation.chief_complaint || undefined,
+        diagnosis: consultation.diagnosis || undefined,
+        plan: consultation.plan || undefined,
       }}
-      existingPrescription={consultation.prescription_data}
+      existingPrescription={consultation.prescription_data as any}
       doctor={{
         name: profile?.full_name || "Médico",
         crm: profile?.crm || "",
       }}
-      templates={templates || []}
+      templates={(templates as any) || []}
     />
   );
 }

@@ -1,27 +1,27 @@
 "use client";
 
-import { FileText, Clock, RefreshCw, Users } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Pie, PieChart, Cell, ResponsiveContainer } from "recharts";
-
-interface AgeDistribution {
-  faixa: string;
-  total: number;
-}
+import { Clock, TrendingUp, CheckCircle, AlertCircle, XCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EfficiencyData } from "@/lib/queries/appointments/get-all-appoitments-by-status";
 
 interface EfficiencyMetricsProps {
-  consultationsThisMonth: number;
-  timeSavedMinutes: number;
-  returnRate: number;
-  ageDistribution: AgeDistribution[];
+  statusData: EfficiencyData['statusData'];
+  timeData: EfficiencyData['timeData'];
 }
 
-export function EfficiencyMetrics({
-  consultationsThisMonth,
-  timeSavedMinutes,
-  returnRate,
-  ageDistribution,
-}: EfficiencyMetricsProps) {
+// Componente de barra de progresso customizado
+function ProgressBar({ value, color }: { value: number; color: string }) {
+  return (
+    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all ${color}`}
+        style={{ width: `${value}%` }}
+      />
+    </div>
+  );
+}
+
+export function EfficiencyMetrics({ statusData, timeData }: EfficiencyMetricsProps) {
   const formatTime = (minutes: number) => {
     if (minutes < 60) return `${minutes}min`;
     const hours = Math.floor(minutes / 60);
@@ -29,38 +29,88 @@ export function EfficiencyMetrics({
     return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
   };
 
-  // Cores para o donut chart (tons pasteis da brand)
-  const COLORS = [
-    'hsl(212, 79%, 81%)',  // Azul brand
-    'hsl(173, 58%, 65%)',  // Verde-água mais claro
-    'hsl(197, 37%, 50%)',  // Azul médio
-    'hsl(43, 74%, 70%)',   // Amarelo pastel
-  ];
+  console.log({ timeData });
+  const total = statusData.pending + statusData.confirmed +
+    statusData.completed + statusData.cancelled;
 
-  // Preparar dados do donut
-  const chartData = ageDistribution.map((item) => ({
-    name: item.faixa,
-    value: item.total,
-  }));
-
-  const totalPatients = ageDistribution.reduce((acc, curr) => acc + curr.total, 0);
+  const timePercentChange = timeData.completedCountData.minutesSaved > 0
+    ? Math.round((timeData.completedCountData.minutesSaved / timeData.completedCountData.completedCount) * 100)
+    : 0;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Card 1: Consultas Este Mês */}
+    <div className="grid gap-4">
+      {/* Card 1: Status das Consultas */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-sm text-muted-foreground mb-2">
-                Consultas Este Mês
-              </p>
-              <p className="text-3xl font-bold text-foreground">
-                {consultationsThisMonth}
-              </p>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Status das Consultas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Total */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total</span>
+            <span className="text-2xl font-bold">{total}</span>
+          </div>
+
+          {/* Breakdown por Status */}
+          <div className="space-y-3">
+            {/* Finalizadas */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Finalizadas</span>
+                </div>
+                <span className="font-medium">{statusData.completed}</span>
+              </div>
+              <ProgressBar
+                value={(statusData.completed / total) * 100}
+                color="bg-green-600"
+              />
             </div>
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-primary" />
+
+            {/* Confirmadas */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span>Confirmadas</span>
+                </div>
+                <span className="font-medium">{statusData.confirmed}</span>
+              </div>
+              <ProgressBar
+                value={(statusData.confirmed / total) * 100}
+                color="bg-blue-600"
+              />
+            </div>
+
+            {/* Pendentes */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <span>Pendentes</span>
+                </div>
+                <span className="font-medium">{statusData.pending}</span>
+              </div>
+              <ProgressBar
+                value={(statusData.pending / total) * 100}
+                color="bg-amber-600"
+              />
+            </div>
+
+            {/* Canceladas */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <span>Canceladas</span>
+                </div>
+                <span className="font-medium">{statusData.cancelled}</span>
+              </div>
+              <ProgressBar
+                value={(statusData.cancelled / total) * 100}
+                color="bg-red-600"
+              />
             </div>
           </div>
         </CardContent>
@@ -68,117 +118,37 @@ export function EfficiencyMetrics({
 
       {/* Card 2: Tempo Economizado */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Eficiência</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground mb-2">
                 Tempo Economizado
               </p>
               <p className="text-3xl font-bold text-foreground">
-                {formatTime(timeSavedMinutes)}
+                {formatTime(timeData.completedCountData.minutesSaved)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                ~15min por consulta
+                ~15min por consulta completada
               </p>
             </div>
             <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-chart-2/20 flex items-center justify-center">
               <Clock className="h-5 w-5 text-chart-2" />
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Card 3: Taxa de Retorno */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-sm text-muted-foreground mb-2">
-                Taxa de Retorno
-              </p>
-              <p className="text-3xl font-bold text-foreground">
-                {returnRate}%
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Pacientes que voltaram
-              </p>
-            </div>
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-chart-4/20 flex items-center justify-center">
-              <RefreshCw className="h-5 w-5 text-chart-4" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Card 4: Distribuição Etária */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between mb-2">
-            <p className="text-sm text-muted-foreground">
-              Distribuição Etária
-            </p>
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-chart-3/20 flex items-center justify-center">
-              <Users className="h-5 w-5 text-chart-3" />
-            </div>
-          </div>
-
-          {chartData.length > 0 ? (
-            <div className="flex items-center gap-3">
-              {/* Mini Donut Chart */}
-              <div className="w-16 h-16">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={16}
-                      outerRadius={28}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+          {/* Comparação com Mês Anterior */}
+          <div className="pt-4 border-t">
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center gap-1 ${timePercentChange > 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                <TrendingUp className="h-4 w-4" />
+                {formatTime(timeData.completedCountData.minutesSaved)} economizados
               </div>
 
-              {/* Legenda Compacta */}
-              <div className="flex-1 space-y-1">
-                {chartData.slice(0, 2).map((item, index) => {
-                  const percentage = totalPatients > 0
-                    ? Math.round((item.value / totalPatients) * 100)
-                    : 0;
-                  return (
-                    <div key={item.name} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: COLORS[index] }}
-                        />
-                        <span className="text-muted-foreground">{item.name}</span>
-                      </div>
-                      <span className="font-medium">{percentage}%</span>
-                    </div>
-                  );
-                })}
-                {chartData.length > 2 && (
-                  <p className="text-xs text-muted-foreground">
-                    +{chartData.length - 2} outras
-                  </p>
-                )}
-              </div>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground mt-2">
-              Sem dados
-            </p>
-          )}
+          </div>
         </CardContent>
       </Card>
     </div>

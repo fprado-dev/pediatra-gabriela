@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/layout/sidebar";
 import { TimerWidget } from "@/components/timers";
 
 export type AppShellUser = {
+  id: string;
   name: string;
   email: string;
   specialty?: string | null;

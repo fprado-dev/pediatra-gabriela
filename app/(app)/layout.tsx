@@ -27,6 +27,7 @@ export default async function ProtectedLayout({
     .single();
 
   const userData = {
+    id: user.id,
     name: profile?.full_name || "Usuário",
     email: user.email || "",
     specialty: profile?.specialty ?? null,

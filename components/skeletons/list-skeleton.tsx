@@ -31,7 +31,7 @@ export function ListSkeleton({ items = 5 }: { items?: number }) {
 
 export function CardGridSkeleton({ items = 6 }: { items?: number }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
       {Array.from({ length: items }).map((_, i) => (
         <Card key={i} className="flex flex-col">
           <CardContent className="p-4 flex flex-col flex-1">

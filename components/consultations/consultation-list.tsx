@@ -155,7 +155,7 @@ export function ConsultationList({
   };
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
       {consultations.map((consultation) => {
         const statusConfig = getStatusConfig(consultation.status);
         const patientAge = consultation.patient?.date_of_birth

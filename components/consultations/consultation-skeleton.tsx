@@ -25,7 +25,7 @@ export function ConsultationSkeleton() {
 
 export function ConsultationListSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
       {Array.from({ length: count }).map((_, i) => (
         <ConsultationSkeleton key={i} />
       ))}

@@ -5,11 +5,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TextDisplayControls } from "./text-display-controls";
 import { useCondensedText, CondenseMode } from "@/hooks/use-condensed-text";
-import { AlertCircle, FileText, Activity, Pill } from "lucide-react";
+import { AlertCircle, FileText, Activity, Pill, ClipboardList } from "lucide-react";
 
 interface CondensableFieldProps {
   title?: string; // Opcional - se vazio, não renderiza header
-  iconName?: 'file-text' | 'activity' | 'pill' | ''; // Opcional - permite string vazia
+  iconName?: 'file-text' | 'activity' | 'pill' | 'clipboard-list' | ''; // Opcional - permite string vazia
   originalText: string;
   consultationId: string;
   fieldName: string;
@@ -19,6 +19,7 @@ const ICON_MAP = {
   'file-text': FileText,
   'activity': Activity,
   'pill': Pill,
+  'clipboard-list': ClipboardList,
 };
 
 const MIN_WORDS_FOR_CONDENSING = 50; // ~1-2 parágrafos

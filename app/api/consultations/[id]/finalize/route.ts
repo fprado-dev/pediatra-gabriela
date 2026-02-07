@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateConsultationSummary } from "@/lib/openai/generate-consultation-summary";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/consultations/[id]/finalize
  * 
@@ -10,9 +12,10 @@ import { generateConsultationSummary } from "@/lib/openai/generate-consultation-
  */
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Verificar autenticação
@@ -24,7 +27,7 @@ export async function POST(
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
 
-    const consultationId = params.id;
+    const consultationId = id;
 
     console.log(`📋 Finalizando consulta ${consultationId}...`);
 

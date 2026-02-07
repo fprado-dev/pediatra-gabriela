@@ -45,6 +45,9 @@ export async function POST(request: NextRequest) {
     const duration = parseInt(formData.get("duration") as string);
     const timerId = formData.get("timer_id") as string | null;
     const clientHash = formData.get("hash") as string | null;
+    // Tipo de consulta (NOVO)
+    const consultationType = formData.get("consultationType") as string | null;
+    const consultationSubtype = formData.get("consultationSubtype") as string | null;
 
     let audioFile: File | null = null;
     let buffer: Buffer;
@@ -165,6 +168,26 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+    
+    // Validar tipo de consulta (NOVO)
+    if (!consultationType) {
+      return NextResponse.json(
+        { error: "Tipo de consulta não fornecido" },
+        { status: 400 }
+      );
+    }
+    
+    // Buscar últimas 3 consultas do paciente para contexto (NOVO)
+    const { data: previousConsultations } = await supabase
+      .from("consultations")
+      .select("id, consultation_date, diagnosis, previous_consultations_summary")
+      .eq("patient_id", patientId)
+      .eq("doctor_id", user.id)
+      .eq("status", "completed")
+      .order("consultation_date", { ascending: false })
+      .limit(3);
+    
+    console.log(`📋 Encontradas ${previousConsultations?.length || 0} consultas anteriores do paciente`);
 
     console.log(`📤 Upload de áudio iniciado - Tamanho: ${(buffer.length / 1024 / 1024).toFixed(2)}MB, Duração: ${duration}s`);
 
@@ -193,6 +216,8 @@ export async function POST(request: NextRequest) {
         doctor_id: user.id,
         patient_id: patientId,
         status: "processing",
+        consultation_type: consultationType, // NOVO
+        consultation_subtype: consultationSubtype, // NOVO
         audio_hash: audioHash, // Salvar hash para detecção de duplicatas
         audio_duration_seconds: duration,
         audio_size_bytes: buffer.length,

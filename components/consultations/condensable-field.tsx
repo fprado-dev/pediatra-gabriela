@@ -8,8 +8,8 @@ import { useCondensedText, CondenseMode } from "@/hooks/use-condensed-text";
 import { AlertCircle, FileText, Activity, Pill } from "lucide-react";
 
 interface CondensableFieldProps {
-  title: string;
-  iconName: 'file-text' | 'activity' | 'pill';
+  title?: string; // Opcional - se vazio, não renderiza header
+  iconName?: 'file-text' | 'activity' | 'pill' | ''; // Opcional - permite string vazia
   originalText: string;
   consultationId: string;
   fieldName: string;
@@ -35,8 +35,9 @@ export function CondensableField({
   consultationId,
   fieldName,
 }: CondensableFieldProps) {
-  const Icon = ICON_MAP[iconName];
+  const Icon = iconName && ICON_MAP[iconName] ? ICON_MAP[iconName] : null;
   const wordCount = useMemo(() => countWords(originalText), [originalText]);
+  const shouldShowHeader = title && Icon;
   const shouldShowControls = wordCount >= MIN_WORDS_FOR_CONDENSING;
   
   // Determinar modo inicial baseado no tamanho
@@ -93,28 +94,43 @@ export function CondensableField({
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {title}
-          </h2>
-        </div>
-        
-        {/* Controles de condensação */}
-        {shouldShowControls && (
-          <div className="flex-shrink-0">
-            <TextDisplayControls
-              mode={mode}
-              onModeChange={setMode}
-              isLoading={isLoading}
-              wordCount={counts}
-              compressionRatio={compressionRatio}
-            />
+      {/* Header - Só renderizar se title e Icon existirem */}
+      {shouldShowHeader && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              {title}
+            </h2>
           </div>
-        )}
-      </div>
+          
+          {/* Controles de condensação */}
+          {shouldShowControls && (
+            <div className="flex-shrink-0">
+              <TextDisplayControls
+                mode={mode}
+                onModeChange={setMode}
+                isLoading={isLoading}
+                wordCount={counts}
+                compressionRatio={compressionRatio}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Controles sem header (quando header oculto mas texto é condensável) */}
+      {!shouldShowHeader && shouldShowControls && (
+        <div className="flex justify-end">
+          <TextDisplayControls
+            mode={mode}
+            onModeChange={setMode}
+            isLoading={isLoading}
+            wordCount={counts}
+            compressionRatio={compressionRatio}
+          />
+        </div>
+      )}
 
       {/* Alerta de auto-condensação */}
       {showAutoCondenseAlert && mode === 'summary' && (

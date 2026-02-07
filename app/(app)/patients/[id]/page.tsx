@@ -245,6 +245,13 @@ export default async function PatientProfilePage({
                     <p className="text-xs text-gray-500 mt-1">cm</p>
                   </div>
                 )}
+                {patient.head_circumference_cm && (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-2">PC</p>
+                    <p className="text-2xl font-semibold text-gray-900">{patient.head_circumference_cm}</p>
+                    <p className="text-xs text-gray-500 mt-1">cm</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

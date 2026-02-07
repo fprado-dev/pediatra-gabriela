@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, Pill, FileCheck, Users, Trash2, ShieldAlert, Cake, UserCheck, RefreshCw, Archive } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, User, Stethoscope, FileText, Activity, PencilLine, Download, Pill, FileCheck, Users, Trash2, ShieldAlert, Cake, UserCheck, RefreshCw, Archive, Baby, Siren, ClipboardList, Heart, Brain, Scale } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -14,6 +14,8 @@ import { CondensableField } from "@/components/consultations/condensable-field";
 import { ProcessingRetry } from "@/components/consultations/processing-retry";
 import { ConsultationActionsFAB } from "@/components/consultations/consultation-actions-fab";
 import { BackButton } from "@/components/consultations/back-button";
+import { PreviousConsultationsCard } from "@/components/consultations/previous-consultations-card";
+import { getConsultationTypeLabel, getConsultationTypeIcon, getConsultationTypeColor } from "@/lib/utils/consultation-type-helpers";
 
 export const dynamic = 'force-dynamic';
 
@@ -79,6 +81,11 @@ export default async function ConsultationPreviewPage({
     .eq("id", id)
     .eq("doctor_id", user.id)
     .single();
+  
+  // Extrair consultation type
+  const consultationType = consultation?.consultation_type;
+  const consultationSubtype = consultation?.consultation_subtype;
+  const previousConsultations = consultation?.previous_consultations_summary;
 
   if (error || !consultation) {
     return (
@@ -180,62 +187,100 @@ export default async function ConsultationPreviewPage({
         {/* Conteúdo Principal - Cards Limpos */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-100">
 
-          {/* Diagnóstico */}
-          {consultation.diagnosis && (
-            <div className="p-6 bg-blue-50/30">
-              <div className="flex items-center gap-2 mb-3">
-                <ShieldAlert className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-medium text-gray-500">
-                  Diagnóstico
-                </h2>
+          {/* 1. TIPO DE CONSULTA */}
+          <div className={`p-6 ${consultationType ? 'bg-gradient-to-r from-blue-50/50 to-indigo-50/50' : ''}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {consultationType ? (
+                  (() => {
+                    const Icon = getConsultationTypeIcon(consultationType);
+                    const colors = getConsultationTypeColor(consultationType);
+                    return (
+                      <>
+                        <div className={`p-2 rounded-lg ${colors.bg}`}>
+                          <Icon className={`h-5 w-5 ${colors.icon}`} />
+                        </div>
+                        <div>
+                          <h2 className="text-sm font-medium text-gray-500 mb-1">
+                            Tipo de Consulta
+                          </h2>
+                          <p className="text-base font-semibold text-gray-900">
+                            {getConsultationTypeLabel(consultationType, consultationSubtype)}
+                          </p>
+                        </div>
+                      </>
+                    );
+                  })()
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-gray-100">
+                      <Stethoscope className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-medium text-gray-500 mb-1">
+                        Tipo de Consulta
+                      </h2>
+                      <p className="text-base text-gray-400 italic">
+                        Tipo não especificado
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-              <span className="text-base leading-relaxed whitespace-pre-wrap text-gray-900 px-6">
-                {consultation.diagnosis}
-              </span>
+              {consultationType && (
+                <Badge variant="outline" className="text-xs">
+                  {consultationType.replace('_', ' ').toUpperCase()}
+                </Badge>
+              )}
             </div>
-          )}
+          </div>
 
-          {/* Histórico Gestacional/Perinatal */}
-          {consultation.prenatal_perinatal_history && (
-            <div className="p-6 bg-amber-50/30">
-              <div className="flex items-center gap-2 mb-3">
-                <Activity className="h-4 w-4 text-amber-600" />
-                <h2 className="text-sm font-medium text-amber-900">
-                  Histórico Gestacional e Perinatal
-                </h2>
-                <span className="ml-auto text-xs font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded">
-                  Importante
-                </span>
-              </div>
-              <p className="text-base leading-relaxed whitespace-pre-wrap text-gray-900 px-6">
-                {consultation.prenatal_perinatal_history}
-              </p>
+          {/* 2. QUEIXA PRINCIPAL */}
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Stethoscope className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-medium text-gray-500">
+                Queixa Principal
+              </h2>
             </div>
-          )}
+            <p className="text-base leading-relaxed text-gray-900 px-6">
+              {consultation.chief_complaint || (
+                <span className="text-gray-400 italic">Sem queixa principal registrada</span>
+              )}
+            </p>
+          </div>
 
-
-          {/* Queixa Principal */}
-          {consultation.chief_complaint && (
-            <div className="p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <Stethoscope className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-medium text-gray-500">
-                  Queixa Principal
-                </h2>
-              </div>
-              <p className="text-base leading-relaxed text-gray-900 px-6">
-                {consultation.chief_complaint}
-              </p>
-            </div>
-          )}
-
-
-          {/* História/Anamnese */}
-          {consultation.history && (
-            <div className="p-6">
+          {/* 3. HMA (História da Moléstia Atual) */}
+          <div className="p-6">
+            {consultation.hma ? (
               <CondensableField
-                title="Anamnese"
+                title="História da Moléstia Atual (HMA)"
                 iconName="file-text"
+                originalText={consultation.hma}
+                consultationId={id}
+                fieldName="hma"
+              />
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-4 w-4 text-gray-400" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">
+                    História da Moléstia Atual (HMA)
+                  </h2>
+                </div>
+                <p className="text-base leading-relaxed text-gray-400 italic px-6">
+                  Sem história da moléstia atual registrada. Detalhe a queixa principal, início e duração dos sintomas, fatores de melhora/piora, uso ou não de medicamentos, escala de dor, etc.
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* 3.5. INFORMAÇÕES COMPLEMENTARES (HISTORY) */}
+          {consultation.history && (
+            <div className="p-6 border-t">
+              <CondensableField
+                title="Informações Complementares"
+                iconName="clipboard-list"
                 originalText={consultation.history}
                 consultationId={id}
                 fieldName="history"
@@ -243,26 +288,158 @@ export default async function ConsultationPreviewPage({
             </div>
           )}
 
+          {/* 4. HISTÓRICO GESTACIONAL E PERINATAL */}
+          <div className={`p-6 ${consultation.prenatal_perinatal_history ? 'bg-amber-50/30' : ''}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <Baby className={`h-4 w-4 ${consultation.prenatal_perinatal_history ? 'text-amber-600' : 'text-gray-400'}`} />
+              <h2 className={`text-sm font-medium ${consultation.prenatal_perinatal_history ? 'text-amber-900' : 'text-gray-500'}`}>
+                Histórico Gestacional e Perinatal
+              </h2>
+              {consultation.prenatal_perinatal_history && (
+                <span className="ml-auto text-xs font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded">
+                  Importante
+                </span>
+              )}
+            </div>
+            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.prenatal_perinatal_history ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+              {consultation.prenatal_perinatal_history || 'Sem histórico gestacional e perinatal registrado'}
+            </p>
+          </div>
 
+          {/* 5. HISTÓRICO FAMILIAR */}
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className={`h-4 w-4 ${consultation.family_history ? 'text-purple-600' : 'text-gray-400'}`} />
+              <h2 className="text-sm font-medium text-gray-500">
+                Histórico Familiar
+              </h2>
+            </div>
+            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.family_history ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+              {consultation.family_history || 'Sem histórico familiar registrado'}
+            </p>
+          </div>
 
-          {/* Exame Físico */}
-          {consultation.physical_exam && (
-            <div className="p-6">
+          {/* 6. DESENVOLVIMENTO NEUROPSICOMOTOR */}
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Brain className={`h-4 w-4 ${consultation.development_notes ? 'text-green-600' : 'text-gray-400'}`} />
+              <h2 className="text-sm font-medium text-gray-500">
+                Desenvolvimento Neuropsicomotor
+              </h2>
+            </div>
+            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.development_notes ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+              {consultation.development_notes || 'Sem observações sobre desenvolvimento neuropsicomotor'}
+            </p>
+          </div>
+
+          {/* 7. EXAME FÍSICO + MEDIDAS ANTROPOMÉTRICAS */}
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-medium text-gray-500">
+                Exame Físico e Medidas Antropométricas
+              </h2>
+            </div>
+
+            {/* Medidas Antropométricas */}
+            {(consultation.weight_kg || consultation.height_cm || consultation.head_circumference_cm) ? (
+              <div className="mb-6">
+                <div className="grid grid-cols-3 gap-4">
+                  {consultation.weight_kg ? (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <Scale className="h-4 w-4 text-gray-500" />
+                        <p className="text-xs text-gray-500">Peso</p>
+                      </div>
+                      <p className="text-2xl font-semibold text-gray-900">{consultation.weight_kg}</p>
+                      <p className="text-xs text-gray-500 mt-1">kg</p>
+                    </div>
+                  ) : (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200 border-dashed">
+                      <p className="text-xs text-gray-400 mb-2">Peso</p>
+                      <p className="text-sm text-gray-400 italic">Não medido</p>
+                    </div>
+                  )}
+                  {consultation.height_cm ? (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-xs text-gray-500 mb-2">Altura</p>
+                      <p className="text-2xl font-semibold text-gray-900">{consultation.height_cm}</p>
+                      <p className="text-xs text-gray-500 mt-1">cm</p>
+                    </div>
+                  ) : (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200 border-dashed">
+                      <p className="text-xs text-gray-400 mb-2">Altura</p>
+                      <p className="text-sm text-gray-400 italic">Não medido</p>
+                    </div>
+                  )}
+                  {consultation.head_circumference_cm ? (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-xs text-gray-500 mb-2">PC</p>
+                      <p className="text-2xl font-semibold text-gray-900">{consultation.head_circumference_cm}</p>
+                      <p className="text-xs text-gray-500 mt-1">cm</p>
+                    </div>
+                  ) : (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200 border-dashed">
+                      <p className="text-xs text-gray-400 mb-2">PC</p>
+                      <p className="text-sm text-gray-400 italic">Não medido</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6">
+                <p className="text-sm text-gray-400 italic">Medidas antropométricas não registradas</p>
+              </div>
+            )}
+
+            {/* Exame Físico */}
+            {consultation.physical_exam ? (
               <CondensableField
-                title="Exame Físico"
-                iconName="activity"
+                title=""
+                iconName=""
                 originalText={consultation.physical_exam}
                 consultationId={id}
                 fieldName="physical_exam"
               />
+            ) : (
+              <p className="text-base text-gray-400 italic">Sem exame físico registrado</p>
+            )}
+          </div>
+
+          {/* 8. HIPÓTESES DIAGNÓSTICAS */}
+          <div className={`p-6 ${consultation.diagnosis ? 'bg-blue-50/30' : ''}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldAlert className={`h-4 w-4 ${consultation.diagnosis ? 'text-primary' : 'text-gray-400'}`} />
+              <h2 className="text-sm font-medium text-gray-500">
+                Hipóteses Diagnósticas
+              </h2>
+              {consultation.diagnosis && consultation.diagnosis_is_ai_suggestion && (
+                <Badge variant="outline" className="text-xs text-blue-600 ml-auto">
+                  Sugestão IA
+                </Badge>
+              )}
             </div>
-          )}
+            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.diagnosis ? 'text-gray-900 font-medium' : 'text-gray-400 italic'}`}>
+              {consultation.diagnosis || 'Sem hipóteses diagnósticas registradas'}
+            </p>
+          </div>
 
+          {/* 9. CONDUTA */}
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <ClipboardList className={`h-4 w-4 ${consultation.conduct ? 'text-orange-600' : 'text-gray-400'}`} />
+              <h2 className="text-sm font-medium text-gray-500">
+                Conduta
+              </h2>
+            </div>
+            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.conduct ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+              {consultation.conduct || 'Sem conduta registrada'}
+            </p>
+          </div>
 
-
-          {/* Plano Terapêutico */}
-          {consultation.plan && (
-            <div className="p-6">
+          {/* 10. PLANO TERAPÊUTICO */}
+          <div className="p-6">
+            {consultation.plan ? (
               <CondensableField
                 title="Plano Terapêutico"
                 iconName="pill"
@@ -270,56 +447,24 @@ export default async function ConsultationPreviewPage({
                 consultationId={id}
                 fieldName="plan"
               />
-            </div>
-          )}
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-3">
+                  <Pill className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Plano Terapêutico
+                  </h2>
+                </div>
+                <p className="text-base leading-relaxed text-gray-400 italic px-6">
+                  Sem plano terapêutico registrado
+                </p>
+              </>
+            )}
+          </div>
 
-          {/* Dados Pediátricos - Grid */}
-          {(consultation.weight_kg || consultation.height_cm || consultation.head_circumference_cm) && (
-            <div className="p-6">
-              <h2 className="text-sm font-medium text-gray-500 mb-4">
-                Medidas Antropométricas
-              </h2>
-              <div className="grid grid-cols-3 gap-6">
-                {consultation.weight_kg && (
-                  <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-2">Peso</p>
-                    <p className="text-2xl font-semibold text-gray-900">{consultation.weight_kg}</p>
-                    <p className="text-xs text-gray-500 mt-1">kg</p>
-                  </div>
-                )}
-                {consultation.height_cm && (
-                  <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-2">Altura</p>
-                    <p className="text-2xl font-semibold text-gray-900">{consultation.height_cm}</p>
-                    <p className="text-xs text-gray-500 mt-1">cm</p>
-                  </div>
-                )}
-                {consultation.head_circumference_cm && (
-                  <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-2">PC</p>
-                    <p className="text-2xl font-semibold text-gray-900">{consultation.head_circumference_cm}</p>
-                    <p className="text-xs text-gray-500 mt-1">cm</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Desenvolvimento */}
-          {consultation.development_notes && (
-            <div className="p-6">
-              <h2 className="text-sm font-medium text-gray-500 mb-3">
-                Desenvolvimento
-              </h2>
-              <p className="text-base leading-relaxed whitespace-pre-wrap text-gray-900">
-                {consultation.development_notes}
-              </p>
-            </div>
-          )}
-
-          {/* Notas Adicionais */}
-          {consultation.notes && (
-            <div className="p-6">
+          {/* 11. OBSERVAÇÕES */}
+          <div className="p-6">
+            {consultation.notes ? (
               <CondensableField
                 title="Observações"
                 iconName="file-text"
@@ -327,9 +472,26 @@ export default async function ConsultationPreviewPage({
                 consultationId={id}
                 fieldName="notes"
               />
-            </div>
-          )}
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Observações
+                  </h2>
+                </div>
+                <p className="text-base leading-relaxed text-gray-400 italic px-6">
+                  Sem observações adicionais
+                </p>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* 12. HISTÓRICO DE CONSULTAS ANTERIORES (antes do áudio) */}
+        {previousConsultations && (
+          <PreviousConsultationsCard data={previousConsultations} />
+        )}
 
         {/* Audio Player */}
         {consultation.audio_url && (

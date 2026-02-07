@@ -25,7 +25,7 @@ export default async function EditConsultationPage({
     .from("consultations")
     .select(`
       *,
-      patient:patients(id, full_name, date_of_birth, weight_kg, height_cm, allergies, current_medications, medical_history, blood_type)
+      patient:patients(id, full_name, date_of_birth, weight_kg, height_cm, head_circumference_cm, allergies, current_medications, medical_history, blood_type)
     `)
     .eq("id", id)
     .eq("doctor_id", user.id)

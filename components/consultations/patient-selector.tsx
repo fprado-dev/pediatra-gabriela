@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronsUpDown, UserPlus, AlertTriangle, Calendar, Heart, ExternalLink } from "lucide-react";
+import { Check, ChevronsUpDown, UserPlus, AlertTriangle, Calendar, Heart, ExternalLink, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { ConsultationType, PuericulturaSubtype } from "@/lib/types/consultation";
+import { ConsultationTypeSelector } from "./consultation-type-selector";
 
 interface Patient {
   id: string;
@@ -34,16 +36,29 @@ interface PatientSelectorProps {
   patients: Patient[];
   selectedPatientId: string | null;
   onSelectPatient: (patientId: string) => void;
+  selectedConsultationType: ConsultationType | null;
+  selectedConsultationSubtype: PuericulturaSubtype | null;
+  onSelectConsultationType: (type: ConsultationType, subtype?: PuericulturaSubtype) => void;
+  onContinue?: () => void;
 }
 
 export function PatientSelector({
   patients,
   selectedPatientId,
   onSelectPatient,
+  selectedConsultationType,
+  selectedConsultationSubtype,
+  onSelectConsultationType,
+  onContinue,
 }: PatientSelectorProps) {
   const [open, setOpen] = useState(false);
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
+  
+  // Validar se pode continuar: paciente E tipo selecionados
+  const canContinue = selectedPatientId && selectedConsultationType && (
+    selectedConsultationType !== 'puericultura' || selectedConsultationSubtype
+  );
 
   const getInitials = (name: string) => {
     return name
@@ -183,32 +198,32 @@ export function PatientSelector({
         </PopoverContent>
       </Popover>
 
-      {/* Selected Patient Card */}
+      {/* Selected Patient Card - MELHORADO */}
       {selectedPatient && (
-        <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-transparent">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-4">
-              {/* Avatar grande */}
-              <Avatar className="h-16 w-16 shrink-0">
-                <AvatarFallback className="bg-primary text-primary-foreground text-lg font-bold">
+        <Card className="border-primary/50 bg-gradient-to-br from-primary/5 via-white to-transparent shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-5">
+              {/* Avatar maior (20x20) */}
+              <Avatar className="h-20 w-20 shrink-0 shadow-md ring-2 ring-primary/10">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-2xl font-bold">
                   {getInitials(selectedPatient.full_name)}
                 </AvatarFallback>
               </Avatar>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-lg mb-1 truncate">
+                <h3 className="font-bold text-xl mb-2 truncate text-gray-900">
                   {selectedPatient.full_name}
                 </h3>
                 
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <Badge variant="secondary" className="gap-1">
-                    <Calendar className="h-3 w-3" />
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <Badge variant="secondary" className="gap-1.5 text-xs font-medium">
+                    <Calendar className="h-3.5 w-3.5" />
                     {calculateAge(selectedPatient.date_of_birth)}
                   </Badge>
                   {selectedPatient.blood_type && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Heart className="h-3 w-3" />
+                    <Badge variant="secondary" className="gap-1.5 text-xs font-medium">
+                      <Heart className="h-3.5 w-3.5" />
                       {selectedPatient.blood_type}
                     </Badge>
                   )}
@@ -216,11 +231,11 @@ export function PatientSelector({
 
                 {/* Allergies warning */}
                 {hasAllergies(selectedPatient) && (
-                  <div className="flex items-start gap-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20">
-                    <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2.5 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                     <div>
-                      <span className="text-xs font-semibold text-destructive">Alergias:</span>
-                      <p className="text-xs text-destructive/80">{selectedPatient.allergies}</p>
+                      <span className="text-sm font-semibold text-destructive">Alergias:</span>
+                      <p className="text-sm text-destructive/90 mt-0.5">{selectedPatient.allergies}</p>
                     </div>
                   </div>
                 )}
@@ -228,13 +243,37 @@ export function PatientSelector({
 
               {/* Actions */}
               <Link href={`/patients/${selectedPatient.id}`} target="_blank">
-                <Button variant="ghost" size="icon" className="shrink-0">
+                <Button variant="ghost" size="icon" className="shrink-0 hover:bg-primary/10">
                   <ExternalLink className="h-4 w-4" />
                 </Button>
               </Link>
             </div>
           </CardContent>
         </Card>
+      )}
+      
+      {/* Consultation Type Selector - NOVO */}
+      {selectedPatient && (
+        <ConsultationTypeSelector
+          selectedType={selectedConsultationType}
+          selectedSubtype={selectedConsultationSubtype}
+          onSelect={onSelectConsultationType}
+        />
+      )}
+      
+      {/* Continue Button - NOVO */}
+      {selectedPatient && (
+        <div className="flex justify-end pt-2">
+          <Button
+            onClick={onContinue}
+            disabled={!canContinue}
+            size="lg"
+            className="gap-2 px-8"
+          >
+            Continuar
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
       )}
 
       {/* New patient button */}

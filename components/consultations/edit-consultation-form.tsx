@@ -36,9 +36,12 @@ import { BackButton } from "./back-button";
 // Esquema de validação
 const consultationSchema = z.object({
   chief_complaint: z.string().min(3, "Queixa principal é obrigatória (mínimo 3 caracteres)"),
-  history: z.string().optional(),
+  hma: z.string().optional(), // História da Moléstia Atual (foco na queixa)
+  history: z.string().optional(), // Informações complementares de contexto
+  family_history: z.string().optional(),
   physical_exam: z.string().optional(),
   diagnosis: z.string().min(2, "Diagnóstico é obrigatório (mínimo 2 caracteres)"),
+  conduct: z.string().optional(), // Conduta (exames, encaminhamentos)
   plan: z.string().optional(),
   weight_kg: z.number().min(0.5).max(150).nullable().optional(),
   height_cm: z.number().min(30).max(200).nullable().optional(),
@@ -99,9 +102,12 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
     resolver: zodResolver(consultationSchema),
     defaultValues: {
       chief_complaint: consultation.chief_complaint || "",
+      hma: consultation.hma || "",
       history: consultation.history || "",
+      family_history: consultation.family_history || "",
       physical_exam: consultation.physical_exam || "",
       diagnosis: consultation.diagnosis || "",
+      conduct: consultation.conduct || "",
       plan: consultation.plan || "",
       weight_kg: defaultWeight,
       height_cm: defaultHeight,
@@ -120,9 +126,12 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
 
       const updateData: any = {
         chief_complaint: data.chief_complaint,
+        hma: data.hma || null,
         history: data.history || null,
+        family_history: data.family_history || null,
         physical_exam: data.physical_exam || null,
         diagnosis: data.diagnosis,
+        conduct: data.conduct || null,
         plan: data.plan || null,
         weight_kg: data.weight_kg || null,
         height_cm: data.height_cm || null,
@@ -137,9 +146,12 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
       if (shouldSaveOriginal) {
         updateData.original_ai_version = {
           chief_complaint: consultation.chief_complaint,
+          hma: consultation.hma,
           history: consultation.history,
+          family_history: consultation.family_history,
           physical_exam: consultation.physical_exam,
           diagnosis: consultation.diagnosis,
+          conduct: consultation.conduct,
           plan: consultation.plan,
           weight_kg: consultation.weight_kg,
           height_cm: consultation.height_cm,
@@ -151,12 +163,68 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
         };
       }
 
+      // Atualizar consulta
       const { error } = await supabase
         .from("consultations")
         .update(updateData)
         .eq("id", consultation.id);
 
       if (error) throw error;
+
+      // Verificar se medidas antropométricas mudaram e atualizar perfil do paciente
+      const measurementsToUpdate: any = {};
+      let shouldUpdatePatientProfile = false;
+
+      if (data.weight_kg && data.weight_kg !== patient?.weight_kg) {
+        measurementsToUpdate.weight_kg = data.weight_kg;
+        shouldUpdatePatientProfile = true;
+      }
+
+      if (data.height_cm && data.height_cm !== patient?.height_cm) {
+        measurementsToUpdate.height_cm = data.height_cm;
+        shouldUpdatePatientProfile = true;
+      }
+
+      if (data.head_circumference_cm && data.head_circumference_cm !== patient?.head_circumference_cm) {
+        measurementsToUpdate.head_circumference_cm = data.head_circumference_cm;
+        shouldUpdatePatientProfile = true;
+      }
+
+      // Atualizar perfil do paciente se houver mudanças
+      if (shouldUpdatePatientProfile) {
+        // Obter ID do paciente (pode estar em consultation.patient_id ou patient.id)
+        const patientId = consultation.patient_id || patient?.id;
+        
+        if (!patientId) {
+          console.error("❌ Não foi possível determinar o ID do paciente para atualização");
+        } else {
+          console.log("🔄 Atualizando paciente:", patientId, "com dados:", measurementsToUpdate);
+          
+          const { data: updateResult, error: patientError } = await supabase
+            .from("patients")
+            .update({
+              ...measurementsToUpdate,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", patientId)
+            .select();
+
+          if (patientError) {
+            console.error("❌ Erro ao atualizar perfil do paciente:", {
+              error: patientError,
+              patientId,
+              updates: measurementsToUpdate
+            });
+            toast.error("Aviso: Não foi possível atualizar o cadastro do paciente automaticamente");
+          } else if (!updateResult || updateResult.length === 0) {
+            console.warn("⚠️ Nenhum registro de paciente foi atualizado. O paciente pode não existir ou você não tem permissão.");
+            toast.warning("Aviso: O cadastro do paciente não foi atualizado automaticamente");
+          } else {
+            console.log("✅ Perfil do paciente atualizado com sucesso!", updateResult);
+            toast.success("Cadastro do paciente atualizado automaticamente!");
+          }
+        }
+      }
 
       toast.success("Consulta atualizada com sucesso!");
       router.push(`/consultations/${consultation.id}/preview`);
@@ -214,14 +282,36 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                 )}
               </div>
 
-              {/* História/Anamnese */}
+              {/* HMA - História da Moléstia Atual */}
               <div className="space-y-2">
-                <Label htmlFor="history">História Clínica / Anamnese</Label>
+                <Label htmlFor="hma">História da Moléstia Atual (HMA)</Label>
+                <Textarea
+                  id="hma"
+                  placeholder="Foco na queixa atual: evolução dos sintomas, início, fatores de melhora/piora..."
+                  rows={6}
+                  {...register("hma")}
+                />
+              </div>
+
+              {/* History - Informações Complementares */}
+              <div className="space-y-2">
+                <Label htmlFor="history">Informações Complementares (History)</Label>
                 <Textarea
                   id="history"
-                  placeholder="Descreva a história clínica do paciente..."
-                  rows={8}
+                  placeholder="Contexto geral: rotina alimentar, padrão de sono, hábitos, informações de base não relacionadas à queixa atual..."
+                  rows={4}
                   {...register("history")}
+                />
+              </div>
+
+              {/* Histórico Familiar */}
+              <div className="space-y-2">
+                <Label htmlFor="family_history">Histórico Familiar</Label>
+                <Textarea
+                  id="family_history"
+                  placeholder="Doenças hereditárias, alergias familiares, condições crônicas relevantes..."
+                  rows={3}
+                  {...register("family_history")}
                 />
               </div>
 
@@ -267,6 +357,17 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                 )}
               </div>
 
+              {/* Conduta */}
+              <div className="space-y-2">
+                <Label htmlFor="conduct">Conduta</Label>
+                <Textarea
+                  id="conduct"
+                  placeholder="Exames solicitados, encaminhamentos, procedimentos realizados..."
+                  rows={4}
+                  {...register("conduct")}
+                />
+              </div>
+
               {/* Plano Terapêutico */}
               <div className="space-y-2">
                 <Label htmlFor="plan">Plano Terapêutico</Label>
@@ -289,7 +390,7 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                 Dados Antropométricos
               </CardTitle>
               <CardDescription>
-                <span className="font-medium">Importante:</span> Registre as medidas atuais para acompanhamento do crescimento
+                <span className="font-medium">Importante:</span> Os dados do cadastro do paciente são usados como base. Qualquer alteração aqui atualiza automaticamente o cadastro.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

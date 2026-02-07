@@ -179,6 +179,21 @@ export async function POST(
 
         await updateProcessingStep(supabase, consultationId, "extraction", "in_progress");
 
+        // Buscar consultas anteriores para histórico
+        const { data: previousConsultations } = await supabase
+          .from("consultations")
+          .select("id, created_at, diagnosis, previous_consultations_summary")
+          .eq("patient_id", consultation.patient_id)
+          .eq("doctor_id", user.id)
+          .eq("status", "completed")
+          .order("created_at", { ascending: false })
+          .limit(3);
+
+        // Extrair summaries das consultas anteriores
+        const previousSummaries = previousConsultations
+          ?.map(c => c.previous_consultations_summary?.consultations?.[0])
+          .filter(Boolean) || [];
+
         const extractedFields = await extractConsultationFields(
           consultation.cleaned_transcription,
           {
@@ -191,17 +206,97 @@ export async function POST(
             bloodType: patient?.blood_type,
             medicalHistory: patient?.medical_history,
             currentMedications: patient?.current_medications,
-          }
+          },
+          consultation.consultation_type,
+          consultation.consultation_subtype,
+          previousSummaries
         );
+
+        // Verificar se há atualizações para o cadastro do paciente
+        const patientProfileUpdates: any = {};
+        let shouldUpdatePatientProfile = false;
+
+        // 1. MEDIDAS ANTROPOMÉTRICAS (se source === "audio" e valor diferente)
+        if (extractedFields.weight_kg && extractedFields.weight_source === "audio" && extractedFields.weight_kg !== patient?.weight_kg) {
+          patientProfileUpdates.weight_kg = extractedFields.weight_kg;
+          shouldUpdatePatientProfile = true;
+          console.log(`📊 Nova medida de peso: ${extractedFields.weight_kg} kg (anterior: ${patient?.weight_kg || 'não registrado'})`);
+        }
+
+        if (extractedFields.height_cm && extractedFields.height_source === "audio" && extractedFields.height_cm !== patient?.height_cm) {
+          patientProfileUpdates.height_cm = extractedFields.height_cm;
+          shouldUpdatePatientProfile = true;
+          console.log(`📊 Nova medida de altura: ${extractedFields.height_cm} cm (anterior: ${patient?.height_cm || 'não registrado'})`);
+        }
+
+        if (extractedFields.head_circumference_cm && extractedFields.head_circumference_source === "audio" && extractedFields.head_circumference_cm !== patient?.head_circumference_cm) {
+          patientProfileUpdates.head_circumference_cm = extractedFields.head_circumference_cm;
+          shouldUpdatePatientProfile = true;
+          console.log(`📊 Nova medida de PC: ${extractedFields.head_circumference_cm} cm (anterior: ${patient?.head_circumference_cm || 'não registrado'})`);
+        }
+
+        // 2. CAMPOS CLÍNICOS DO CADASTRO (se mencionados no áudio via patient_updates)
+        if (extractedFields.patient_updates) {
+          if (extractedFields.patient_updates.allergies !== undefined && extractedFields.patient_updates.allergies !== patient?.allergies) {
+            patientProfileUpdates.allergies = extractedFields.patient_updates.allergies;
+            shouldUpdatePatientProfile = true;
+            console.log(`🔴 Alergias atualizadas: "${extractedFields.patient_updates.allergies}" (anterior: "${patient?.allergies || 'não registrado'}")`);
+          }
+
+          if (extractedFields.patient_updates.current_medications !== undefined && extractedFields.patient_updates.current_medications !== patient?.current_medications) {
+            patientProfileUpdates.current_medications = extractedFields.patient_updates.current_medications;
+            shouldUpdatePatientProfile = true;
+            console.log(`💊 Medicações atualizadas: "${extractedFields.patient_updates.current_medications}" (anterior: "${patient?.current_medications || 'não registrado'}")`);
+          }
+
+          if (extractedFields.patient_updates.blood_type !== undefined && extractedFields.patient_updates.blood_type !== patient?.blood_type) {
+            patientProfileUpdates.blood_type = extractedFields.patient_updates.blood_type;
+            shouldUpdatePatientProfile = true;
+            console.log(`🩸 Tipo sanguíneo atualizado: ${extractedFields.patient_updates.blood_type} (anterior: ${patient?.blood_type || 'não registrado'})`);
+          }
+
+          if (extractedFields.patient_updates.medical_history !== undefined && extractedFields.patient_updates.medical_history !== patient?.medical_history) {
+            patientProfileUpdates.medical_history = extractedFields.patient_updates.medical_history;
+            shouldUpdatePatientProfile = true;
+            console.log(`📋 Histórico médico atualizado (anterior: "${patient?.medical_history || 'não registrado'}")`);
+          }
+        }
+
+        // Atualizar perfil do paciente se houver mudanças
+        if (shouldUpdatePatientProfile && consultation.patient_id) {
+          console.log(`🔄 Atualizando cadastro do paciente ${consultation.patient_id}...`);
+          console.log(`📝 Atualizações:`, patientProfileUpdates);
+          
+          const { data: updateResult, error: patientUpdateError } = await supabase
+            .from("patients")
+            .update({
+              ...patientProfileUpdates,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", consultation.patient_id)
+            .select();
+
+          if (patientUpdateError) {
+            console.error("❌ Erro ao atualizar cadastro do paciente:", patientUpdateError);
+            // Não falhar a consulta por isso, apenas logar
+          } else if (!updateResult || updateResult.length === 0) {
+            console.warn("⚠️ Nenhum registro de paciente foi atualizado (RLS ou paciente não encontrado)");
+          } else {
+            console.log("✅ Cadastro do paciente atualizado com sucesso!", updateResult[0]);
+          }
+        }
 
         // Salvar campos extraídos
         await supabase
           .from("consultations")
           .update({
             chief_complaint: extractedFields.chief_complaint,
-            history: extractedFields.history,
+            hma: extractedFields.hma, // História da Moléstia Atual (foco na queixa)
+            history: extractedFields.history, // Informações complementares de contexto
+            family_history: extractedFields.family_history,
             physical_exam: extractedFields.physical_exam,
             diagnosis: extractedFields.diagnosis,
+            conduct: extractedFields.conduct, // Conduta (exames, encaminhamentos)
             plan: extractedFields.plan,
             notes: extractedFields.notes,
             weight_kg: extractedFields.weight_kg,

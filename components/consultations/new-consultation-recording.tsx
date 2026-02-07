@@ -19,6 +19,7 @@ import { ArrowLeft, AlertCircle, CheckCircle2, Sparkles, Clock, RotateCcw } from
 import { toast } from "sonner";
 import { calculateAudioHash } from "@/lib/utils/calculate-audio-hash";
 import { divideIntoChunks, shouldUseChunking, generateSessionId } from "@/lib/utils/audio-chunker";
+import { ConsultationType, PuericulturaSubtype } from "@/lib/types/consultation";
 
 interface Patient {
   id: string;
@@ -72,6 +73,10 @@ export function NewConsultationRecording({
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Consultation type state (NOVO)
+  const [consultationType, setConsultationType] = useState<ConsultationType | null>(null);
+  const [consultationSubtype, setConsultationSubtype] = useState<PuericulturaSubtype | null>(null);
 
   // Audio state
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -125,7 +130,20 @@ export function NewConsultationRecording({
       toast.error("Por favor, selecione um paciente");
       return;
     }
+    if (!consultationType) {
+      toast.error("Por favor, selecione o tipo de consulta");
+      return;
+    }
+    if (consultationType === 'puericultura' && !consultationSubtype) {
+      toast.error("Por favor, selecione o período de puericultura");
+      return;
+    }
     setFlowState("select-mode");
+  };
+  
+  const handleConsultationTypeSelected = (type: ConsultationType, subtype?: PuericulturaSubtype) => {
+    setConsultationType(type);
+    setConsultationSubtype(subtype || null);
   };
 
   const handleModeSelected = (mode: InputMode) => {
@@ -297,6 +315,13 @@ export function NewConsultationRecording({
       if (hash) {
         formData.append("hash", hash);
       }
+      // Adicionar tipo de consulta (NOVO)
+      if (consultationType) {
+        formData.append("consultationType", consultationType);
+      }
+      if (consultationSubtype) {
+        formData.append("consultationSubtype", consultationSubtype);
+      }
 
       const response = await fetch("/api/consultations/upload-audio", {
         method: "POST",
@@ -365,6 +390,13 @@ export function NewConsultationRecording({
       formData.append("duration", audioDuration.toString());
       if (hash) {
         formData.append("hash", hash);
+      }
+      // Adicionar tipo de consulta (NOVO)
+      if (consultationType) {
+        formData.append("consultationType", consultationType);
+      }
+      if (consultationSubtype) {
+        formData.append("consultationSubtype", consultationSubtype);
       }
 
       // Simular progresso durante upload (20% já foi usado para hash/duplicata)
@@ -590,24 +622,17 @@ export function NewConsultationRecording({
             </Alert>
           )}
 
-          {/* Step 1: Select Patient */}
+          {/* Step 1: Select Patient & Consultation Type */}
           {flowState === "select-patient" && (
-            <>
-              <PatientSelector
-                patients={patients}
-                selectedPatientId={selectedPatientId}
-                onSelectPatient={setSelectedPatientId}
-              />
-              <div className="flex justify-end">
-                <Button
-                  size="lg"
-                  onClick={handlePatientSelected}
-                  disabled={!selectedPatientId}
-                >
-                  Continuar
-                </Button>
-              </div>
-            </>
+            <PatientSelector
+              patients={patients}
+              selectedPatientId={selectedPatientId}
+              onSelectPatient={setSelectedPatientId}
+              selectedConsultationType={consultationType}
+              selectedConsultationSubtype={consultationSubtype}
+              onSelectConsultationType={handleConsultationTypeSelected}
+              onContinue={handlePatientSelected}
+            />
           )}
 
           {/* Step 2: Select Mode */}

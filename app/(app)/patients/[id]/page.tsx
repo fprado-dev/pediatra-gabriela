@@ -28,6 +28,7 @@ import { ConsultationList } from "@/components/consultations/consultation-list";
 import { PatientGrowthSection } from "@/components/growth";
 import { VaccineCalendar } from "@/components/vaccines";
 import { PatientCertificatesHistory } from "@/components/patients/patient-certificates-history";
+import { PatientPrescriptionsHistory } from "@/components/patients/patient-prescriptions-history";
 import { BackButton } from "@/components/consultations/back-button";
 
 export const dynamic = 'force-dynamic';
@@ -64,7 +65,7 @@ export default async function PatientProfilePage({
   // Buscar últimas 10 consultas do paciente
   const { data: consultations, error: consultationsError } = await supabase
     .from("consultations")
-    .select("id, patient_id, status, created_at, audio_duration_seconds, chief_complaint")
+    .select("id, patient_id, status, created_at, consultation_date, audio_duration_seconds, chief_complaint, diagnosis, prescription_data")
     .eq("patient_id", id)
     .eq("doctor_id", user.id)
     .order("created_at", { ascending: false })
@@ -80,8 +81,11 @@ export default async function PatientProfilePage({
     patient_id: consultation.patient_id || id,
     status: consultation.status,
     created_at: consultation.created_at,
+    consultation_date: consultation.consultation_date,
     audio_duration_seconds: consultation.audio_duration_seconds,
     chief_complaint: consultation.chief_complaint,
+    diagnosis: consultation.diagnosis,
+    prescription_data: consultation.prescription_data,
     patient: {
       id: patient.id,
       full_name: patient.full_name,
@@ -377,6 +381,9 @@ export default async function PatientProfilePage({
             </div>
           )}
         </div>
+
+        {/* Últimas Receitas */}
+        <PatientPrescriptionsHistory consultations={consultationsWithPatient} />
 
         {/* Histórico de Atestados */}
         <PatientCertificatesHistory patientId={id} />

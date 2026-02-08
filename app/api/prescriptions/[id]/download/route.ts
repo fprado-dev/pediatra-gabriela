@@ -15,7 +15,7 @@ const LAYOUT = {
   margin: 50,
   lineHeight: 16,
   sectionSpacing: 20,
-  footerHeight: 80,
+  footerHeight: 90,
 };
 
 const COLORS = {
@@ -132,57 +132,23 @@ class PrescriptionPDFBuilder {
 
   /**
    * Renderiza segmentos de texto com formatação inline (negrito, itálico)
+   * Retorna o número de linhas renderizadas
    */
   private drawTextSegments(
     segments: TextSegment[],
     x: number,
     fontSize: number,
     color = COLORS.text
-  ) {
+  ): number {
     const maxWidth = LAYOUT.pageWidth - LAYOUT.margin * 2 - (x - LAYOUT.margin);
     let currentX = x;
     let line: { text: string; font: PDFFont; width: number }[] = [];
     let lineWidth = 0;
+    let linesRendered = 0;
 
-    for (const segment of segments) {
-      const cleanedText = this.cleanText(segment.text);
-      const font = segment.bold ? this.fontBold : this.font;
-      const words = cleanedText.split(" ");
-
-      for (let i = 0; i < words.length; i++) {
-        const word = words[i];
-        const wordText = i < words.length - 1 ? word + " " : word;
-        const wordWidth = font.widthOfTextAtSize(wordText, fontSize);
-
-        // Verificar se precisa quebrar linha
-        if (lineWidth + wordWidth > maxWidth && line.length > 0) {
-          // Renderizar linha atual
-          this.checkNewPage();
-          currentX = x;
-          for (const part of line) {
-            this.currentPage.drawText(part.text, {
-              x: currentX,
-              y: this.y,
-              size: fontSize,
-              font: part.font,
-              color,
-            });
-            currentX += part.width;
-          }
-          this.y -= LAYOUT.lineHeight;
-          
-          // Resetar linha
-          line = [];
-          lineWidth = 0;
-        }
-
-        line.push({ text: wordText, font, width: wordWidth });
-        lineWidth += wordWidth;
-      }
-    }
-
-    // Renderizar última linha
-    if (line.length > 0) {
+    const renderLine = () => {
+      if (line.length === 0) return;
+      
       this.checkNewPage();
       currentX = x;
       for (const part of line) {
@@ -196,7 +162,37 @@ class PrescriptionPDFBuilder {
         currentX += part.width;
       }
       this.y -= LAYOUT.lineHeight;
+      linesRendered++;
+      
+      // Resetar linha
+      line = [];
+      lineWidth = 0;
+    };
+
+    for (const segment of segments) {
+      const cleanedText = this.cleanText(segment.text);
+      const font = segment.bold ? this.fontBold : this.font;
+      const words = cleanedText.split(" ");
+
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const wordText = i < words.length - 1 ? word + " " : word;
+        const wordWidth = font.widthOfTextAtSize(wordText, fontSize);
+
+        // Verificar se precisa quebrar linha
+        if (lineWidth + wordWidth > maxWidth && line.length > 0) {
+          renderLine();
+        }
+
+        line.push({ text: wordText, font, width: wordWidth });
+        lineWidth += wordWidth;
+      }
     }
+
+    // Renderizar última linha
+    renderLine();
+    
+    return linesRendered;
   }
 
   /**
@@ -210,7 +206,10 @@ class PrescriptionPDFBuilder {
   ) {
     const elements = htmlToPdfElements(html);
 
-    for (const element of elements) {
+    for (let i = 0; i < elements.length; i++) {
+      const element = elements[i];
+      const isLast = i === elements.length - 1;
+
       if (element.type === "line-break") {
         this.y -= LAYOUT.lineHeight / 2;
         continue;
@@ -218,43 +217,60 @@ class PrescriptionPDFBuilder {
 
       if (element.type === "paragraph" && element.content) {
         this.drawTextSegments(element.content, x, fontSize, color);
-        this.y -= 4; // Espaçamento entre parágrafos
+        // Só adicionar espaçamento se não for o último elemento
+        if (!isLast) {
+          this.y -= 6;
+        }
         continue;
       }
 
       if (element.type === "bullet-list" && element.items) {
         for (const item of element.items) {
           this.checkNewPage();
-          // Desenhar bullet
+          
+          // Salvar posição Y para desenhar bullet na primeira linha
+          const bulletY = this.y;
+          
+          // Desenhar conteúdo do item PRIMEIRO (pode ocupar múltiplas linhas)
+          this.drawTextSegments(item, x + 15, fontSize, color);
+          
+          // Agora desenhar bullet na altura da primeira linha
           this.currentPage.drawText("•", {
             x,
-            y: this.y,
+            y: bulletY,
             size: fontSize,
             font: this.font,
             color,
           });
-          // Desenhar conteúdo do item
-          this.drawTextSegments(item, x + 15, fontSize, color);
         }
-        this.y -= 4;
+        if (!isLast) {
+          this.y -= 6;
+        }
         continue;
       }
 
       if (element.type === "ordered-list" && element.items) {
-        for (let i = 0; i < element.items.length; i++) {
+        for (let j = 0; j < element.items.length; j++) {
           this.checkNewPage();
-          // Desenhar número
-          this.currentPage.drawText(`${i + 1}.`, {
+          
+          // Salvar posição Y para desenhar número na primeira linha
+          const numberY = this.y;
+          
+          // Desenhar conteúdo do item PRIMEIRO (pode ocupar múltiplas linhas)
+          this.drawTextSegments(element.items[j], x + 20, fontSize, color);
+          
+          // Agora desenhar número na altura da primeira linha
+          this.currentPage.drawText(`${j + 1}.`, {
             x,
-            y: this.y,
+            y: numberY,
             size: fontSize,
             font: this.font,
             color,
           });
-          // Desenhar conteúdo do item
-          this.drawTextSegments(element.items[i], x + 20, fontSize, color);
         }
-        this.y -= 4;
+        if (!isLast) {
+          this.y -= 6;
+        }
         continue;
       }
     }
@@ -524,6 +540,30 @@ class PrescriptionPDFBuilder {
         color: COLORS.muted,
       });
     }
+
+    // Instagram
+    const instagramY = LAYOUT.footerHeight - 38;
+    const instagramText = "@pediatragabrielamarinho";
+    const instagramWidth = this.fontBold.widthOfTextAtSize(instagramText, 9);
+    lastPage.drawText(instagramText, {
+      x: (LAYOUT.pageWidth - instagramWidth) / 2,
+      y: instagramY,
+      size: 9,
+      font: this.fontBold,
+      color: rgb(0.23, 0.35, 0.6), // Azul elegante
+    });
+
+    // Frase convidativa
+    const inviteY = instagramY - 12;
+    const inviteText = "Siga para dicas e informacoes sobre saude infantil";
+    const inviteWidth = this.font.widthOfTextAtSize(inviteText, 7);
+    lastPage.drawText(inviteText, {
+      x: (LAYOUT.pageWidth - inviteWidth) / 2,
+      y: inviteY,
+      size: 7,
+      font: this.font,
+      color: COLORS.muted,
+    });
   }
 
   async save(): Promise<Uint8Array> {

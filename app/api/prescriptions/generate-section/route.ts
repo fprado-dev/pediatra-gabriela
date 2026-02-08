@@ -28,6 +28,51 @@ interface RequestBody {
   currentMedications?: Medication[];
 }
 
+/**
+ * Converte texto plano com quebras de linha em HTML para o Tiptap
+ */
+function convertTextToHTML(text: string): string {
+  // Detectar se já é HTML (tem tags <p>, <ul>, etc)
+  if (text.includes('<p>') || text.includes('<ul>') || text.includes('<ol>')) {
+    return text;
+  }
+
+  // Dividir por linhas duplas (parágrafos)
+  const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 0);
+  
+  const htmlParagraphs = paragraphs.map(paragraph => {
+    const trimmed = paragraph.trim();
+    
+    // Detectar listas com marcadores (-, *, •, 🚨, ⚠️, 📋)
+    if (/^[-*•🚨⚠️📋]\s/.test(trimmed)) {
+      const items = trimmed
+        .split(/\n(?=[-*•🚨⚠️📋]\s)/)
+        .map(item => item.replace(/^[-*•🚨⚠️📋]\s+/, '').trim())
+        .filter(item => item.length > 0);
+      
+      const listItems = items.map(item => `<li><p>${item}</p></li>`).join('');
+      return `<ul>${listItems}</ul>`;
+    }
+    
+    // Detectar listas numeradas (1., 2., etc)
+    if (/^\d+\.\s/.test(trimmed)) {
+      const items = trimmed
+        .split(/\n(?=\d+\.\s)/)
+        .map(item => item.replace(/^\d+\.\s+/, '').trim())
+        .filter(item => item.length > 0);
+      
+      const listItems = items.map(item => `<li><p>${item}</p></li>`).join('');
+      return `<ol>${listItems}</ol>`;
+    }
+    
+    // Parágrafo normal - substituir quebras de linha simples por <br>
+    const withBreaks = trimmed.replace(/\n/g, '<br>');
+    return `<p>${withBreaks}</p>`;
+  });
+  
+  return htmlParagraphs.join('');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -294,6 +339,22 @@ Output:
 Retorne texto simples com bullets (•), máximo 8 itens, priorizados por importância.
 Cada item deve ter: categoria em CAPS + instrução específica e acionável.
 
+FORMATAÇÃO (CRÍTICO - SIGA EXATAMENTE):
+- Use bullets (• ou -) no início de cada orientação, um por linha
+- Separe grupos de orientações com LINHA EM BRANCO (\n\n)
+- Se tiver mais de 4 orientações, divida em grupos temáticos separados por linha em branco
+- Para sub-itens ou detalhes, use indentação com hífens (-)
+- Mantenha texto claro e organizado
+
+EXEMPLO DE FORMATO:
+• HIDRATAÇÃO (CRÍTICO): Oferecer bastante líquido durante o dia.
+
+• ALIMENTAÇÃO: Manter dieta leve e fracionada.
+- Preferir alimentos cozidos
+- Evitar frituras e doces
+
+• REPOUSO: Garantir sono adequado de 10-12 horas por noite.
+
 === CONSTRAINTS ===
 ❌ NUNCA usar jargão médico sem explicar
 ❌ NUNCA dar orientações genéricas tipo "manter repouso" sem especificar
@@ -314,8 +375,9 @@ Cada item deve ter: categoria em CAPS + instrução específica e acionável.
   });
 
   const content = response.choices[0]?.message?.content || "";
+  const contentHTML = convertTextToHTML(content);
   console.log("📊 Orientations generated");
-  return { content };
+  return { content: contentHTML };
 }
 
 async function generateAlertSigns(
@@ -372,6 +434,21 @@ Retorne texto simples com bullets (•), máximo 8 itens.
 Use emojis: 🚨 para emergência imediata, ⚠️ para urgente, 📋 para atenção.
 Cada item deve especificar: QUANDO procurar + QUAL sinal específico + O QUE FAZER.
 
+FORMATAÇÃO (CRÍTICO - SIGA EXATAMENTE):
+- Use bullets (• ou emojis 🚨/⚠️/📋) no início de cada sinal de alerta
+- Separe por gravidade com LINHA EM BRANCO (\n\n)
+- Agrupe sinais de mesma gravidade juntos
+- Mantenha formatação clara e escaneável
+
+EXEMPLO DE FORMATO:
+• 🚨 EMERGÊNCIA - Ligar SAMU 192 se: Lábios roxos ou pausas respiratórias.
+
+• ⚠️ PROCURAR PS URGENTE se: Afundamento forte das costelas ao respirar.
+
+• ⚠️ IR AO PS se: Recusa completa de líquidos por mais de 6 horas.
+
+• 📋 RETORNAR À CONSULTA se: Febre persistindo após 3 dias de tratamento.
+
 === CONSTRAINTS ===
 ❌ NUNCA usar sinais vagos ("se piorar", "se não melhorar")
 ❌ NUNCA ultrapassar 8 sinais (pais não lembram de muitos)
@@ -392,8 +469,9 @@ Cada item deve especificar: QUANDO procurar + QUAL sinal específico + O QUE FAZ
   });
 
   const content = response.choices[0]?.message?.content || "";
+  const contentHTML = convertTextToHTML(content);
   console.log("📊 Alert signs generated");
-  return { content };
+  return { content: contentHTML };
 }
 
 async function generatePrevention(
@@ -449,6 +527,22 @@ Retorne texto simples com bullets (•), máximo 6 itens.
 Use emojis: ✅ alta eficácia, 📊 média eficácia, 💡 suporte.
 Cada item: categoria + medida específica e acionável + evidência quando disponível.
 
+FORMATAÇÃO (CRÍTICO - SIGA EXATAMENTE):
+- Use bullets (• ou emojis ✅/📊/💡) no início de cada medida
+- Separe grupos de eficácia com LINHA EM BRANCO (\n\n)
+- Agrupe medidas de alta eficácia, depois média, depois suporte
+- Use hífens (-) para sub-detalhes quando necessário
+- Mantenha texto claro e escaneável
+
+EXEMPLO DE FORMATO:
+• ✅ HIGIENE DE MÃOS (Alta eficácia): Lavar mãos com água e sabão antes de comer.
+
+• ✅ ÁGUA TRATADA: Ferver ou filtrar toda água para consumo.
+
+• 📊 VACINAÇÃO: Verificar cartão de vacinação atualizado.
+
+• 💡 AMBIENTE LIMPO: Manter casa ventilada e limpa.
+
 === CONSTRAINTS ===
 ❌ NUNCA dar orientações genéricas ("melhorar higiene")
 ❌ NUNCA sugerir medidas caras ou inacessíveis
@@ -469,6 +563,7 @@ Cada item: categoria + medida específica e acionável + evidência quando dispo
   });
 
   const content = response.choices[0]?.message?.content || "";
+  const contentHTML = convertTextToHTML(content);
   console.log("📊 Prevention generated");
-  return { content };
+  return { content: contentHTML };
 }

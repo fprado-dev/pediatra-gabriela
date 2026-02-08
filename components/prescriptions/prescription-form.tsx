@@ -60,6 +60,7 @@ import { MedicationItem } from "./medication-item";
 import { ptBR } from "date-fns/locale";
 import { PrescriptionFormFAB } from "./prescription-form-fab";
 import { TemplateSelectorModal } from "../templates/template-selector-modal";
+import { TextImprover } from "@/components/consultations/text-improver";
 
 interface Medication {
   id: string;
@@ -600,19 +601,26 @@ export function PrescriptionForm({
                 <Lightbulb className="h-5 w-5" />
                 Orientações
               </CardTitle>
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => generateSection("orientations")}
-                disabled={isGenerating === "orientations"}
-              >
-                {isGenerating === "orientations" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                Gerar com IA
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => generateSection("orientations")}
+                  disabled={isGenerating === "orientations"}
+                >
+                  {isGenerating === "orientations" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  Gerar com IA
+                </Button>
+                <TextImprover
+                  value={orientations}
+                  onChange={setOrientations}
+                  fieldName="orientations"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <RichTextEditor
@@ -632,19 +640,26 @@ export function PrescriptionForm({
                 <AlertTriangle className="h-5 w-5" />
                 Sinais de Alerta
               </CardTitle>
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => generateSection("alertSigns")}
-                disabled={isGenerating === "alertSigns"}
-              >
-                {isGenerating === "alertSigns" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                Gerar com IA
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => generateSection("alertSigns")}
+                  disabled={isGenerating === "alertSigns"}
+                >
+                  {isGenerating === "alertSigns" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  Gerar com IA
+                </Button>
+                <TextImprover
+                  value={alertSigns}
+                  onChange={setAlertSigns}
+                  fieldName="alertSigns"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <RichTextEditor
@@ -664,19 +679,26 @@ export function PrescriptionForm({
                 <Shield className="h-5 w-5" />
                 Como Prevenir
               </CardTitle>
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => generateSection("prevention")}
-                disabled={isGenerating === "prevention"}
-              >
-                {isGenerating === "prevention" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                Gerar com IA
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => generateSection("prevention")}
+                  disabled={isGenerating === "prevention"}
+                >
+                  {isGenerating === "prevention" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  Gerar com IA
+                </Button>
+                <TextImprover
+                  value={prevention}
+                  onChange={setPrevention}
+                  fieldName="prevention"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <RichTextEditor
@@ -691,11 +713,16 @@ export function PrescriptionForm({
 
           {/* Seção: Anotações */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <StickyNote className="h-5 w-5" />
                 Anotações Adicionais
               </CardTitle>
+              <TextImprover
+                value={notes}
+                onChange={setNotes}
+                fieldName="notes"
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-4">

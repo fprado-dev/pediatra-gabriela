@@ -41,7 +41,7 @@ export default async function DashboardPage() {
       {/* Hero Section */}
       <HeroSection
         consultationsToday={totalAppointments}
-        nextAppointmentTime={monthlyAppointments[0].appointment_date}
+        nextAppointmentTime={monthlyAppointments[0]?.appointment_date}
         totalActivePatients={totalActivePatients || 0}
       />
       {/* Métricas de Eficiência */}

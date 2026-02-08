@@ -185,7 +185,7 @@ async function addPDFHeader(
   builder.yPosition = titleStartY - (logoHeight > 0 ? 10 : 0);
 
   // Título principal
-  builder.drawText("PRONTUÁRIO MEDICO PEDIATRICO", {
+  builder.drawText("PRONTUÁRIO MÉDICO PEDIÁTRICO", {
     size: 16,
     bold: true,
     align: 'center',
@@ -466,8 +466,8 @@ export async function generateConsultationPDF(
   // Criar documento PDF
   const pdfDoc = await PDFDocument.create();
   pdfDoc.setTitle(`Consulta - ${patient?.full_name || "Paciente"}`);
-  pdfDoc.setAuthor(profile?.full_name || "Medico");
-  pdfDoc.setSubject("Prontuario Medico Pediatrico");
+  pdfDoc.setAuthor(profile?.full_name || "Médico(a)");
+  pdfDoc.setSubject("PRONTUÁRIO MÉDICO PEDIÁTRICO");
 
   // Criar builder
   const builder = new PDFBuilder(pdfDoc);

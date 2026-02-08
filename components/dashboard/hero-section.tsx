@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 
 interface HeroSectionProps {
   consultationsToday: number;
-  nextAppointmentTime: string | null;
+  nextAppointmentTime: string | null | undefined;
   totalActivePatients: number;
 }
 

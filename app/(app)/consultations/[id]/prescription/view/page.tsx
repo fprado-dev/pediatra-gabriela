@@ -28,6 +28,27 @@ import { PrescriptionActionsFAB } from "@/components/consultations/prescription-
 
 export const dynamic = "force-dynamic";
 
+// Função para renderizar texto ou HTML
+function renderTextOrHtml(content: string, textColor: string = "text-gray-700") {
+  // Detectar se é HTML (tem tags como <p>, <ul>, <ol>)
+  const hasHtmlTags = /<p>|<ul>|<ol>|<li>|<br>/.test(content);
+  
+  if (hasHtmlTags) {
+    return (
+      <div
+        className={`prose prose-sm max-w-none text-sm ${textColor} leading-relaxed`}
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+    );
+  }
+  
+  return (
+    <p className={`whitespace-pre-wrap text-sm ${textColor} leading-relaxed`}>
+      {content}
+    </p>
+  );
+}
+
 // Função para calcular idade detalhada
 function calculateDetailedAge(birthDate: string): string {
   const birth = new Date(birthDate);
@@ -264,9 +285,7 @@ export default async function PrescriptionViewPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
-              <p className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
-                {prescriptionData.orientations}
-              </p>
+              {renderTextOrHtml(prescriptionData.orientations)}
             </CardContent>
           </Card>
         )}
@@ -288,9 +307,7 @@ export default async function PrescriptionViewPage({
               </div>
             </CardHeader>
             <CardContent className="pt-6">
-              <p className="whitespace-pre-wrap text-sm text-gray-900 leading-relaxed">
-                {prescriptionData.alertSigns}
-              </p>
+              {renderTextOrHtml(prescriptionData.alertSigns, "text-gray-900")}
             </CardContent>
           </Card>
         )}
@@ -305,9 +322,7 @@ export default async function PrescriptionViewPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
-              <p className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
-                {prescriptionData.prevention}
-              </p>
+              {renderTextOrHtml(prescriptionData.prevention)}
             </CardContent>
           </Card>
         )}
@@ -347,9 +362,7 @@ export default async function PrescriptionViewPage({
                 )}
                 {prescriptionData.notes && (
                   <div className="pt-3 border-t border-gray-100">
-                    <p className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
-                      {prescriptionData.notes}
-                    </p>
+                    {renderTextOrHtml(prescriptionData.notes)}
                   </div>
                 )}
               </CardContent>

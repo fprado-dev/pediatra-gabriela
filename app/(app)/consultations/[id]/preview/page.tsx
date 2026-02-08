@@ -16,6 +16,7 @@ import { ConsultationActionsFAB } from "@/components/consultations/consultation-
 import { BackButton } from "@/components/consultations/back-button";
 import { PreviousConsultationsCard } from "@/components/consultations/previous-consultations-card";
 import { getConsultationTypeLabel, getConsultationTypeIcon, getConsultationTypeColor } from "@/lib/utils/consultation-type-helpers";
+import { formatDate } from "@/lib/utils/date-helpers";
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +54,28 @@ export function calculateDetailedAge(birthDate: string): string {
     }
     return `${years} ${years === 1 ? 'ano' : 'anos'} e ${months} ${months === 1 ? 'mês' : 'meses'}`;
   }
+}
+
+// Função helper para renderizar texto com suporte a HTML
+function renderTextOrHtml(content: string | null | undefined, className: string) {
+  if (!content) return null;
+
+  const hasHtml = content.includes("<p>") || content.includes("<ul>") || content.includes("<ol>");
+
+  if (hasHtml) {
+    return (
+      <div
+        className={`prose prose-sm max-w-none ${className}`}
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+    );
+  }
+
+  return (
+    <p className={`whitespace-pre-wrap ${className}`}>
+      {content}
+    </p>
+  );
 }
 
 export default async function ConsultationPreviewPage({
@@ -106,12 +129,7 @@ export default async function ConsultationPreviewPage({
 
   const patient = consultation.patient as any;
 
-  // Buscar perfil do médico
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, crm, specialty")
-    .eq("id", user.id)
-    .single();
+
 
   // Calcular idade detalhada
   let patientAge = null;
@@ -119,6 +137,9 @@ export default async function ConsultationPreviewPage({
     patientAge = calculateDetailedAge(patient.date_of_birth);
   }
 
+  console.log(patient.date_of_birth);
+  console.log(new Date(patient.date_of_birth));
+  console.log(formatDate(new Date(patient.date_of_birth)));
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       {/* FAB de ações */}
@@ -135,7 +156,7 @@ export default async function ConsultationPreviewPage({
               {patient?.date_of_birth && (
                 <div className="flex items-center gap-1.5">
                   <Cake className="h-3.5 w-3.5 text-gray-400" />
-                  <span>{format(new Date(patient.date_of_birth), "dd/MM/yyyy", { locale: ptBR })}</span>
+                  <span>{formatDate(new Date(patient.date_of_birth))}</span>
                   {patientAge && (
                     <>
                       <span className="text-gray-300">•</span>
@@ -233,11 +254,13 @@ export default async function ConsultationPreviewPage({
                 Queixa Principal
               </h2>
             </div>
-            <p className="text-base leading-relaxed text-gray-900 px-6">
-              {consultation.chief_complaint || (
-                <span className="text-gray-400 italic">Sem queixa principal registrada</span>
+            <div className="px-6">
+              {consultation.chief_complaint ? (
+                renderTextOrHtml(consultation.chief_complaint, "text-base leading-relaxed text-gray-900")
+              ) : (
+                <p className="text-base leading-relaxed text-gray-400 italic">Sem queixa principal registrada</p>
               )}
-            </p>
+            </div>
           </div>
 
           {/* 3. HMA (História da Moléstia Atual) */}
@@ -291,9 +314,13 @@ export default async function ConsultationPreviewPage({
                 </span>
               )}
             </div>
-            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.prenatal_perinatal_history ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-              {consultation.prenatal_perinatal_history || 'Sem histórico gestacional e perinatal registrado'}
-            </p>
+            <div className="px-6">
+              {consultation.prenatal_perinatal_history ? (
+                renderTextOrHtml(consultation.prenatal_perinatal_history, "text-base leading-relaxed text-gray-900")
+              ) : (
+                <p className="text-base leading-relaxed text-gray-400 italic">Sem histórico gestacional e perinatal registrado</p>
+              )}
+            </div>
           </div>
 
           {/* 5. HISTÓRICO FAMILIAR */}
@@ -304,9 +331,13 @@ export default async function ConsultationPreviewPage({
                 Histórico Familiar
               </h2>
             </div>
-            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.family_history ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-              {consultation.family_history || 'Sem histórico familiar registrado'}
-            </p>
+            <div className="px-6">
+              {consultation.family_history ? (
+                renderTextOrHtml(consultation.family_history, "text-base leading-relaxed text-gray-900")
+              ) : (
+                <p className="text-base leading-relaxed text-gray-400 italic">Sem histórico familiar registrado</p>
+              )}
+            </div>
           </div>
 
           {/* 6. DESENVOLVIMENTO NEUROPSICOMOTOR */}
@@ -317,9 +348,13 @@ export default async function ConsultationPreviewPage({
                 Desenvolvimento Neuropsicomotor
               </h2>
             </div>
-            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.development_notes ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-              {consultation.development_notes || 'Sem observações sobre desenvolvimento neuropsicomotor'}
-            </p>
+            <div className="px-6">
+              {consultation.development_notes ? (
+                renderTextOrHtml(consultation.development_notes, "text-base leading-relaxed text-gray-900")
+              ) : (
+                <p className="text-base leading-relaxed text-gray-400 italic">Sem observações sobre desenvolvimento neuropsicomotor</p>
+              )}
+            </div>
           </div>
 
           {/* 7. EXAME FÍSICO + MEDIDAS ANTROPOMÉTRICAS */}
@@ -409,9 +444,16 @@ export default async function ConsultationPreviewPage({
                 </Badge>
               )}
             </div>
-            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.diagnosis ? 'text-gray-900 font-medium' : 'text-gray-400 italic'}`}>
-              {consultation.diagnosis || 'Sem hipóteses diagnósticas registradas'}
-            </p>
+            {consultation.diagnosis && (consultation.diagnosis.includes("<p>") || consultation.diagnosis.includes("<ul>") || consultation.diagnosis.includes("<ol>")) ? (
+              <div
+                className="prose prose-sm max-w-none text-base leading-relaxed px-6 text-gray-900 font-medium"
+                dangerouslySetInnerHTML={{ __html: consultation.diagnosis }}
+              />
+            ) : (
+              <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.diagnosis ? 'text-gray-900 font-medium' : 'text-gray-400 italic'}`}>
+                {consultation.diagnosis || 'Sem hipóteses diagnósticas registradas'}
+              </p>
+            )}
           </div>
 
           {/* 9. CONDUTA */}
@@ -422,9 +464,16 @@ export default async function ConsultationPreviewPage({
                 Conduta
               </h2>
             </div>
-            <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.conduct ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-              {consultation.conduct || 'Sem conduta registrada'}
-            </p>
+            {consultation.conduct && (consultation.conduct.includes("<p>") || consultation.conduct.includes("<ul>") || consultation.conduct.includes("<ol>")) ? (
+              <div
+                className="prose prose-sm max-w-none text-base leading-relaxed px-6 text-gray-900"
+                dangerouslySetInnerHTML={{ __html: consultation.conduct }}
+              />
+            ) : (
+              <p className={`text-base leading-relaxed whitespace-pre-wrap px-6 ${consultation.conduct ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+                {consultation.conduct || 'Sem conduta registrada'}
+              </p>
+            )}
           </div>
 
           {/* 10. PLANO TERAPÊUTICO */}

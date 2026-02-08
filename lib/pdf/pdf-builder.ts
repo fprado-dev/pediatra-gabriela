@@ -7,6 +7,7 @@ import { PDFDocument, rgb, PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import fs from "fs";
 import path from "path";
+import { htmlToPdfElements, stripHtml, type PdfElement, type TextSegment } from "./html-to-pdf-elements";
 
 // Cores do tema
 export const COLORS = {
@@ -27,7 +28,7 @@ export const LAYOUT = {
   marginLeft: 50,
   marginRight: 50,
   marginTop: 50,
-  marginBottom: 70,
+  marginBottom: 90, // Aumentado para acomodar Instagram
   lineHeight: 14,
   sectionSpacing: 20,
   paragraphSpacing: 8,
@@ -291,43 +292,52 @@ export class PDFBuilder {
     size?: number;
     lineHeight?: number;
   } = {}) {
-    const font = this.fonts.regular;
     const size = options.size || 9;
     const lineHeight = options.lineHeight || 13;
-    const color = COLORS.text;
-    
-    // Usar método específico que PRESERVA \n
-    const cleanText = this.cleanPreformattedText(text);
-    
-    // Dividir em linhas pelo \n
-    const lines = cleanText.split('\n');
-    
-    for (const line of lines) {
-      // Verificar espaço
-      if (!this.checkSpace(lineHeight + 10)) {
-        this.addNewPage();
+    const x = LAYOUT.marginLeft + 10;
+
+    // Verificar se é HTML
+    if (text.includes("<p>") || text.includes("<ul>") || text.includes("<ol>")) {
+      // Usar renderização HTML
+      this.drawHtmlContent(text, x, size, COLORS.text);
+    } else {
+      // Fallback para texto simples com quebras de linha
+      const font = this.fonts.regular;
+      const color = COLORS.text;
+      
+      // Usar método específico que PRESERVA \n
+      const cleanText = this.cleanPreformattedText(text);
+      
+      // Dividir em linhas pelo \n
+      const lines = cleanText.split('\n');
+      
+      for (const line of lines) {
+        // Verificar espaço
+        if (!this.checkSpace(lineHeight + 10)) {
+          this.addNewPage();
+        }
+        
+        // Se linha vazia, só pular
+        if (line.trim().length === 0) {
+          this.yPosition -= lineHeight / 2;
+          continue;
+        }
+        
+        // Desenhar linha preservando formatação
+        this.currentPage.drawText(line, {
+          x,
+          y: this.yPosition,
+          size,
+          font,
+          color,
+        });
+        
+        this.yPosition -= lineHeight;
       }
       
-      // Se linha vazia, só pular
-      if (line.trim().length === 0) {
-        this.yPosition -= lineHeight / 2;
-        continue;
-      }
-      
-      // Desenhar linha preservando formatação
-      this.currentPage.drawText(line, {
-        x: LAYOUT.marginLeft + 10,
-        y: this.yPosition,
-        size,
-        font,
-        color,
-      });
-      
-      this.yPosition -= lineHeight;
+      // Garantir espaço após o texto pré-formatado
+      this.yPosition -= 5;
     }
-    
-    // Garantir espaço após o texto pré-formatado
-    this.yPosition -= 5;
   }
 
   addSection(title: string, content: string | null, options: {
@@ -357,7 +367,8 @@ export class PDFBuilder {
         lineHeight: 13,
       });
     } else {
-      this.drawText(content, {
+      // Usar novo método com suporte a HTML
+      this.drawTextWithHtmlSupport(content, {
         size: options.size || 10,
         bold: options.bold,
       });
@@ -467,5 +478,220 @@ export class PDFBuilder {
       font: this.fonts.regular,
       color: COLORS.gray,
     });
+
+    // Instagram
+    const instagramY = footerBaseY - 20;
+    const instagramText = "@pediatragabrielamarinho";
+    const instagramWidth = this.fonts.bold.widthOfTextAtSize(instagramText, 9);
+    const instagramX = LAYOUT.marginLeft + (LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight - instagramWidth) / 2;
+    
+    this.currentPage.drawText(instagramText, {
+      x: instagramX,
+      y: instagramY,
+      size: 9,
+      font: this.fonts.bold,
+      color: rgb(0.23, 0.35, 0.6), // Azul elegante
+    });
+
+    // Frase convidativa
+    const inviteY = instagramY - 12;
+    const inviteText = "Siga para dicas e informacoes sobre saude infantil";
+    const inviteWidth = this.fonts.regular.widthOfTextAtSize(inviteText, 7);
+    const inviteX = LAYOUT.marginLeft + (LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight - inviteWidth) / 2;
+    
+    this.currentPage.drawText(inviteText, {
+      x: inviteX,
+      y: inviteY,
+      size: 7,
+      font: this.fonts.regular,
+      color: COLORS.gray,
+    });
+  }
+
+  /**
+   * Renderiza segmentos de texto com formatação inline (negrito, itálico)
+   * Retorna o número de linhas renderizadas
+   */
+  drawTextSegments(
+    segments: TextSegment[],
+    x: number,
+    fontSize: number,
+    color = COLORS.text
+  ): number {
+    const maxWidth = LAYOUT.pageWidth - LAYOUT.marginLeft - LAYOUT.marginRight - (x - LAYOUT.marginLeft);
+    let currentX = x;
+    let line: { text: string; font: any; width: number }[] = [];
+    let lineWidth = 0;
+    let linesRendered = 0;
+
+    const renderLine = () => {
+      if (line.length === 0) return;
+      
+      if (!this.checkSpace(LAYOUT.lineHeight + 10)) {
+        this.addNewPage();
+      }
+      
+      currentX = x;
+      for (const part of line) {
+        this.currentPage.drawText(part.text, {
+          x: currentX,
+          y: this.yPosition,
+          size: fontSize,
+          font: part.font,
+          color,
+        });
+        currentX += part.width;
+      }
+      
+      this.yPosition -= LAYOUT.lineHeight;
+      linesRendered++;
+      
+      // Resetar linha
+      line = [];
+      lineWidth = 0;
+    };
+
+    for (const segment of segments) {
+      const cleanedText = this.cleanText(segment.text);
+      const font = segment.bold ? this.fonts.bold : this.fonts.regular;
+      const words = cleanedText.split(" ");
+
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const wordText = i < words.length - 1 ? word + " " : word;
+        const wordWidth = font.widthOfTextAtSize(wordText, fontSize);
+
+        // Verificar se precisa quebrar linha
+        if (lineWidth + wordWidth > maxWidth && line.length > 0) {
+          renderLine();
+        }
+
+        line.push({ text: wordText, font, width: wordWidth });
+        lineWidth += wordWidth;
+      }
+    }
+
+    // Renderizar última linha
+    renderLine();
+    
+    return linesRendered;
+  }
+
+  /**
+   * Renderiza HTML estruturado (parágrafos, listas, etc.)
+   */
+  drawHtmlContent(
+    html: string,
+    x: number,
+    fontSize: number,
+    color = COLORS.text
+  ) {
+    const elements = htmlToPdfElements(html);
+
+    for (let i = 0; i < elements.length; i++) {
+      const element = elements[i];
+      const isLast = i === elements.length - 1;
+      
+      if (element.type === "line-break") {
+        this.yPosition -= LAYOUT.lineHeight / 2;
+        continue;
+      }
+
+      if (element.type === "paragraph" && element.content) {
+        this.drawTextSegments(element.content, x, fontSize, color);
+        // Só adicionar espaçamento se não for o último elemento
+        if (!isLast) {
+          this.yPosition -= 6; // Espaçamento entre parágrafos
+        }
+        continue;
+      }
+
+      if (element.type === "bullet-list" && element.items) {
+        for (const item of element.items) {
+          if (!this.checkSpace(LAYOUT.lineHeight + 10)) {
+            this.addNewPage();
+          }
+          
+          // Salvar posição Y para desenhar bullet na primeira linha
+          const bulletY = this.yPosition;
+          
+          // Desenhar conteúdo do item PRIMEIRO (pode ocupar múltiplas linhas)
+          const linesRendered = this.drawTextSegments(item, x + 15, fontSize, color);
+          
+          // Agora desenhar bullet na altura da primeira linha
+          this.currentPage.drawText("•", {
+            x,
+            y: bulletY, // Posição da primeira linha
+            size: fontSize,
+            font: this.fonts.regular,
+            color,
+          });
+        }
+        // Só adicionar espaçamento se não for o último elemento
+        if (!isLast) {
+          this.yPosition -= 6;
+        }
+        continue;
+      }
+
+      if (element.type === "ordered-list" && element.items) {
+        for (let j = 0; j < element.items.length; j++) {
+          if (!this.checkSpace(LAYOUT.lineHeight + 10)) {
+            this.addNewPage();
+          }
+          
+          // Salvar posição Y para desenhar número na primeira linha
+          const numberY = this.yPosition;
+          
+          // Desenhar conteúdo do item PRIMEIRO (pode ocupar múltiplas linhas)
+          const linesRendered = this.drawTextSegments(element.items[j], x + 20, fontSize, color);
+          
+          // Agora desenhar número na altura da primeira linha
+          this.currentPage.drawText(`${j + 1}.`, {
+            x,
+            y: numberY, // Posição da primeira linha
+            size: fontSize,
+            font: this.fonts.regular,
+            color,
+          });
+        }
+        // Só adicionar espaçamento se não for o último elemento
+        if (!isLast) {
+          this.yPosition -= 6;
+        }
+        continue;
+      }
+    }
+  }
+
+  /**
+   * Desenha texto com suporte automático a HTML
+   * Se o conteúdo contiver tags HTML, usa drawHtmlContent
+   * Caso contrário, usa drawText normal
+   */
+  drawTextWithHtmlSupport(content: string, options: {
+    x?: number;
+    size?: number;
+    bold?: boolean;
+    color?: any;
+    maxWidth?: number;
+  } = {}) {
+    const x = options.x !== undefined ? options.x : LAYOUT.marginLeft;
+    const size = options.size || 10;
+    const color = options.color || COLORS.text;
+
+    // Verificar se é HTML
+    if (content.includes("<p>") || content.includes("<ul>") || content.includes("<ol>")) {
+      this.drawHtmlContent(content, x, size, color);
+    } else {
+      // Fallback para texto simples
+      this.drawText(content, {
+        x,
+        size,
+        bold: options.bold,
+        color,
+        maxWidth: options.maxWidth,
+      });
+    }
   }
 }

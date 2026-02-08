@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -279,11 +280,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                     fieldName="chief_complaint"
                   />
                 </div>
-                <Textarea
-                  id="chief_complaint"
+                <RichTextEditor
                   placeholder="Ex: Febre há 2 dias..."
-                  rows={3}
-                  {...register("chief_complaint")}
+                  value={watch("chief_complaint") || ""}
+                  onChange={(value) => setValue("chief_complaint", value)}
+                  minHeight="100px"
                 />
                 {errors.chief_complaint && (
                   <p className="text-sm text-red-500">{errors.chief_complaint.message}</p>
@@ -300,11 +301,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                     fieldName="hma"
                   />
                 </div>
-                <Textarea
-                  id="hma"
+                <RichTextEditor
                   placeholder="Foco na queixa atual: evolução dos sintomas, início, fatores de melhora/piora..."
-                  rows={6}
-                  {...register("hma")}
+                  value={watch("hma") || ""}
+                  onChange={(value) => setValue("hma", value)}
+                  minHeight="200px"
                 />
               </div>
 
@@ -318,11 +319,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                     fieldName="history"
                   />
                 </div>
-                <Textarea
-                  id="history"
+                <RichTextEditor
                   placeholder="Contexto geral: rotina alimentar, padrão de sono, hábitos, informações de base não relacionadas à queixa atual..."
-                  rows={4}
-                  {...register("history")}
+                  value={watch("history") || ""}
+                  onChange={(value) => setValue("history", value)}
+                  minHeight="150px"
                 />
               </div>
 
@@ -336,11 +337,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                     fieldName="family_history"
                   />
                 </div>
-                <Textarea
-                  id="family_history"
+                <RichTextEditor
                   placeholder="Doenças hereditárias, alergias familiares, condições crônicas relevantes..."
-                  rows={3}
-                  {...register("family_history")}
+                  value={watch("family_history") || ""}
+                  onChange={(value) => setValue("family_history", value)}
+                  minHeight="120px"
                 />
               </div>
 
@@ -370,11 +371,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                     />
                   </div>
                 </div>
-                <Textarea
-                  id="physical_exam"
+                <RichTextEditor
                   placeholder="Descreva os achados do exame físico..."
-                  rows={6}
-                  {...register("physical_exam")}
+                  value={watch("physical_exam") || ""}
+                  onChange={(value) => setValue("physical_exam", value)}
+                  minHeight="200px"
                 />
               </div>
 
@@ -403,11 +404,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                     fieldName="conduct"
                   />
                 </div>
-                <Textarea
-                  id="conduct"
+                <RichTextEditor
                   placeholder="Exames solicitados, encaminhamentos, procedimentos realizados..."
-                  rows={4}
-                  {...register("conduct")}
+                  value={watch("conduct") || ""}
+                  onChange={(value) => setValue("conduct", value)}
+                  minHeight="150px"
                 />
               </div>
 
@@ -421,11 +422,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                     fieldName="plan"
                   />
                 </div>
-                <Textarea
-                  id="plan"
+                <RichTextEditor
                   placeholder="Descreva o plano de tratamento..."
-                  rows={6}
-                  {...register("plan")}
+                  value={watch("plan") || ""}
+                  onChange={(value) => setValue("plan", value)}
+                  minHeight="200px"
                 />
               </div>
 
@@ -564,12 +565,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                     fieldName="development_notes"
                   />
                 </div>
-                <Textarea
-                  id="development_notes"
+                <RichTextEditor
                   placeholder="Marcos do desenvolvimento, observações..."
-                  rows={4}
-                  className="bg-white"
-                  {...register("development_notes")}
+                  value={watch("development_notes") || ""}
+                  onChange={(value) => setValue("development_notes", value)}
+                  minHeight="150px"
                 />
               </div>
             </CardContent>
@@ -594,12 +594,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                   fieldName="prenatal_perinatal_history"
                 />
               </div>
-              <Textarea
-                id="prenatal_perinatal_history"
+              <RichTextEditor
                 placeholder="Ex: Nasceu prematuro (35 semanas), mãe teve diabetes gestacional, ficou 5 dias em UTI neonatal..."
-                rows={4}
-                className="bg-white dark:bg-gray-950 border-amber-300 dark:border-amber-800"
-                {...register("prenatal_perinatal_history")}
+                value={watch("prenatal_perinatal_history") || ""}
+                onChange={(value) => setValue("prenatal_perinatal_history", value)}
+                minHeight="150px"
               />
             </CardContent>
           </Card>
@@ -620,11 +619,11 @@ export function EditConsultationForm({ consultation, previousMeasurements = [] }
                   fieldName="notes"
                 />
               </div>
-              <Textarea
-                id="notes"
+              <RichTextEditor
                 placeholder="Notas adicionais, observações, lembretes..."
-                rows={4}
-                {...register("notes")}
+                value={watch("notes") || ""}
+                onChange={(value) => setValue("notes", value)}
+                minHeight="150px"
               />
             </CardContent>
           </Card>

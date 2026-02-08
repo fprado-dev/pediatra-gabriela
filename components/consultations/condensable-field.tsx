@@ -165,9 +165,17 @@ export function CondensableField({
             <Skeleton className="h-4 w-3/4" />
           </div>
         ) : (
-          <p className="text-base leading-relaxed whitespace-pre-wrap">
-            {displayText}
-          </p>
+          // Renderizar HTML se detectado, caso contrário usar texto simples
+          displayText.includes("<p>") || displayText.includes("<ul>") || displayText.includes("<ol>") ? (
+            <div 
+              className="prose prose-sm max-w-none text-base leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: displayText }}
+            />
+          ) : (
+            <p className="text-base leading-relaxed whitespace-pre-wrap">
+              {displayText}
+            </p>
+          )
         )}
       </div>
     </div>

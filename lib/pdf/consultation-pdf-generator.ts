@@ -3,7 +3,7 @@
  * Responsável por toda a lógica de montagem e formatação do PDF
  */
 
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PDFBuilder, COLORS } from "./pdf-builder";
@@ -31,9 +31,12 @@ interface ConsultationData {
   id: string;
   created_at: string;
   chief_complaint?: string;
+  hma?: string;
   history?: string;
+  family_history?: string;
   physical_exam?: string;
   diagnosis?: string;
+  conduct?: string;
   plan?: string;
   prescription?: string;
   weight_kg?: number;
@@ -53,69 +56,115 @@ interface ProfileData {
 }
 
 /**
- * Calcula idade a partir da data de nascimento
+ * Calcula idade detalhada a partir da data de nascimento
  */
-function calculateAge(dateOfBirth: string): number | null {
+function calculateDetailedAge(dateOfBirth: string): string | null {
   try {
-    const birthDate = new Date(dateOfBirth);
+    const birth = new Date(dateOfBirth);
     const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+    let years = today.getFullYear() - birth.getFullYear();
+    let months = today.getMonth() - birth.getMonth();
+    let days = today.getDate() - birth.getDate();
+
+    if (days < 0) {
+      months--;
+      const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      days += lastMonth.getDate();
     }
 
-    return age;
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    // Formatação baseada na idade
+    if (years === 0 && months === 0) {
+      return `${days} ${days === 1 ? 'dia' : 'dias'}`;
+    } else if (years === 0) {
+      if (days === 0) {
+        return `${months} ${months === 1 ? 'mes' : 'meses'}`;
+      }
+      return `${months} ${months === 1 ? 'mes' : 'meses'} e ${days} ${days === 1 ? 'dia' : 'dias'}`;
+    } else {
+      if (months === 0) {
+        return `${years} ${years === 1 ? 'ano' : 'anos'}`;
+      }
+      return `${years} ${years === 1 ? 'ano' : 'anos'} e ${months} ${months === 1 ? 'mes' : 'meses'}`;
+    }
   } catch {
     return null;
   }
 }
 
 /**
- * Formata texto descritivo dos dados do paciente
+ * Adiciona dados complementares do paciente
  */
-function formatPatientDescription(patient: PatientData, patientAge: number | null): string {
-  let description = `Olá, meu nome é ${patient?.full_name || 'N/A'}`;
+function addPatientDetails(builder: PDFBuilder, patient: PatientData) {
+  let hasDetails = false;
 
-  // Idade
-  if (patientAge !== null) {
-    description += ` e tenho ${patientAge} anos de idade`;
-  }
-  description += `.`;
+  // Tipo Sanguíneo e Alergias em destaque
+  if (patient.blood_type || patient.allergies) {
+    builder.drawText("INFORMACOES IMPORTANTES", {
+      size: 11,
+      bold: true,
+      color: COLORS.textLight,
+    });
+    builder.moveDown(5);
 
-  // Data de Nascimento
-  if (patient?.date_of_birth) {
-    description += ` Nasci em ${format(new Date(patient.date_of_birth), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
-  }
-
-  // Tipo Sanguíneo
-  if (patient?.blood_type) {
-    description += ` e meu tipo sanguíneo é ${patient.blood_type}`;
-  }
-  description += `.`;
-
-  // Responsável
-  if (patient?.responsible_name) {
-    description += ` Meu responsável é ${patient.responsible_name}`;
-    if (patient?.responsible_cpf) {
-      description += ` (CPF: ${patient.responsible_cpf})`;
+    if (patient.blood_type) {
+      builder.drawText(`Tipo Sanguineo: ${patient.blood_type}`, {
+        size: 9,
+        color: COLORS.text,
+      });
+      builder.moveDown(3);
+      hasDetails = true;
     }
-    description += `.`;
+
+    if (patient.allergies) {
+      builder.drawText(`Alergias: ${patient.allergies}`, {
+        size: 9,
+        color: rgb(0.8, 0.2, 0.2), // Vermelho para alergias
+        bold: true,
+      });
+      builder.moveDown(3);
+      hasDetails = true;
+    }
   }
 
-  // Contato
-  if (patient?.phone) {
-    description += ` Para contato, o telefone é ${patient.phone}`;
-    description += `.`;
+  // Contato e Endereço
+  if (patient.phone || patient.address) {
+    if (hasDetails) builder.moveDown(5);
+
+    builder.drawText("CONTATO", {
+      size: 11,
+      bold: true,
+      color: COLORS.textLight,
+    });
+    builder.moveDown(5);
+
+    if (patient.phone) {
+      builder.drawText(`Telefone: ${patient.phone}`, {
+        size: 9,
+        color: COLORS.text,
+      });
+      builder.moveDown(3);
+    }
+
+    if (patient.address) {
+      builder.drawText(`Endereco: ${patient.address}`, {
+        size: 9,
+        color: COLORS.text,
+      });
+      builder.moveDown(3);
+    }
+    hasDetails = true;
   }
 
-  // Endereço
-  if (patient?.address) {
-    description += ` Resido em: ${patient.address}.`;
+  if (hasDetails) {
+    builder.moveDown(10);
+    builder.drawLine();
   }
-
-  return description;
 }
 
 /**
@@ -124,7 +173,9 @@ function formatPatientDescription(patient: PatientData, patientAge: number | nul
 async function addPDFHeader(
   builder: PDFBuilder,
   profile: ProfileData | null,
-  consultationDate: string
+  consultationDate: string,
+  patient: PatientData,
+  patientAge: string | null
 ) {
   // Logo
   const logoHeight = await builder.drawLogo();
@@ -134,33 +185,67 @@ async function addPDFHeader(
   builder.yPosition = titleStartY - (logoHeight > 0 ? 10 : 0);
 
   // Título principal
-  builder.drawText("PRONTUÁRIO MÉDICO PEDIÁTRICO", {
-    size: 18,
+  builder.drawText("PRONTUÁRIO MEDICO PEDIATRICO", {
+    size: 16,
     bold: true,
     align: 'center',
     color: COLORS.primary,
   });
-  builder.moveDown(8);
+  builder.moveDown(5);
 
   // Dados do médico
   if (profile?.full_name) {
     builder.drawText(
       `${profile.full_name} - CRM: ${profile.crm || 'N/A'}`,
       {
-        size: 11,
+        size: 9,
         align: 'center',
-        color: COLORS.textLight,
+        color: COLORS.gray,
       }
     );
+    builder.moveDown(10);
+  }
+
+  // Linha divisória
+  builder.drawLine();
+  builder.moveDown(5);
+
+  // Nome do Paciente (destaque)
+  builder.drawText(patient.full_name, {
+    size: 18,
+    bold: true,
+    color: COLORS.text,
+  });
+  builder.moveDown(8);
+
+  // Informações do paciente em linha
+  let patientInfo = "";
+
+  if (patient.date_of_birth) {
+    patientInfo += `Nascimento: ${format(new Date(patient.date_of_birth), "dd/MM/yyyy", { locale: ptBR })}`;
+    if (patientAge) {
+      patientInfo += ` (${patientAge})`;
+    }
+  }
+
+  if (patient.responsible_name) {
+    if (patientInfo) patientInfo += " | ";
+    patientInfo += `Responsavel: ${patient.responsible_name}`;
+  }
+
+  if (patientInfo) {
+    builder.drawText(patientInfo, {
+      size: 9,
+      color: COLORS.gray,
+    });
     builder.moveDown(5);
   }
 
   // Data da consulta
   builder.drawText(
-    `Consulta realizada em: ${format(new Date(consultationDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`,
+    `Data da Consulta: ${format(new Date(consultationDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`,
     {
-      size: 10,
-      align: 'center',
+      size: 9,
       color: COLORS.gray,
     }
   );
@@ -170,27 +255,6 @@ async function addPDFHeader(
   builder.drawLine();
 }
 
-/**
- * Adiciona seção de dados do paciente
- */
-function addPatientSection(
-  builder: PDFBuilder,
-  patient: PatientData,
-  patientAge: number | null
-) {
-  const patientDescription = formatPatientDescription(patient, patientAge);
-  builder.addSection("Dados do Paciente", patientDescription);
-}
-
-/**
- * Adiciona alerta de alergias
- */
-function addAllergiesWarning(builder: PDFBuilder, patient: PatientData) {
-  if (patient?.allergies) {
-    builder.addAllergyWarning(patient.allergies);
-    builder.moveDown(10);
-  }
-}
 
 /**
  * Adiciona seção de medicações atuais
@@ -203,31 +267,110 @@ function addCurrentMedicationsSection(builder: PDFBuilder, patient: PatientData)
 }
 
 /**
- * Adiciona seções clínicas da consulta
+ * Adiciona queixa principal
  */
-function addClinicalSections(builder: PDFBuilder, consultation: ConsultationData) {
-  builder.addSection("Queixa Principal", consultation.chief_complaint || null);
-  builder.addSection("História / Anamnese", consultation.history || null);
-  builder.addSection("Diagnóstico", consultation.diagnosis || null);
-  builder.addSection("Plano Terapêutico", consultation.plan || null);
+function addChiefComplaintSection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.chief_complaint) {
+    builder.addSection("Queixa Principal", consultation.chief_complaint);
+  }
 }
 
 /**
- * Adiciona seção de medidas antropométricas
+ * Adiciona HMA (História da Moléstia Atual)
  */
-function addMeasurementsSection(builder: PDFBuilder, consultation: ConsultationData) {
+function addHMASection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.hma) {
+    builder.addSection("História da Moléstia Atual (HMA)", consultation.hma);
+  }
+}
+
+/**
+ * Adiciona informações complementares (history)
+ */
+function addHistorySection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.history) {
+    builder.addSection("Informações Complementares", consultation.history);
+  }
+}
+
+/**
+ * Adiciona histórico gestacional e perinatal
+ */
+function addPrenatalHistorySection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.prenatal_perinatal_history) {
+    builder.addSection("HISTORICO GESTACIONAL E PERINATAL (IMPORTANTE)", consultation.prenatal_perinatal_history);
+  }
+}
+
+/**
+ * Adiciona histórico familiar
+ */
+function addFamilyHistorySection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.family_history) {
+    builder.addSection("Histórico Familiar", consultation.family_history);
+  }
+}
+
+/**
+ * Adiciona desenvolvimento neuropsicomotor
+ */
+function addDevelopmentSection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.development_notes) {
+    builder.addSection("Desenvolvimento Neuropsicomotor", consultation.development_notes);
+  }
+}
+
+/**
+ * Adiciona exame físico e medidas antropométricas
+ */
+function addPhysicalExamSection(builder: PDFBuilder, consultation: ConsultationData) {
+  // Medidas antropométricas
   if (consultation.weight_kg || consultation.height_cm || consultation.head_circumference_cm) {
     let measures = "";
 
     if (consultation.weight_kg) {
-      measures += `Peso: ${consultation.weight_kg} kg | Altura: ${consultation.height_cm} cm | `;
+      measures += `Peso: ${consultation.weight_kg} kg`;
     }
-
+    if (consultation.height_cm) {
+      measures += ` | Altura: ${consultation.height_cm} cm`;
+    }
     if (consultation.head_circumference_cm) {
-      measures += `Perímetro Cefálico: ${consultation.head_circumference_cm} cm`;
+      measures += ` | Perímetro Cefálico: ${consultation.head_circumference_cm} cm`;
     }
 
-    builder.addSection("Medidas Antropométricas", measures);
+    builder.addSection("Medidas Antropométricas", measures.trim());
+  }
+
+  // Exame físico
+  if (consultation.physical_exam) {
+    builder.addSection("Exame Físico", consultation.physical_exam);
+  }
+}
+
+/**
+ * Adiciona diagnóstico
+ */
+function addDiagnosisSection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.diagnosis) {
+    builder.addSection("Hipóteses Diagnósticas", consultation.diagnosis);
+  }
+}
+
+/**
+ * Adiciona conduta
+ */
+function addConductSection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.conduct) {
+    builder.addSection("Conduta", consultation.conduct);
+  }
+}
+
+/**
+ * Adiciona plano terapêutico
+ */
+function addPlanSection(builder: PDFBuilder, consultation: ConsultationData) {
+  if (consultation.plan) {
+    builder.addSection("Plano Terapêutico", consultation.plan);
   }
 }
 
@@ -244,32 +387,12 @@ function addPrescriptionSection(builder: PDFBuilder, consultation: ConsultationD
 }
 
 /**
- * Adiciona seção de observações adicionais
+ * Adiciona observações adicionais
  */
-function addObservationsSection(builder: PDFBuilder, consultation: ConsultationData) {
-  let observations = "";
-
-  if (consultation.physical_exam) {
-    observations += `Exame Físico:\n${consultation.physical_exam}\n\n`;
-  }
-
-  if (consultation.prenatal_perinatal_history) {
-    observations += `⚠️ HISTÓRICO GESTACIONAL E PERINATAL (CRÍTICO):\n${consultation.prenatal_perinatal_history}\n\n`;
-  }
-
-  if (consultation.development_notes) {
-    observations += `Desenvolvimento:\n${consultation.development_notes}\n\n`;
-  }
-
+function addNotesSection(builder: PDFBuilder, consultation: ConsultationData) {
   if (consultation.notes) {
-    observations += `${consultation.notes}`;
+    builder.addSection("Observações Adicionais", consultation.notes);
   }
-
-  if (observations.trim()) {
-    builder.addSection("Observações Adicionais", observations.trim());
-  }
-
-  builder.moveDown(10);
 }
 
 /**
@@ -337,52 +460,73 @@ export async function generateConsultationPDF(
 
   // Calcular idade do paciente
   const patientAge = patient?.date_of_birth
-    ? calculateAge(patient.date_of_birth)
+    ? calculateDetailedAge(patient.date_of_birth)
     : null;
 
   // Criar documento PDF
   const pdfDoc = await PDFDocument.create();
   pdfDoc.setTitle(`Consulta - ${patient?.full_name || "Paciente"}`);
-  pdfDoc.setAuthor(profile?.full_name || "Médico");
-  pdfDoc.setSubject("Prontuário Médico Pediátrico");
+  pdfDoc.setAuthor(profile?.full_name || "Medico");
+  pdfDoc.setSubject("Prontuario Medico Pediatrico");
 
   // Criar builder
   const builder = new PDFBuilder(pdfDoc);
   await builder.loadFonts();
 
-  // === MONTAR PDF ===
+  // === MONTAR PDF (seguindo ordem da preview) ===
 
-  // Cabeçalho
-  await addPDFHeader(builder, profile, consultation.created_at);
+  // Cabeçalho com dados do paciente
+  await addPDFHeader(builder, profile, consultation.created_at, patient, patientAge);
 
-  // Dados do Paciente
-  addPatientSection(builder, patient, patientAge);
-
-  // Alergias (se houver)
-  addAllergiesWarning(builder, patient);
+  // Dados complementares do paciente (tipo sanguíneo, alergias, contato)
+  addPatientDetails(builder, patient);
 
   // Medicações Atuais (se houver)
   addCurrentMedicationsSection(builder, patient);
 
-  // Seções Clínicas
-  addClinicalSections(builder, consultation);
+  // 1. Queixa Principal
+  addChiefComplaintSection(builder, consultation);
 
-  // Medidas Antropométricas
-  addMeasurementsSection(builder, consultation);
+  // 2. HMA (História da Moléstia Atual)
+  addHMASection(builder, consultation);
 
-  // Prescrição Médica
+  // 3. Informações Complementares
+  addHistorySection(builder, consultation);
+
+  // 4. Histórico Gestacional e Perinatal
+  addPrenatalHistorySection(builder, consultation);
+
+  // 5. Histórico Familiar
+  addFamilyHistorySection(builder, consultation);
+
+  // 6. Desenvolvimento Neuropsicomotor
+  addDevelopmentSection(builder, consultation);
+
+  // 7. Exame Físico + Medidas Antropométricas
+  addPhysicalExamSection(builder, consultation);
+
+  // 8. Hipóteses Diagnósticas
+  addDiagnosisSection(builder, consultation);
+
+  // 9. Conduta
+  addConductSection(builder, consultation);
+
+  // 10. Plano Terapêutico
+  addPlanSection(builder, consultation);
+
+  // 11. Prescrição Médica (se houver)
   addPrescriptionSection(builder, consultation);
 
-  // Observações Adicionais
-  addObservationsSection(builder, consultation);
+  // 12. Observações Adicionais
+  addNotesSection(builder, consultation);
 
-  // Transcrição com Falantes (se disponível)
+  // 13. Transcrição com Falantes (se disponível)
   addSpeakerTranscriptionSection(builder, consultation);
 
-  // Histórico Médico
+  // 14. Histórico Médico
   addMedicalHistorySection(builder, patient);
 
-  // Rodapé
+  // Rodapé com Instagram
   await builder.addFooter();
 
   // === GERAR BYTES ===

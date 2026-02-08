@@ -107,7 +107,7 @@ export async function POST(
         patient_id: consultation.patient_id,
         doctor_id: user.id,
         certificate_type: certificateType,
-        certificate_data: certificateData,
+        certificate_data: certificateData as any,
       })
       .select()
       .single();

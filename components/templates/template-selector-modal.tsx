@@ -104,7 +104,7 @@ export function TemplateSelectorModal({
       const { data: myData, error: myError } = await supabase
         .from("prescription_templates")
         .select("*")
-        .eq("doctor_id", user?.id)
+        .eq("doctor_id", user?.id || "")
         .eq("is_open_template", false)
         .order("is_favorite", { ascending: false })
         .order("usage_count", { ascending: false })
@@ -122,10 +122,10 @@ export function TemplateSelectorModal({
 
       if (communityError) throw communityError;
 
-      setMyTemplates(myData || []);
-      setCommunityTemplates(communityData || []);
-      setFilteredMyTemplates(myData || []);
-      setFilteredCommunityTemplates(communityData || []);
+      setMyTemplates(myData as unknown as PrescriptionTemplate[]);
+      setCommunityTemplates(communityData as unknown as PrescriptionTemplate[]);
+      setFilteredMyTemplates(myData as unknown as PrescriptionTemplate[]);
+      setFilteredCommunityTemplates(communityData as unknown as PrescriptionTemplate[]);
     } catch (error: any) {
       console.error("Erro ao carregar templates:", error);
       toast.error("Erro ao carregar templates");

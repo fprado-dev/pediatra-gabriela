@@ -75,17 +75,18 @@ export async function GET(
     // Mapear vacinas com status
     const patientVaccineMap = new Map<string, PatientVaccine>();
     (patientVaccines || []).forEach((pv) => {
-      patientVaccineMap.set(pv.vaccine_code, pv);
+      patientVaccineMap.set(pv.vaccine_code, pv as PatientVaccine);
     });
 
     const vaccinesWithStatus: VaccineWithStatus[] = (vaccineRef || []).map(
-      (vaccine: VaccineReference) => {
-        const patientVaccine = patientVaccineMap.get(vaccine.code);
-        const isApplicable = isVaccineApplicable(vaccine, ageMonths);
-        const isOverdue = isVaccineOverdue(vaccine, ageMonths, patientVaccine);
+      (vaccine) => {
+        const typedVaccine = vaccine as VaccineReference;
+        const patientVaccine = patientVaccineMap.get(typedVaccine.code);
+        const isApplicable = isVaccineApplicable(typedVaccine, ageMonths);
+        const isOverdue = isVaccineOverdue(typedVaccine, ageMonths, patientVaccine);
 
         return {
-          ...vaccine,
+          ...typedVaccine,
           patientVaccine,
           isApplicable,
           isOverdue,

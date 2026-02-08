@@ -25,13 +25,15 @@ interface Patient {
   date_of_birth: string;
 }
 
+type ConsultationStatus = "processing" | "completed" | "error" | "in_progress";
+
 interface Consultation {
   id: string;
   patient_id: string;
-  status: "processing" | "completed" | "error";
+  status: ConsultationStatus | any;
   created_at: string;
   audio_duration_seconds: number;
-  chief_complaint?: string;
+  chief_complaint?: string | null;
   diagnosis?: string;
   patient?: Patient;
 }

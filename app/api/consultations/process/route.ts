@@ -7,6 +7,7 @@ import { downloadAudio, extractKeyFromUrl } from "@/lib/cloudflare/r2-client";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { ConsultationType, PuericulturaSubtype } from "@/lib/types/consultation";
 
 export const maxDuration = 600; // 10 minutos para processamento de áudios grandes
 export const dynamic = 'force-dynamic';
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       audioUrlToUse = consultation.original_audio_url;
       console.log(`🔄 Usando áudio ORIGINAL (backup) para processamento`);
     } else {
-      audioUrlToUse = consultation.audio_url;
+      audioUrlToUse = consultation.audio_url || "";
       if (useOriginal && !consultation.original_audio_url) {
         console.warn(`⚠️ Áudio original solicitado mas não disponível, usando áudio normal`);
       }
@@ -132,16 +133,16 @@ export async function POST(request: NextRequest) {
     if (extension === "webm") {
       console.log("🔄 Detectado WebM - convertendo para MP3 para metadados confiáveis...");
       const mp3Path = join(tmpdir(), `audio-${Date.now()}-converted.mp3`);
-      
+
       try {
         // Usar compressAudio que já converte para MP3
         const { compressAudio } = await import("@/lib/utils/compress-audio");
         await compressAudio(tempFilePath, mp3Path);
-        
+
         // Trocar arquivo original pelo convertido
         await unlink(tempFilePath);
         tempFilePath = mp3Path;
-        
+
         console.log(`✅ WebM convertido para MP3 com sucesso: ${tempFilePath}`);
       } catch (conversionError: any) {
         console.warn(`⚠️ Erro ao converter WebM, continuando com original: ${conversionError.message}`);
@@ -226,7 +227,7 @@ export async function POST(request: NextRequest) {
 
     // Extrair summaries das consultas anteriores
     const previousSummaries = previousConsultations
-      ?.map(c => c.previous_consultations_summary?.consultations?.[0])
+      ?.map(c => (c.previous_consultations_summary as any)?.consultations?.[0])
       .filter(Boolean) || [];
 
     // Calcular idade do paciente
@@ -247,8 +248,8 @@ export async function POST(request: NextRequest) {
         medicalHistory: patient?.medical_history,
         currentMedications: patient?.current_medications,
       },
-      consultation.consultation_type,
-      consultation.consultation_subtype,
+      consultation.consultation_type as ConsultationType,
+      consultation.consultation_subtype as PuericulturaSubtype | null,
       previousSummaries
     );
 
@@ -309,7 +310,7 @@ export async function POST(request: NextRequest) {
     if (shouldUpdatePatientProfile && consultation.patient_id) {
       console.log(`🔄 Atualizando cadastro do paciente ${consultation.patient_id}...`);
       console.log(`📝 Atualizações:`, patientProfileUpdates);
-      
+
       const { data: updateResult, error: patientUpdateError } = await supabase
         .from("patients")
         .update({
@@ -347,7 +348,7 @@ export async function POST(request: NextRequest) {
         head_circumference_cm: extractedFields.head_circumference_cm,
         development_notes: extractedFields.development_notes,
         prenatal_perinatal_history: extractedFields.prenatal_perinatal_history,
-        original_ai_version: extractedFields, // Guardar versão original
+        original_ai_version: extractedFields as any, // Guardar versão original
         status: "completed",
         processing_completed_at: new Date().toISOString(),
       })

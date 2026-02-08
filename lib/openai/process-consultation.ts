@@ -182,7 +182,7 @@ export async function processConsultation(consultationId: string) {
         head_circumference_cm: extractedFields.head_circumference_cm,
         development_notes: extractedFields.development_notes,
         prenatal_perinatal_history: extractedFields.prenatal_perinatal_history, // NOVO: histórico gestacional
-        original_ai_version: extractedFields, // Guardar versão original
+        original_ai_version: extractedFields as unknown as any, // Guardar versão original
         status: "completed",
         processing_completed_at: new Date().toISOString(),
       })

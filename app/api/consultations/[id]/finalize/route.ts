@@ -67,9 +67,9 @@ export async function POST(
     // Validar se consulta pode ser finalizada
     if (consultation.status === "completed") {
       return NextResponse.json(
-        { 
+        {
           error: "Consulta já está finalizada",
-          already_finalized: true 
+          already_finalized: true
         },
         { status: 400 }
       );
@@ -84,12 +84,12 @@ export async function POST(
 
     // Gerar resumo automático com IA
     console.log("🤖 Gerando resumo automático da consulta...");
-    
+
     let newSummary;
     try {
       newSummary = await generateConsultationSummary({
         consultation_id: consultation.id,
-        created_at: consultation.created_at,
+        created_at: consultation.created_at || "",
         consultation_type: consultation.consultation_type,
         consultation_subtype: consultation.consultation_subtype,
         chief_complaint: consultation.chief_complaint,
@@ -112,7 +112,7 @@ export async function POST(
     // Marcar consulta como completa
     const { error: updateError } = await supabase
       .from("consultations")
-      .update({ 
+      .update({
         status: "completed",
         updated_at: new Date().toISOString()
       })
@@ -150,7 +150,7 @@ export async function POST(
 
         // Extrair summaries existentes
         const existingSummaries = completedConsultations
-          ?.map(c => c.previous_consultations_summary?.consultations || [])
+          ?.map(c => (c.previous_consultations_summary as any)?.consultations || [])
           .flat()
           .filter(Boolean) || [];
 
@@ -216,9 +216,9 @@ export async function POST(
   } catch (error: any) {
     console.error("❌ Erro ao finalizar consulta:", error);
     return NextResponse.json(
-      { 
+      {
         error: "Erro ao finalizar consulta",
-        details: error.message 
+        details: error.message
       },
       { status: 500 }
     );

@@ -77,12 +77,12 @@ export async function GET(
     const pdfBuffer = await generateConsultationPDF(consultation as any, profile);
 
     // === GERAR NOME DO ARQUIVO ===
-    const patient = Array.isArray(consultation.patient) 
-      ? consultation.patient[0] 
+    const patient = Array.isArray(consultation.patient)
+      ? consultation.patient[0]
       : consultation.patient;
     const fileName = generatePDFFileName(
       patient?.full_name || "Paciente",
-      consultation.created_at
+      consultation.created_at || ""
     );
 
     console.log(`📥 Enviando PDF: ${fileName}`);

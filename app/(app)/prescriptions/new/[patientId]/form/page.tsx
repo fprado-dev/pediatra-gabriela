@@ -119,7 +119,7 @@ export default async function PrescriptionFormPage({
         name: profile?.full_name || "Médico",
         crm: profile?.crm || "",
       }}
-      templates={templates || []}
+      templates={templates || [] as any[]}
     />
   );
 }

@@ -20,7 +20,7 @@ interface Patient {
 }
 
 interface PatientListProps {
-  patients: Patient[];
+  patients: Patient[] | any[];
 }
 
 export function PatientList({ patients }: PatientListProps) {

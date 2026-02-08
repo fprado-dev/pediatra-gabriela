@@ -95,26 +95,26 @@ export function ProcessingStatus({ consultationId, onComplete, onError }: Proces
 
         // Calcular progresso baseado nos steps
         const processingSteps = consultation.processing_steps || [];
-        const completedSteps = processingSteps.filter(
+        const completedSteps = (processingSteps as any[]).filter(
           (s: any) => s.status === "completed"
         ).length;
 
         // Atualizar steps UI baseado nos dados reais
         const newSteps = [...steps];
-        if (processingSteps.length > 0) {
+        if ((processingSteps as any[]).length > 0) {
           // Upload sempre completo
           // Transcribe
-          const transcribeStep = processingSteps.find((s: any) => s.step === "transcription");
+          const transcribeStep = (processingSteps as any[]).find((s: any) => s.step === "transcription");
           if (transcribeStep) {
             newSteps[1].status = transcribeStep.status === "completed" ? "completed" : "processing";
           }
           // Clean
-          const cleanStep = processingSteps.find((s: any) => s.step === "cleaning");
+          const cleanStep = (processingSteps as any[]).find((s: any) => s.step === "cleaning");
           if (cleanStep) {
             newSteps[2].status = cleanStep.status === "completed" ? "completed" : "processing";
           }
           // Extract
-          const extractStep = processingSteps.find((s: any) => s.step === "extraction");
+          const extractStep = (processingSteps as any[]).find((s: any) => s.step === "extraction");
           if (extractStep) {
             newSteps[3].status = extractStep.status === "completed" ? "completed" : "processing";
           }
@@ -230,7 +230,7 @@ export function ProcessingStatus({ consultationId, onComplete, onError }: Proces
             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm text-red-800 mb-3">{error}</p>
-              
+
               {hasOriginalAudio && (
                 <div className="flex gap-2 flex-wrap">
                   <Button
@@ -262,13 +262,13 @@ export function ProcessingStatus({ consultationId, onComplete, onError }: Proces
                         setIsRetrying(true);
                         setError(null);
                         setProgress(25); // Reset para início do processamento
-                        
+
                         const response = await fetch('/api/consultations/process', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ 
-                            consultationId, 
-                            useOriginal: true 
+                          body: JSON.stringify({
+                            consultationId,
+                            useOriginal: true
                           }),
                         });
 

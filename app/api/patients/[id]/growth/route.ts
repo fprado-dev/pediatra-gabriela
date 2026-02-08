@@ -47,7 +47,7 @@ export async function GET(
     const measurements: Measurement[] = (consultations || [])
       .filter((c) => c.weight_kg || c.height_cm)
       .map((c) => ({
-        date: new Date(c.consultation_date),
+        date: new Date(c.consultation_date || ""),
         weight_kg: c.weight_kg,
         height_cm: c.height_cm,
         head_circumference_cm: c.head_circumference_cm,
@@ -71,8 +71,8 @@ export async function GET(
     }
 
     // Determine sex from patient profile (default to female if not specified)
-    const sex: Sex = (patient.sex === "male" || patient.sex === "female") 
-      ? patient.sex 
+    const sex: Sex = (patient.sex === "male" || patient.sex === "female")
+      ? patient.sex
       : "female";
 
     const dateOfBirth = new Date(patient.date_of_birth);

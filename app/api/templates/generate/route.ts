@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     if (count && count > 0) {
       return NextResponse.json(
-        { 
+        {
           error: "Você já possui templates criados",
           count,
           message: "Para gerar novos templates, delete os existentes primeiro"
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await supabase
       .from("prescription_templates")
-      .insert(templatesWithDoctorId)
+      .insert(templatesWithDoctorId as any)
       .select();
 
     if (error) {

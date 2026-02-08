@@ -32,7 +32,7 @@ export function htmlToPdfElements(html: string): PdfElement[] {
   if (!html || html === "<p></p>") return [];
 
   const elements: PdfElement[] = [];
-  
+
   // Parse HTML simples (sem usar DOMParser no Node.js)
   // Dividir por tags de bloco
   const blockRegex = /<(p|ul|ol|br)[\s>].*?<\/\1>|<br\s*\/?>/gi;
@@ -42,8 +42,8 @@ export function htmlToPdfElements(html: string): PdfElement[] {
 
   // Encontrar todas as tags de bloco
   const tempHtml = html.replace(/<br\s*\/?>/gi, "<br></br>");
-  const parser = tempHtml.matchAll(/<(p|ul|ol|br)[\s>](.*?)<\/\1>/gis);
-  
+  const parser = tempHtml.matchAll(/<(p|ul|ol|br)[\s>](.*?)<\/\1>/g);
+
   for (const match of parser) {
     matches.push({
       tag: match[1].toLowerCase(),
@@ -165,11 +165,11 @@ function parseTextSegments(html: string): TextSegment[] {
  */
 function parseListItems(html: string): TextSegment[][] {
   const items: TextSegment[][] = [];
-  
+
   // Extrair cada <li>
-  const liRegex = /<li>(.*?)<\/li>/gis;
+  const liRegex = /<li>(.*?)<\/li>/g;
   let match;
-  
+
   while ((match = liRegex.exec(html)) !== null) {
     const segments = parseTextSegments(match[1]);
     if (segments.length > 0) {

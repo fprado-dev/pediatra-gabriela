@@ -18,20 +18,20 @@ interface PatientFormProps {
     id: string;
     full_name: string;
     date_of_birth: string;
-    sex?: string;
+    sex?: string | null;
     cpf: string;
     phone: string;
-    email?: string;
-    address?: string;
-    medical_history?: string;
-    allergies?: string;
-    current_medications?: string;
-    notes?: string;
-    responsible_name?: string;
-    responsible_cpf?: string;
-    blood_type?: string;
-    weight_kg?: number;
-    height_cm?: number;
+    email?: string | null;
+    address?: string | null;
+    medical_history?: string | null;
+    allergies?: string | null;
+    current_medications?: string | null;
+    notes?: string | null;
+    responsible_name?: string | null;
+    responsible_cpf?: string | null;
+    blood_type?: string | null;
+    weight_kg?: number | null;
+    height_cm?: number | null;
   };
   mode: "create" | "edit";
 }
@@ -144,7 +144,7 @@ export function PatientForm({ patient, mode }: PatientFormProps) {
         const { error } = await supabase
           .from("patients")
           .update(patientData)
-          .eq("id", patient?.id);
+          .eq("id", patient?.id || "");
         if (error) throw error;
         toast.success("Paciente atualizado com sucesso!");
       }

@@ -9,7 +9,7 @@ export interface VaccineReference {
   age_months_min: number;
   age_months_max: number | null;
   type: 'sus' | 'particular';
-  category: string;
+  category: string | null;
   notes: string | null;
   display_order: number;
 }
@@ -47,29 +47,29 @@ export function calculateAgeInMonths(dateOfBirth: string): number {
   const years = today.getFullYear() - birth.getFullYear();
   const months = today.getMonth() - birth.getMonth();
   const days = today.getDate() - birth.getDate();
-  
+
   let totalMonths = years * 12 + months;
   if (days < 0) totalMonths--;
-  
+
   return totalMonths;
 }
 
 // Helper para verificar se vacina está atrasada
 export function isVaccineOverdue(
-  vaccine: VaccineReference, 
-  ageMonths: number, 
+  vaccine: VaccineReference,
+  ageMonths: number,
   patientVaccine?: PatientVaccine
 ): boolean {
   // Se já foi aplicada ou pulada, não está atrasada
   if (patientVaccine?.status === 'applied' || patientVaccine?.status === 'skipped') {
     return false;
   }
-  
+
   // Se a idade atual passou do limite máximo da vacina
   if (vaccine.age_months_max && ageMonths > vaccine.age_months_max) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -79,14 +79,14 @@ export function isVaccineApplicable(vaccine: VaccineReference, ageMonths: number
   if (ageMonths < vaccine.age_months_min) {
     return false;
   }
-  
+
   return true;
 }
 
 // Helper para agrupar vacinas por faixa etária
 export function groupVaccinesByAge(vaccines: VaccineWithStatus[]): VaccinesByAgeGroup[] {
   const grouped = new Map<string, VaccineWithStatus[]>();
-  
+
   // Ordem das faixas etárias
   const ageOrder = [
     'Ao nascer',
@@ -109,13 +109,13 @@ export function groupVaccinesByAge(vaccines: VaccineWithStatus[]): VaccinesByAge
     '9 a 45 anos',
     '11 a 14 anos',
   ];
-  
+
   vaccines.forEach((vaccine) => {
     const group = grouped.get(vaccine.age_group) || [];
     group.push(vaccine);
     grouped.set(vaccine.age_group, group);
   });
-  
+
   // Ordenar por ordem definida
   const result: VaccinesByAgeGroup[] = [];
   ageOrder.forEach((ageGroup) => {
@@ -127,7 +127,7 @@ export function groupVaccinesByAge(vaccines: VaccineWithStatus[]): VaccinesByAge
       });
     }
   });
-  
+
   // Adicionar qualquer grupo não listado
   grouped.forEach((vaccines, ageGroup) => {
     if (!ageOrder.includes(ageGroup)) {
@@ -137,6 +137,6 @@ export function groupVaccinesByAge(vaccines: VaccineWithStatus[]): VaccinesByAge
       });
     }
   });
-  
+
   return result;
 }

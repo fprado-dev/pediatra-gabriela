@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { ConsultationType } from "@/lib/types/consultation";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Obter dados do body
     const body = await request.json();
-    const { sourceConsultationId, patientId, timerId } = body;
+    const { sourceConsultationId, patientId } = body;
 
     // Validar parâmetros
     if (!sourceConsultationId || !patientId) {
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest) {
     const { data: newConsultation, error: insertError } = await supabase
       .from("consultations")
       .insert({
+        consultation_type: sourceConsultation.consultation_type as ConsultationType,
         // IDs e metadata
         doctor_id: user.id,
         patient_id: patientId, // Pode ser diferente do original!
@@ -151,22 +153,6 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Nova consulta criada: ${newConsultation.id}`);
 
     // 4. Link com timer se fornecido
-    if (timerId) {
-      console.log(`🔗 Linkando timer ${timerId} com consulta ${newConsultation.id}`);
-
-      const { error: linkError } = await supabase
-        .from("consultation_timers")
-        .update({ consultation_id: newConsultation.id })
-        .eq("id", timerId)
-        .eq("doctor_id", user.id); // Garante ownership
-
-      if (linkError) {
-        console.error(`⚠️ Erro ao linkar timer: ${linkError.message}`);
-        // Não é crítico, continuamos
-      } else {
-        console.log(`✅ Timer ${timerId} linkado com sucesso`);
-      }
-    }
 
     console.log(`🎉 Consulta reutilizada com sucesso! ID: ${newConsultation.id}`);
 

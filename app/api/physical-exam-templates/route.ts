@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     // If complete template requested, combine all systems
     if (complete) {
       const completeTemplate: CompleteExamTemplate = {
-        templates: templates || [],
+        templates: (templates || []) as PhysicalExamTemplate[],
         full_text: (templates || [])
           .map(
             (t) => `**${t.system_label}**\n${t.template_text}`
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
         system_name: system.name,
         system_label: system.label,
         templates:
-          templates?.filter((t) => t.system_name === system.name) || [],
+          (templates?.filter((t) => t.system_name === system.name) || []) as PhysicalExamTemplate[],
       })
     ).filter((group) => group.templates.length > 0);
 

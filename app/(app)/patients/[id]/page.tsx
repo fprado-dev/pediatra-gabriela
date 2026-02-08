@@ -329,7 +329,7 @@ export default async function PatientProfilePage({
           patientId={id}
           patientName={patient.full_name}
           dateOfBirth={patient.date_of_birth}
-          medicalHistory={patient.medical_history}
+          medicalHistory={patient.medical_history || undefined}
         />
 
         {/* Calendário Vacinal */}
@@ -362,7 +362,7 @@ export default async function PatientProfilePage({
           </div>
 
           {consultationsWithPatient.length > 0 ? (
-            <ConsultationList consultations={consultationsWithPatient} />
+            <ConsultationList consultations={consultationsWithPatient as any[]} />
           ) : (
             <div className="text-center py-12">
               <Stethoscope className="h-12 w-12 mx-auto mb-4 text-gray-300" />
@@ -383,7 +383,7 @@ export default async function PatientProfilePage({
         </div>
 
         {/* Últimas Receitas */}
-        <PatientPrescriptionsHistory consultations={consultationsWithPatient} />
+        <PatientPrescriptionsHistory consultations={consultationsWithPatient as any[]} />
 
         {/* Histórico de Atestados */}
         <PatientCertificatesHistory patientId={id} />

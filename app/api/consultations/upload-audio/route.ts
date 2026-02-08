@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-    
+
     // Validar tipo de consulta (NOVO)
     if (!consultationType) {
       return NextResponse.json(
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     // Buscar últimas 3 consultas do paciente para contexto (NOVO)
     const { data: previousConsultations } = await supabase
       .from("consultations")
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
       .eq("status", "completed")
       .order("consultation_date", { ascending: false })
       .limit(3);
-    
+
     console.log(`📋 Encontradas ${previousConsultations?.length || 0} consultas anteriores do paciente`);
 
     console.log(`📤 Upload de áudio iniciado - Tamanho: ${(buffer.length / 1024 / 1024).toFixed(2)}MB, Duração: ${duration}s`);
@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
       console.log(`📦 Fazendo backup do áudio original...`);
       originalAudioUrl = await uploadOriginalAudio(r2FileName, buffer, fileType);
       console.log(`✅ Backup do áudio original salvo: ${originalAudioUrl}`);
-      
+
       // Salvar original_audio_url imediatamente no banco
       await supabase
         .from("consultations")
@@ -300,37 +300,6 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", consultation.id);
 
-    // Link com timer se fornecido
-    if (timerId) {
-      console.log(`🔗 Linkando timer ${timerId} com consultation ${consultation.id}`);
-
-      // Validar que o timer pertence ao médico e ao paciente correto
-      const { data: timer, error: timerError } = await supabase
-        .from("consultation_timers")
-        .select("doctor_id, patient_id, status")
-        .eq("id", timerId)
-        .single();
-
-      if (timerError || !timer) {
-        console.warn(`⚠️ Timer ${timerId} não encontrado, continuando sem link`);
-      } else if (timer.doctor_id !== user.id) {
-        console.warn(`⚠️ Timer ${timerId} não pertence ao médico, continuando sem link`);
-      } else if (timer.patient_id !== patientId) {
-        console.warn(`⚠️ Timer ${timerId} não pertence ao paciente correto, continuando sem link`);
-      } else {
-        // Fazer link
-        const { error: linkError } = await supabase
-          .from("consultation_timers")
-          .update({ consultation_id: consultation.id })
-          .eq("id", timerId);
-
-        if (linkError) {
-          console.error(`❌ Erro ao linkar timer: ${linkError.message}`);
-        } else {
-          console.log(`✅ Timer ${timerId} linkado com sucesso à consultation ${consultation.id}`);
-        }
-      }
-    }
 
     console.log(`✅ Upload concluído - Consulta ID: ${consultation.id}`);
     console.log(`📤 Retornando resposta ao cliente (cliente iniciará processamento)...`);
